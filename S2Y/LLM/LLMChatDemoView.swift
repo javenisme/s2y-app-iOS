@@ -16,7 +16,7 @@ private enum LLMKeychain {
 }
 
 
-private struct ChatMessage: Identifiable, Hashable {
+private struct ChatMessage: Identifiable, Hashable, Sendable {
     enum Role: String { case user, assistant }
     let id = UUID()
     let role: Role
@@ -141,7 +141,10 @@ struct LLMChatDemoView: View {
         Task {
             defer { isSending = false }
             do {
-                let reply = try await completeChatCloudflare(messages: messages, gatewayURL: gatewayURL, modelPath: modelPath, token: cfToken)
+                let provider = CloudflareLLMProvider(gatewayURL: gatewayURL, modelPath: modelPath, token: cfToken)
+                let reply = try await retrying(times: 2, initialDelayMs: 400) {
+                    try await provider.complete(messages: messages.map { .init(role: $0.role == .user ? .user : .assistant, content: $0.content) })
+                }
                 messages.append(.init(role: .assistant, content: reply))
             } catch {
                 errorText = error.localizedDescription
@@ -149,77 +152,21 @@ struct LLMChatDemoView: View {
         }
     }
 
-    private func completeChatCloudflare(messages: [ChatMessage], gatewayURL: String, modelPath: String, token: String) async throws -> String {
-        let (url, useQueryField) = try buildCloudflareURL(gatewayURL: gatewayURL, modelPath: modelPath)
-        let (prompt, lastUser) = composePrompts(messages)
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try encodeCloudflareBody(useQueryField: useQueryField, prompt: prompt, lastUserMessage: lastUser)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
-        guard (200..<300).contains(http.statusCode) else {
-            let text = String(data: data, encoding: .utf8) ?? ""
-            throw NSError(domain: "CloudflareAIError", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: text])
-        }
-        return try parseCloudflareReply(data)
-    }
-
-    private func buildCloudflareURL(gatewayURL: String, modelPath: String) throws -> (URL, Bool) {
-        var base = gatewayURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        if base.hasSuffix("/") { base.removeLast() }
-        var path = modelPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        if path.hasPrefix("/") { path.removeFirst() }
-        let full = path.isEmpty ? base : (base + "/" + path)
-        guard let url = URL(string: full) else { throw URLError(.badURL) }
-        return (url, full.contains("ai-search"))
-    }
-
-    private func composePrompts(_ messages: [ChatMessage]) -> (prompt: String, lastUser: String) {
-        let lastUser = messages.last(where: { $0.role == .user })?.content ?? messages.last?.content ?? ""
-        let prompt = messages.map { msg in
-            switch msg.role {
-            case .user: return "User: \(msg.content)"
-            case .assistant: return "Assistant: \(msg.content)"
-            }
-        }.joined(separator: "\n")
-        return (prompt, lastUser)
-    }
-
-    private func encodeCloudflareBody(useQueryField: Bool, prompt: String, lastUserMessage: String) throws -> Data {
-        struct CFPayloadPrompt: Codable { let prompt: String }
-        struct CFPayloadQuery: Codable { let query: String }
-        if useQueryField {
-            return try JSONEncoder().encode(CFPayloadQuery(query: lastUserMessage))
-        } else {
-            return try JSONEncoder().encode(CFPayloadPrompt(prompt: prompt))
-        }
-    }
-
-    private func parseCloudflareReply(_ data: Data) throws -> String {
-        struct CFResult: Codable {
-            let response: String?
-            let text: String?
-            let outputText: String?
-            let answer: String?
-            enum CodingKeys: String, CodingKey {
-                case response
-                case text
-                case outputText = "output_text"
-                case answer
+    private func retrying<T: Sendable>(
+        times: Int,
+        initialDelayMs: UInt64,
+        _ operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        var attempt = 0
+        var delay = initialDelayMs
+        while true {
+            do { return try await operation() } catch {
+                attempt += 1
+                if attempt > times { throw error }
+                try? await Task.sleep(nanoseconds: delay * 1_000_000)
+                delay *= 2
             }
         }
-        struct CFResponse: Codable { let result: CFResult?; let success: Bool? }
-
-        let decoded = try JSONDecoder().decode(CFResponse.self, from: data)
-        let reply = decoded.result?.response
-            ?? decoded.result?.text
-            ?? decoded.result?.outputText
-            ?? decoded.result?.answer
-            ?? ""
-        return reply.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
