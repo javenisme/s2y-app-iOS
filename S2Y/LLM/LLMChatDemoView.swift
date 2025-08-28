@@ -141,6 +141,10 @@ struct LLMChatDemoView: View {
         Task {
             defer { isSending = false }
             do {
+                if let toolReply = try await handleNLQueryWithTools(text: text) {
+                    messages.append(.init(role: .assistant, content: toolReply))
+                    return
+                }
                 let provider = CloudflareLLMProvider(gatewayURL: gatewayURL, modelPath: modelPath, token: cfToken)
                 let reply = try await retrying(times: 2, initialDelayMs: 400) {
                     try await provider.complete(messages: messages.map { .init(role: $0.role == .user ? .user : .assistant, content: $0.content) })
@@ -150,6 +154,29 @@ struct LLMChatDemoView: View {
                 errorText = error.localizedDescription
             }
         }
+    }
+
+    // MARK: - Minimal NL → Tool orchestration (demo)
+
+    private func handleNLQueryWithTools(text: String) async throws -> String? {
+        let lowered = text.lowercased()
+        let containsSteps = lowered.contains("步数") || lowered.contains("steps")
+        let contains7d = lowered.contains("7天") || lowered.contains("七天") || lowered.contains("7-day")
+        let containsCompare = lowered.contains("对比") || lowered.contains("compare")
+        guard containsSteps && contains7d && containsCompare else { return nil }
+
+        try await HealthKitService.shared.requestAuthorization()
+        let comp = try await HealthKitService.shared.compare(kind: .steps, windowDays: 7)
+        return formatComparison(title: "过去7天步数 vs 上周", unit: "步/天", comparison: comp)
+    }
+
+    private func formatComparison(title: String, unit: String, comparison: HealthKitService.Comparison) -> String {
+        let cur = comparison.currentAverage
+        let prev = comparison.previousAverage
+        let delta = comparison.delta
+        let rate = comparison.deltaRate * 100
+        let arrow = delta >= 0 ? "⬆️" : "⬇️"
+        return "\(title)\n当前平均：\(String(format: "%.0f", cur)) \(unit)\n上期平均：\(String(format: "%.0f", prev)) \(unit)\n变化：\(arrow) \(String(format: "%.1f", abs(rate)))% (\(String(format: "%.0f", abs(delta))) \(unit))\n建议：保持稳定作息与适度运动，逐步提升日常活动量。"
     }
 
     private func retrying<T: Sendable>(
