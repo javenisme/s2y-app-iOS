@@ -47,6 +47,9 @@ public final class HealthKitService {
         case sleepDurationHours
     }
 
+    // Explicit aggregation control for generic quantity metrics
+    public enum Aggregation: Sendable { case sum, average }
+
     public func fetchDailyMetrics(kind: MetricKind, start: Date, end: Date) async throws -> [DailyMetric] {
         if kind == .sleepDurationHours {
             return try await fetchDailySleepHours(start: start, end: end)
@@ -87,6 +90,78 @@ public final class HealthKitService {
             }
             self.healthStore.execute(query)
         }
+    }
+
+    // MARK: - Generic fetchers (any authorized type)
+
+    public func fetchDailyQuantity(
+        type: HKQuantityType,
+        unit: HKUnit,
+        aggregation: Aggregation,
+        start: Date,
+        end: Date
+    ) async throws -> [DailyMetric] {
+        let options: HKStatisticsOptions = (aggregation == .sum) ? .cumulativeSum : .discreteAverage
+        let calendar = Calendar.current
+        let anchorComponents = calendar.dateComponents([.day, .month, .year], from: start)
+        guard let anchorDate = calendar.date(from: anchorComponents) else { return [] }
+        var interval = DateComponents(); interval.day = 1
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+        return try await withCheckedThrowingContinuation { cont in
+            let query = HKStatisticsCollectionQuery(quantityType: type, quantitySamplePredicate: predicate, options: options, anchorDate: anchorDate, intervalComponents: interval)
+            query.initialResultsHandler = { _, results, error in
+                if let error { cont.resume(throwing: error); return }
+                guard let results else { cont.resume(returning: []) ; return }
+                var points: [DailyMetric] = []
+                results.enumerateStatistics(from: start, to: end) { stat, _ in
+                    let q: HKQuantity? = (aggregation == .sum) ? stat.sumQuantity() : stat.averageQuantity()
+                    let value = q?.doubleValue(for: unit) ?? 0
+                    points.append(.init(date: stat.startDate, value: value))
+                }
+                cont.resume(returning: points)
+            }
+            self.healthStore.execute(query)
+        }
+    }
+
+    // Sum total duration (hours) per day for any category type with start/end (e.g., sleep, mindful session)
+    public func fetchDailyCategoryDurationHours(
+        type: HKCategoryType,
+        start: Date,
+        end: Date,
+        includeValues: Set<Int>? = nil // when provided, only include matching category values
+    ) async throws -> [DailyMetric] {
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+        let samples: [HKCategorySample] = try await withCheckedThrowingContinuation { cont in
+            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, results, error in
+                if let error { cont.resume(throwing: error); return }
+                cont.resume(returning: (results as? [HKCategorySample]) ?? [])
+            }
+            self.healthStore.execute(query)
+        }
+        let calendar = Calendar.current
+        var buckets: [Date: TimeInterval] = [:]
+        var cur = calendar.startOfDay(for: start)
+        let endDay = calendar.startOfDay(for: end)
+        while cur <= endDay {
+            buckets[cur] = 0
+            guard let next = calendar.date(byAdding: .day, value: 1, to: cur) else { break }
+            cur = next
+        }
+        for s in samples {
+            if let includeValues, !includeValues.contains(s.value) { continue }
+            var segStart = s.startDate
+            let segEnd = s.endDate
+            while segStart < segEnd {
+                let dayStart = calendar.startOfDay(for: segStart)
+                guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else { break }
+                let intervalEnd = min(dayEnd, segEnd)
+                let overlap = max(0, intervalEnd.timeIntervalSince(segStart))
+                buckets[dayStart, default: 0] += overlap
+                segStart = intervalEnd
+            }
+        }
+        return buckets.keys.sorted().map { .init(date: $0, value: buckets[$0, default: 0] / 3600.0) }
     }
 
     // MARK: - Helpers
