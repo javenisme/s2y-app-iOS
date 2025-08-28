@@ -46,6 +46,12 @@ The following screenshots show a wide variety of features based on Spezi Modules
 
 The [DocC documentation of the Spezi Template Application contains information on how to use the application as the basis for your Spezi-based application, run the application, and modify the application](https://stanfordspezi.github.io/SpeziTemplateApplication).
 
+## Project Documents
+
+- Project Summary: [docs/PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md)
+- Product Requirements (PRD): [docs/PRD.md](docs/PRD.md)
+- TODO Roadmap: [docs/TODO.md](docs/TODO.md)
+
 ## Contributing
 
 Contributions to this project are welcome. Please make sure to read the [contribution guidelines](https://github.com/StanfordSpezi/.github/blob/main/CONTRIBUTING.md) and the [contributor covenant code of conduct](https://github.com/StanfordSpezi/.github/blob/main/CODE_OF_CONDUCT.md) first.
