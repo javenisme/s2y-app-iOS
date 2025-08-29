@@ -79,14 +79,16 @@ enum QueryPlanner {
         case let .compare(kind, windowDays):
             let comparison = try await HealthKitService.shared.compare(
                 kind: kind,
-                windowDays: windowDays
+                windowDays: windowDays,
+                useCache: true
             )
             return formatComparison(kind: kind, comparison: comparison)
 
         case let .trend(kind, days):
             let trendResult = try await HealthKitService.shared.trend(
                 kind: kind,
-                days: days
+                days: days,
+                useCache: true
             )
             return formatTrend(kind: kind, trend: trendResult)
         }
