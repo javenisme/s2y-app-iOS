@@ -10,12 +10,12 @@ default_platform(:ios)
 
 APP_CONFIG = {
   default_environment: "staging",
-  default_app_identifier: "edu.stanford.spezi.templateapplication",
-  default_provisioningProfile: "Spezi Template Application",
+  default_app_identifier: "edu.stanford.s2y",
+  default_provisioningProfile: "S2Y",
   default_version_name: "1.0.0",
-  default_release_notes: "Bug fixes and performance improvements.",
-  scheme: "TemplateApplication",
-  plist_path: "TemplateApplication/Supporting Files/Info.plist"
+  default_release_notes: "Initial release with HealthKit integration and AI-powered health assistant.",
+  scheme: "S2Y",
+  plist_path: "S2Y/Supporting Files/Info.plist"
 }.freeze
 
 platform :ios do
