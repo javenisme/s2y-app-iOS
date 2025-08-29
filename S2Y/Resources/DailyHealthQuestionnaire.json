@@ -1,0 +1,405 @@
+{
+  "resourceType": "Questionnaire",
+  "language": "en-US",
+  "id": "DailyHealth",
+  "name": "DailyHealth",
+  "title": "Daily Health Check-in",
+  "description": "Daily questionnaire to track health status, symptoms, and wellbeing for personalized health insights.",
+  "version": "1.0.0",
+  "status": "active",
+  "publisher": "S2Y Health Assistant",
+  "meta": {
+    "profile": [
+      "http://spezi.stanford.edu/fhir/StructureDefinition/sdf-Questionnaire"
+    ],
+    "tag": [
+      {
+        "system": "urn:ietf:bcp:47",
+        "code": "en-US",
+        "display": "English"
+      }
+    ]
+  },
+  "useContext": [
+    {
+      "code": {
+        "system": "http://hl7.org/fhir/ValueSet/usage-context-type",
+        "code": "focus",
+        "display": "Clinical Focus"
+      },
+      "valueCodeableConcept": {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+            "code": "HEALTHREC",
+            "display": "Health Record"
+          }
+        ]
+      }
+    }
+  ],
+  "contact": [
+    {
+      "name": "S2Y Health Assistant"
+    }
+  ],
+  "subjectType": [
+    "Patient"
+  ],
+  "purpose": "Daily health check-in to collect subjective wellbeing data for personalized health insights and AI-powered health analysis.",
+  "copyright": "Copyright © 2025 S2Y. All rights reserved.",
+  "date": "2025-08-29T00:00:00-08:00",
+  "url": "http://s2y.stanford.edu/fhir/questionnaire/daily-health-checkin",
+  "item": [
+    {
+      "linkId": "overall-wellness",
+      "type": "choice",
+      "text": "How do you feel overall today?",
+      "required": true,
+      "answerOption": [
+        {
+          "valueCoding": {
+            "code": "excellent",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/wellness-scale",
+            "display": "Excellent - I feel great!"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "good",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/wellness-scale",
+            "display": "Good - I feel well"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "fair",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/wellness-scale",
+            "display": "Fair - Okay, but could be better"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "poor",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/wellness-scale",
+            "display": "Poor - Not feeling well"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "energy-level",
+      "type": "choice",
+      "text": "What's your energy level today?",
+      "required": true,
+      "answerOption": [
+        {
+          "valueCoding": {
+            "code": "high",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/energy-scale",
+            "display": "High - Very energetic"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "moderate",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/energy-scale",
+            "display": "Moderate - Normal energy"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "low",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/energy-scale",
+            "display": "Low - Feeling tired"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "very-low",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/energy-scale",
+            "display": "Very Low - Exhausted"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "sleep-quality",
+      "type": "choice",
+      "text": "How was your sleep quality last night?",
+      "required": true,
+      "answerOption": [
+        {
+          "valueCoding": {
+            "code": "excellent",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/sleep-quality",
+            "display": "Excellent - Deep, restful sleep"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "good",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/sleep-quality",
+            "display": "Good - Slept well"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "fair",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/sleep-quality",
+            "display": "Fair - Some interruptions"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "poor",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/sleep-quality",
+            "display": "Poor - Restless sleep"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "sleep-hours",
+      "type": "decimal",
+      "text": "How many hours did you sleep last night?",
+      "required": false,
+      "extension": [
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/minValue",
+          "valueDecimal": 0.0
+        },
+        {
+          "url": "http://hl7.org/fhir/StructureDefinition/maxValue",
+          "valueDecimal": 24.0
+        },
+        {
+          "url": "http://biodesign.stanford.edu/fhir/StructureDefinition/validationtext",
+          "valueString": "Please enter hours between 0 and 24."
+        }
+      ]
+    },
+    {
+      "linkId": "stress-level",
+      "type": "choice",
+      "text": "What's your stress level today?",
+      "required": true,
+      "answerOption": [
+        {
+          "valueCoding": {
+            "code": "none",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/stress-scale",
+            "display": "None - Very relaxed"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "mild",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/stress-scale",
+            "display": "Mild - Slightly stressed"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "moderate",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/stress-scale",
+            "display": "Moderate - Noticeably stressed"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "high",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/stress-scale",
+            "display": "High - Very stressed"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "physical-activity",
+      "type": "choice",
+      "text": "How much physical activity did you do yesterday?",
+      "required": true,
+      "answerOption": [
+        {
+          "valueCoding": {
+            "code": "none",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/activity-level",
+            "display": "None - No exercise"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "light",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/activity-level",
+            "display": "Light - Walking or gentle movement"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "moderate",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/activity-level",
+            "display": "Moderate - 30+ minutes of exercise"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "intense",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/activity-level",
+            "display": "Intense - Vigorous workout"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "mood",
+      "type": "choice",
+      "text": "How would you describe your mood today?",
+      "required": true,
+      "answerOption": [
+        {
+          "valueCoding": {
+            "code": "very-positive",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/mood-scale",
+            "display": "Very Positive - Feeling great"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "positive",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/mood-scale",
+            "display": "Positive - Good mood"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "neutral",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/mood-scale",
+            "display": "Neutral - Neither good nor bad"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "negative",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/mood-scale",
+            "display": "Negative - Feeling down"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "very-negative",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/mood-scale",
+            "display": "Very Negative - Feeling very low"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "symptoms",
+      "type": "choice",
+      "text": "Are you experiencing any of these symptoms today?",
+      "required": false,
+      "repeats": true,
+      "answerOption": [
+        {
+          "valueCoding": {
+            "code": "headache",
+            "system": "http://snomed.info/sct",
+            "display": "Headache"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "fatigue",
+            "system": "http://snomed.info/sct",
+            "display": "Fatigue"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "nausea",
+            "system": "http://snomed.info/sct",
+            "display": "Nausea"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "muscle-pain",
+            "system": "http://snomed.info/sct",
+            "display": "Muscle or joint pain"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "anxiety",
+            "system": "http://snomed.info/sct",
+            "display": "Anxiety"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "none",
+            "system": "http://snomed.info/sct",
+            "display": "None of the above"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "notes",
+      "type": "text",
+      "text": "Any additional notes about your health today? (Optional)",
+      "required": false,
+      "maxLength": 500
+    },
+    {
+      "linkId": "goals-today",
+      "type": "choice",
+      "text": "What health goal would you like to focus on today?",
+      "required": false,
+      "answerOption": [
+        {
+          "valueCoding": {
+            "code": "more-steps",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/health-goals",
+            "display": "Get more steps/exercise"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "better-sleep",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/health-goals",
+            "display": "Improve sleep quality"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "reduce-stress",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/health-goals",
+            "display": "Reduce stress"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "mindfulness",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/health-goals",
+            "display": "Practice mindfulness"
+          }
+        },
+        {
+          "valueCoding": {
+            "code": "none",
+            "system": "http://s2y.stanford.edu/fhir/CodeSystem/health-goals",
+            "display": "No specific goal today"
+          }
+        }
+      ]
+    },
+    {
+      "linkId": "completion-message",
+      "type": "display",
+      "text": "Thank you for completing your daily health check-in! Your responses help us provide better personalized health insights.",
+      "required": false
+    }
+  ]
+}

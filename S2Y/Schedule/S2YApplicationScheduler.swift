@@ -27,12 +27,24 @@ final class S2YApplicationScheduler: Module, DefaultInitializable, EnvironmentAc
     /// Add or update the current list of task upon app startup.
     func configure() {
         do {
+            // Daily Health Check-in Questionnaire
+            try scheduler.createOrUpdateTask(
+                id: "daily-health-questionnaire",
+                title: "Daily Health Check-in",
+                instructions: "Please complete your daily health check-in to help us provide personalized insights.",
+                category: .questionnaire,
+                schedule: .daily(hour: 19, minute: 0, startingAt: .today) // Evening check-in
+            ) { context in
+                context.questionnaire = Bundle.main.questionnaire(withName: "DailyHealthQuestionnaire")
+            }
+            
+            // Keep existing social support questionnaire but make it weekly
             try scheduler.createOrUpdateTask(
                 id: "social-support-questionnaire",
-                title: "Social Support Questionnaire",
-                instructions: "Please fill out the Social Support Questionnaire every day.",
+                title: "Weekly Social Support Check",
+                instructions: "Please fill out the Social Support Questionnaire once a week.",
                 category: .questionnaire,
-                schedule: .daily(hour: 8, minute: 0, startingAt: .today)
+                schedule: .weekly(weekday: .sunday, hour: 10, minute: 0, startingAt: .today)
             ) { context in
                 context.questionnaire = Bundle.main.questionnaire(withName: "SocialSupportQuestionnaire")
             }
