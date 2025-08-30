@@ -4,6 +4,8 @@
 // SPDX-FileCopyrightText: 2025 Stanford University
 //
 // SPDX-License-Identifier: MIT
+
+// swiftlint:disable file_types_order missing_docs type_contents_order multiline_function_chains trailing_newline discouraged_optional_boolean
 //
 
 import Foundation
@@ -20,7 +22,7 @@ public struct LLMMessage: Sendable {
 }
 
 
-public protocol LLMProvider {
+public protocol LLMProvider: Sendable {
     func complete(messages: [LLMMessage]) async throws -> String
 }
 

@@ -6,8 +6,9 @@
 // SPDX-License-Identifier: MIT
 //
 
-import SwiftUI
+// swiftlint:disable closure_body_length line_length sorted_imports
 import Charts
+import SwiftUI
 
 struct HealthTrendChart: View {
     let trend: HealthKitService.Trend

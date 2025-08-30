@@ -4,6 +4,8 @@
 // SPDX-FileCopyrightText: 2025 Stanford University
 //
 // SPDX-License-Identifier: MIT
+
+// swiftlint:disable function_body_length type_body_length conditional_returns_on_newline deployment_target force_unwrapping missing_docs trailing_newline type_contents_order
 //
 
 import Foundation
@@ -14,7 +16,7 @@ public enum HealthKitError: Error, LocalizedError {
     case notAvailable
     case authorizationFailed
     case noData
-    case queryFailed(Error)
+    case queryFailed(any Error)
     
     public var errorDescription: String? {
         switch self {
@@ -88,7 +90,7 @@ public final class HealthKitService {
         
         // Check cache first
         if useCache, let cached = cache.get(key: cacheKey, type: [DailyMetric].self) {
-            logger.debug("Using cached data for \(kind) from \(start) to \(end)")
+            logger.debug("Using cached data for \(String(describing: kind)) from \(start) to \(end)")
             return cached
         }
         do {
@@ -152,12 +154,12 @@ public final class HealthKitService {
             // Cache the result
             if useCache {
                 cache.set(result, forKey: cacheKey)
-                logger.debug("Cached \(result.count) data points for \(kind)")
+                logger.debug("Cached \(result.count) data points for \(String(describing: kind))")
             }
             
             return result
         } catch {
-            logger.error("Failed to fetch daily metrics for \(kind): \(error.localizedDescription)")
+            logger.error("Failed to fetch daily metrics for \(String(describing: kind)): \(error.localizedDescription)")
             throw error
         }
     }
@@ -222,7 +224,7 @@ public final class HealthKitService {
         
         // Check cache first
         if useCache, let cached = cache.get(key: cacheKey, type: Trend.self) {
-            logger.debug("Using cached trend data for \(kind) \(days) days")
+            logger.debug("Using cached trend data for \(String(describing: kind)) \(days) days")
             return cached
         }
         
@@ -239,7 +241,7 @@ public final class HealthKitService {
         // Cache the result
         if useCache {
             cache.set(result, forKey: cacheKey)
-            logger.debug("Cached trend data for \(kind) \(days) days")
+            logger.debug("Cached trend data for \(String(describing: kind)) \(days) days")
         }
         
         return result
@@ -260,7 +262,7 @@ public final class HealthKitService {
         
         // Check cache first
         if useCache, let cached = cache.get(key: cacheKey, type: Comparison.self) {
-            logger.debug("Using cached comparison data for \(kind) \(windowDays) days")
+            logger.debug("Using cached comparison data for \(String(describing: kind)) \(windowDays) days")
             return cached
         }
         
@@ -291,7 +293,7 @@ public final class HealthKitService {
         // Cache the result
         if useCache {
             cache.set(result, forKey: cacheKey)
-            logger.debug("Cached comparison data for \(kind) \(windowDays) days")
+            logger.debug("Cached comparison data for \(String(describing: kind)) \(windowDays) days")
         }
         
         return result

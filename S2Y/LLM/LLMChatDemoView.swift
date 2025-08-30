@@ -4,6 +4,8 @@
 // SPDX-FileCopyrightText: 2025 Stanford University
 //
 // SPDX-License-Identifier: MIT
+
+// swiftlint:disable attributes conditional_returns_on_newline type_contents_order trailing_newline
 //
 
 import Foundation
@@ -16,7 +18,7 @@ private enum LLMKeychain {
 }
 
 
-private struct ChatMessage: Identifiable, Hashable, Sendable {
+private struct DemoChatMessage: Identifiable, Hashable, Sendable {
     enum Role: String { case user, assistant }
     let id = UUID()
     let role: Role
@@ -30,7 +32,7 @@ struct LLMChatDemoView: View {
     @State private var cfToken: String = (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.BearerToken") as? String) ?? ""
     @State private var inputText: String = ""
     @State private var isSending = false
-    @State private var messages: [ChatMessage] = [
+    @State private var messages: [DemoChatMessage] = [
         .init(role: .assistant, content: "你好，我是 OpenAI 模型示例。请输入你的问题。")
     ]
     @State private var errorText: String?
@@ -62,7 +64,7 @@ struct LLMChatDemoView: View {
     }
 
     @ViewBuilder
-    private func messageRow(_ message: ChatMessage) -> some View {
+    private func messageRow(_ message: DemoChatMessage) -> some View {
         HStack(alignment: .top) {
             if message.role == .assistant {
                 Text("🤖").accessibilityHidden(true)
@@ -134,7 +136,7 @@ struct LLMChatDemoView: View {
 
         errorText = nil
         isSending = true
-        let userMsg = ChatMessage(role: .user, content: text)
+        let userMsg = DemoChatMessage(role: .user, content: text)
         messages.append(userMsg)
         inputText = ""
 

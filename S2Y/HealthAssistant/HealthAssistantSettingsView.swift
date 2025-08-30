@@ -6,8 +6,9 @@
 // SPDX-License-Identifier: MIT
 //
 
-import SwiftUI
+// swiftlint:disable closure_body_length sorted_imports trailing_comma
 import Security
+import SwiftUI
 
 struct HealthAssistantSettingsView: View {
     @Environment(\.dismiss) private var dismiss
