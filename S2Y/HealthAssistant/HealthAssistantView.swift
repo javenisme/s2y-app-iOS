@@ -6,6 +6,8 @@
 // SPDX-License-Identifier: MIT
 //
 
+// swiftlint:disable closure_body_length
+
 import Security
 import SwiftUI
 
@@ -289,10 +291,12 @@ struct HealthAssistantView: View {
         """
         
         let messages = [LLMMessage(role: .user, content: systemPrompt)]
-        return try await provider.complete(messages: messages)
+        // Ensure provider is captured immutably as Sendable value
+        let localProvider = provider
+        return try await localProvider.complete(messages: messages)
     }
     
-    private func loadLLMProvider() throws -> LLMProvider? {
+    private func loadLLMProvider() throws -> (any LLMProvider)? {
         let keychain = Keychain()
         
         // Try to load from Info.plist first

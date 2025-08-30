@@ -6,8 +6,9 @@
 // SPDX-License-Identifier: MIT
 //
 
-import SwiftUI
+// swiftlint:disable closure_body_length
 import Security
+import SwiftUI
 
 struct EnhancedHealthAssistantView: View {
     @State private var inputText: String = ""
@@ -73,28 +74,28 @@ struct EnhancedHealthAssistantView: View {
                 }
                 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
-                    QuickQueryCard(
+                    EnhancedQuickQueryCard(
                         icon: "figure.walk",
                         title: "Step Trends",
                         query: "How are my step trends over the past 7 days?",
                         action: { inputText = "How are my step trends over the past 7 days?" }
                     )
                     
-                    QuickQueryCard(
+                    EnhancedQuickQueryCard(
                         icon: "heart.fill",
                         title: "Heart Rate Comparison",
                         query: "Compare my average heart rate this week vs last week",
                         action: { inputText = "Compare my average heart rate this week vs last week" }
                     )
                     
-                    QuickQueryCard(
+                    EnhancedQuickQueryCard(
                         icon: "bed.double.fill",
                         title: "Sleep Analysis",
                         query: "How is my recent sleep quality?",
                         action: { inputText = "How is my recent sleep quality?" }
                     )
                     
-                    QuickQueryCard(
+                    EnhancedQuickQueryCard(
                         icon: "lightbulb.fill",
                         title: "Health Insights",
                         query: "Give me some health recommendations and insights",
@@ -311,7 +312,7 @@ struct EnhancedMessageBubble: View {
     }
 }
 
-struct QuickQueryCard: View {
+private struct EnhancedQuickQueryCard: View {
     let icon: String
     let title: String
     let query: String

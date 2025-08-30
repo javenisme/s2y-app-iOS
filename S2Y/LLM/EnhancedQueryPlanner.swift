@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 //
 
+// swiftlint:disable file_length type_body_length line_length conditional_returns_on_newline
 import Foundation
 
 enum EnhancedQueryPlanner {

@@ -1,6 +1,44 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {
+
+    },
+    "%@ - %lld Day Trend" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ - %2$lld Day Trend"
+          }
+        }
+      }
+    },
+    "%@ - Comparison Analysis" : {
+
+    },
+    "%@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
+    "%@%%" : {
+
+    },
+    "%lld Day Window Comparison" : {
+
+    },
+    "🤖" : {
+
+    },
+    "🧑" : {
+
+    },
     "Account" : {
 
     },
@@ -95,7 +133,56 @@
         }
       }
     },
+    "Analysis" : {
+
+    },
+    "Analyzing your health data..." : {
+
+    },
+    "Ask about your health data..." : {
+
+    },
+    "Authentication" : {
+
+    },
     "Authorized" : {
+
+    },
+    "Average" : {
+
+    },
+    "Average: %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Average: %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Avg" : {
+
+    },
+    "Bearer Token" : {
+
+    },
+    "Bluetooth" : {
+
+    },
+    "Cache Management" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Change:" : {
+
+    },
+    "Chat" : {
+
+    },
+    "Clear Health Data Cache" : {
 
     },
     "Close" : {
@@ -116,6 +203,37 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Stäng"
+          }
+        }
+      }
+    },
+    "Configuration information is saved in device Keychain to ensure data security" : {
+
+    },
+    "Configure LLM service to enable intelligent health analysis features" : {
+
+    },
+    "Consent" : {
+
+    },
+    "CONSENT_LOADING_ERROR" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bitte fügen Sie ein Markdown-basiertes Dokument namens \"ConsentDocument\" in Ihrem Modul-Bundle ein."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please include a markdown based document named \"ConsentDocument\" in your module Bundle."
+          }
+        },
+        "sv" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vänligen inkludera ett markdown-baserat dokument med namnet \"ConsentDocument\" i din modulpaket."
           }
         }
       }
@@ -164,7 +282,31 @@
         }
       }
     },
+    "Continue" : {
+
+    },
+    "Current" : {
+
+    },
+    "Current Avg:" : {
+
+    },
+    "Daily Health Check-in" : {
+
+    },
+    "Date" : {
+
+    },
+    "Devices" : {
+
+    },
+    "Done" : {
+
+    },
     "Firebase" : {
+
+    },
+    "Gateway URL" : {
 
     },
     "Grant Access" : {
@@ -188,6 +330,12 @@
           }
         }
       }
+    },
+    "Health Assistant" : {
+
+    },
+    "Health Assistant Settings" : {
+
     },
     "Health Permissions" : {
 
@@ -304,6 +452,9 @@
           }
         }
       }
+    },
+    "https://api.cloudflare.com/..." : {
+
     },
     "Interesting Modules" : {
       "localizations" : {
@@ -438,6 +589,7 @@
       }
     },
     "Learn More" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -506,6 +658,9 @@
     "Manage Account" : {
 
     },
+    "Model Path" : {
+
+    },
     "Name" : {
 
     },
@@ -530,6 +685,9 @@
           }
         }
       }
+    },
+    "Not Set" : {
+
     },
     "Not signed in" : {
 
@@ -578,6 +736,9 @@
         }
       }
     },
+    "OK" : {
+
+    },
     "Onboarding" : {
       "localizations" : {
         "de" : {
@@ -609,7 +770,17 @@
     "Open System Settings" : {
 
     },
+    "Operation completed" : {
+
+    },
+    "Please complete your daily health check-in to help us provide personalized insights." : {
+
+    },
+    "Please enter your Bearer Token" : {
+
+    },
     "Please fill out the Social Support Questionnaire every day." : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -631,16 +802,37 @@
         }
       }
     },
+    "Please fill out the Social Support Questionnaire once a week." : {
+
+    },
     "Present Social Support Questionnaire" : {
 
     },
+    "Previous" : {
+
+    },
+    "Previous Avg:" : {
+
+    },
+    "Query your health data using natural language and get personalized insights and recommendations" : {
+
+    },
     "Questionnaire" : {
+
+    },
+    "Recommendation" : {
 
     },
     "Request Permissions" : {
 
     },
     "Run Onboarding Again" : {
+
+    },
+    "Save" : {
+
+    },
+    "Save Configuration" : {
 
     },
     "Schedule" : {
@@ -668,10 +860,20 @@
     "Scheduler" : {
 
     },
+    "Send message" : {
+
+    },
+    "Service Configuration" : {
+
+    },
+    "Set" : {
+
+    },
     "Settings" : {
 
     },
     "Social Support Questionnaire" : {
+      "extractionState" : "stale",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -759,6 +961,12 @@
         }
       }
     },
+    "SpeziBluetooth added. Enable Bluetooth in Settings to use." : {
+
+    },
+    "SpeziDevices added. Integrate specific device plugins as needed." : {
+
+    },
     "Start Questionnaire" : {
       "localizations" : {
         "de" : {
@@ -780,6 +988,9 @@
           }
         }
       }
+    },
+    "Success" : {
+
     },
     "Swift Package Manager" : {
       "localizations" : {
@@ -847,6 +1058,9 @@
         }
       }
     },
+    "Type a message..." : {
+
+    },
     "Unsupported Event" : {
       "localizations" : {
         "de" : {
@@ -869,10 +1083,19 @@
         }
       }
     },
+    "Update" : {
+
+    },
     "Upload Sample to Storage" : {
 
     },
     "User ID" : {
+
+    },
+    "v4/accounts/.../ai-gateway/..." : {
+
+    },
+    "Weekly Social Support Check" : {
 
     },
     "WELCOME_AREA1_DESCRIPTION" : {
@@ -987,6 +1210,33 @@
           }
         }
       }
+    },
+    "健康助手" : {
+
+    },
+    "健康助手图标" : {
+
+    },
+    "关闭" : {
+
+    },
+    "发送消息" : {
+
+    },
+    "正在分析您的健康数据..." : {
+
+    },
+    "设置" : {
+
+    },
+    "询问您的健康数据..." : {
+
+    },
+    "警告" : {
+
+    },
+    "通过自然语言查询您的健康数据，获得个性化洞察和建议" : {
+
     }
   },
   "version" : "1.0"

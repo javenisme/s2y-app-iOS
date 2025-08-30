@@ -6,6 +6,7 @@
 // SPDX-License-Identifier: MIT
 //
 
+// swiftlint:disable function_body_length line_length cyclomatic_complexity
 import Foundation
 
 /// Enhanced query processor that returns structured data for visualization
