@@ -79,6 +79,31 @@ public final class HealthKitService {
         case activeEnergy
         case bodyMass
         case sleepDurationHours
+        
+        /// Get localized display name for this metric
+        public var displayName: String {
+            HealthMetricsDictionary.displayName(for: self)
+        }
+        
+        /// Get localized unit for this metric
+        public var unit: String {
+            HealthMetricsDictionary.unit(for: self)
+        }
+        
+        /// Get category for this metric
+        public var category: HealthMetricsDictionary.MetricCategory {
+            HealthMetricsDictionary.info(for: self)?.category ?? .activity
+        }
+        
+        /// Format a value with appropriate unit
+        public func formatValue(_ value: Double) -> String {
+            HealthMetricsDictionary.formatValue(value, for: self)
+        }
+        
+        /// Get health assessment for a value
+        public func healthAssessment(for value: Double) -> String {
+            HealthMetricsDictionary.healthAssessment(value: value, for: self)
+        }
     }
 
     // Explicit aggregation control for generic quantity metrics
@@ -364,5 +389,3 @@ extension Array where Element == Double {
         return reduce(0, +) / Double(count)
     }
 }
-
-
