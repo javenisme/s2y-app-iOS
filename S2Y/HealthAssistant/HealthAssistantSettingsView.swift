@@ -11,7 +11,6 @@ import Security
 import SwiftUI
 
 struct HealthAssistantSettingsView: View {
-    @Environment(\.dismiss) private var dismiss
     @State private var gatewayURL: String = ""
     @State private var modelPath: String = ""
     @State private var bearerToken: String = ""
