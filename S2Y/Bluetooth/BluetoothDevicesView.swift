@@ -16,23 +16,19 @@ struct BluetoothDevicesView: View {
     @State private var selectedDevice: BluetoothHealthDevice?
     
     var body: some View {
-        NavigationView {
-            List {
-                scanningSection
-                connectedDevicesSectionIfNeeded
-                discoveredDevicesSectionIfNeeded
-                supportedDevicesSection
+        List {
+            scanningSection
+            connectedDevicesSectionIfNeeded
+            discoveredDevicesSectionIfNeeded
+            supportedDevicesSection
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                scanButton
             }
-            .navigationTitle("Bluetooth Devices")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    scanButton
-                }
-            }
-            .sheet(item: $selectedDevice) { device in
-                BluetoothDeviceDetailView(device: device)
-            }
+        }
+        .sheet(item: $selectedDevice) { device in
+            BluetoothDeviceDetailView(device: device)
         }
     }
     
