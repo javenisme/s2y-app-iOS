@@ -93,17 +93,24 @@ struct ShowcaseView: View {
 
     @ViewBuilder
     private var bluetoothSection: some View {
-        Section("Bluetooth") {
-            Text("SpeziBluetooth added. Enable Bluetooth in Settings to use.")
+        Section("Bluetooth Health Devices") {
+            NavigationLink("Manage Devices") {
+                BluetoothDevicesView()
+                    .navigationTitle("Bluetooth Devices")
+            }
+            
+            Text("Connect health devices like blood pressure monitors, weight scales, and pulse oximeters.")
+                .font(.caption)
                 .foregroundStyle(.secondary)
-            Button("Open System Settings") { openAppSettings() }
         }
     }
 
     @ViewBuilder
     private var devicesSection: some View {
-        Section("Devices") {
-            Text("SpeziDevices added. Integrate specific device plugins as needed.")
+        Section("System Settings") {
+            Button("Open Bluetooth Settings") { openAppSettings() }
+            Text("Enable Bluetooth in system settings to connect health devices.")
+                .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }

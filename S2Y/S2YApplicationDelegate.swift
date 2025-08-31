@@ -10,6 +10,8 @@ import class FirebaseFirestore.FirestoreSettings
 import class FirebaseFirestore.MemoryCacheSettings
 import Spezi
 import SpeziAccount
+import SpeziBluetooth
+import SpeziDevices
 import SpeziFirebaseAccount
 import SpeziFirebaseAccountStorage
 import SpeziFirebaseStorage
@@ -47,6 +49,9 @@ class S2YApplicationDelegate: SpeziAppDelegate {
             
             healthKit 
             
+            // Bluetooth configuration for health devices
+            Bluetooth {}
+            
             S2YApplicationScheduler()
             Scheduler()
             
@@ -79,6 +84,9 @@ class S2YApplicationDelegate: SpeziAppDelegate {
         HealthKit {
             CollectSample(.stepCount)
             CollectSample(.heartRate)
+            CollectSample(.restingHeartRate)
+            CollectSample(.activeEnergyBurned)
+            CollectSample(.bodyMass)
         }
     }
 }
