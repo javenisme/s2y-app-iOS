@@ -96,7 +96,6 @@ struct ShowcaseView: View {
         Section("Bluetooth Health Devices") {
             NavigationLink("Manage Devices") {
                 BluetoothDevicesView()
-                    .navigationTitle("Bluetooth Devices")
             }
             
             Text("Connect health devices like blood pressure monitors, weight scales, and pulse oximeters.")

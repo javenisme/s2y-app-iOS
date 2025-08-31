@@ -11,7 +11,6 @@ import Security
 import SwiftUI
 
 struct HealthAssistantSettingsView: View {
-    @Environment(\.dismiss) private var dismiss
     @State private var gatewayURL: String = ""
     @State private var modelPath: String = ""
     @State private var bearerToken: String = ""
@@ -20,8 +19,7 @@ struct HealthAssistantSettingsView: View {
     @State private var errorMessage: String?
     
     var body: some View {
-        NavigationView {
-            Form {
+        Form {
                 Section {
                     Text("Configure LLM service to enable intelligent health analysis features")
                         .font(.caption)
@@ -110,30 +108,21 @@ struct HealthAssistantSettingsView: View {
                     }
                 }
             }
-            .navigationTitle("Health Assistant Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
-                        dismiss()
-                    }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Save Configuration") {
+                    saveConfiguration()
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save Configuration") {
-                        saveConfiguration()
-                    }
-                    .disabled(gatewayURL.isEmpty)
-                }
+                .disabled(gatewayURL.isEmpty)
             }
-            .alert("Success", isPresented: $showingSuccessAlert) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("Operation completed")
-            }
-            .onAppear {
-                loadConfiguration()
-            }
+        }
+        .alert("Success", isPresented: $showingSuccessAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Operation completed")
+        }
+        .onAppear {
+            loadConfiguration()
         }
     }
     
