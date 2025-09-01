@@ -9,6 +9,8 @@
 // swiftlint:disable closure_body_length
 import Security
 import SwiftUI
+import AVFoundation
+import Speech
 
 struct EnhancedHealthAssistantView: View {
     @State private var inputText: String = ""
@@ -16,6 +18,12 @@ struct EnhancedHealthAssistantView: View {
     @State private var isProcessing = false
     @State private var errorMessage: String?
     @State private var showingSettings = false
+    @StateObject private var speechManager = SpeechManager()
+    @AppStorage(StorageKeys.voiceEnabled) private var voiceEnabled = true
+    @AppStorage(StorageKeys.voiceSpeakResponses) private var voiceSpeakResponses = true
+    @AppStorage(StorageKeys.voiceInputLanguageCode) private var voiceInputLanguage = ""
+    @AppStorage(StorageKeys.voiceOutputLanguageCode) private var voiceOutputLanguage = ""
+    @AppStorage(StorageKeys.voiceSpeechRate) private var voiceSpeechRate: Double = 0.5
     
     private let healthService = HealthKitService.shared
     
@@ -152,6 +160,31 @@ struct EnhancedHealthAssistantView: View {
                     .lineLimit(1...4)
                     .disabled(isProcessing)
                 
+                if voiceEnabled {
+                    Button {
+                        Task {
+                            if speechManager.isRecording {
+                                speechManager.stopRecording()
+                                if !speechManager.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    inputText = speechManager.transcript
+                                    await sendMessage()
+                                }
+                            } else {
+                                do {
+                                    try await speechManager.startRecording(languageCode: voiceInputLanguage)
+                                } catch {
+                                    errorMessage = error.localizedDescription
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: speechManager.isRecording ? "mic.circle.fill" : "mic.circle")
+                            .foregroundColor(speechManager.isRecording ? .red : .blue)
+                            .font(.system(size: 28))
+                    }
+                    .disabled(isProcessing)
+                }
+
                 Button {
                     Task { await sendMessage() }
                 } label: {
@@ -205,6 +238,12 @@ struct EnhancedHealthAssistantView: View {
             let result = try await HealthQueryProcessor.processQuery(query)
             let assistantMessage = EnhancedChatMessage(role: .assistant, content: contentFromResult(result))
             messages.append(assistantMessage)
+
+            if voiceEnabled && voiceSpeakResponses {
+                if case let .text(text) = assistantMessage.content {
+                    speechManager.speak(text, languageCode: voiceOutputLanguage, rate: voiceSpeechRate)
+                }
+            }
         } catch {
             let errorResponse = EnhancedChatMessage(
                 role: .assistant,
