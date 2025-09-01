@@ -26,6 +26,9 @@ final class S2YApplicationScheduler: Module, DefaultInitializable, EnvironmentAc
     
     /// Add or update the current list of task upon app startup.
     func configure() {
+        if UserDefaults.standard.bool(forKey: StorageKeys.disableScheduler) {
+            return
+        }
         do {
             // Daily Health Check-in Questionnaire
             try scheduler.createOrUpdateTask(

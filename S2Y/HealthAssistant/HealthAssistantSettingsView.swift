@@ -18,6 +18,9 @@ struct HealthAssistantSettingsView: View {
     @State private var showingTokenField = false
     @State private var showingSuccessAlert = false
     @State private var errorMessage: String?
+    @AppStorage(StorageKeys.disableTimeSensitiveNotifications) private var disableTSN = false
+    @AppStorage(StorageKeys.disableScheduler) private var disableScheduler = false
+    @AppStorage(StorageKeys.disableBluetooth) private var disableBluetooth = false
     
     var body: some View {
         NavigationView {
@@ -87,6 +90,15 @@ struct HealthAssistantSettingsView: View {
                             }
                         }
                     }
+                }
+
+                Section("Debug Runtime Toggles") {
+                    Toggle("Disable Time Sensitive Notifications", isOn: $disableTSN)
+                    Toggle("Disable Scheduler", isOn: $disableScheduler)
+                    Toggle("Disable Bluetooth Features", isOn: $disableBluetooth)
+                    Text("Use these during on-device debugging to temporarily disable certain features.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 
                 Section("Cache Management") {

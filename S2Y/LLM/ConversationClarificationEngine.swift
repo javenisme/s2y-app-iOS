@@ -220,6 +220,14 @@ public final class ConversationClarificationEngine {
         case .activeEnergy: return "flame.fill"
         case .bodyMass: return "scalemass.fill"
         case .sleepDurationHours: return "bed.double.fill"
+        case .heartRateVariability: return "waveform.path.ecg"
+        case .heartRateRecovery: return "arrow.down.heart"
+        case .vo2Max: return "lungs.fill"
+        case .walkingHeartRateAverage: return "figure.walk.circle"
+        case .oxygenSaturation: return "lungs"
+        case .bloodPressureSystolic, .bloodPressureDiastolic: return "gauge.medium"
+        case .bodyTemperature: return "thermometer"
+        case .respiratoryRate: return "wind"
         }
     }
 }

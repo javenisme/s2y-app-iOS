@@ -18,4 +18,12 @@ enum StorageKeys {
     static let homeTabSelection = "home.tabselection"
     /// The TabView customization on iPadOS
     static let tabViewCustomization = "home.tab-view-customization"
+
+    // MARK: - Debug Toggles (Runtime)
+    /// Disable Time Sensitive Notifications usage at runtime
+    static let disableTimeSensitiveNotifications = "debug.disable-time-sensitive-notifications"
+    /// Disable Scheduler module configuration and UI at runtime
+    static let disableScheduler = "debug.disable-scheduler"
+    /// Disable Bluetooth features at runtime
+    static let disableBluetooth = "debug.disable-bluetooth"
 }

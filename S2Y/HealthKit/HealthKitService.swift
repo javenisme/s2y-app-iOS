@@ -48,12 +48,26 @@ public final class HealthKitService {
         }
 
         let readTypes: Set<HKObjectType> = [
+            // Basic metrics
             HKObjectType.quantityType(forIdentifier: .stepCount)!,
             HKObjectType.quantityType(forIdentifier: .heartRate)!,
             HKObjectType.quantityType(forIdentifier: .restingHeartRate)!,
             HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!,
             HKObjectType.quantityType(forIdentifier: .bodyMass)!,
-            HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!
+            HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!,
+            
+            // Advanced cardiac metrics
+            HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN)!,
+            HKObjectType.quantityType(forIdentifier: .heartRateRecoveryOneMinute)!,
+            HKObjectType.quantityType(forIdentifier: .vo2Max)!,
+            HKObjectType.quantityType(forIdentifier: .walkingHeartRateAverage)!,
+            HKObjectType.quantityType(forIdentifier: .oxygenSaturation)!,
+            
+            // Blood pressure and vitals
+            HKObjectType.quantityType(forIdentifier: .bloodPressureSystolic)!,
+            HKObjectType.quantityType(forIdentifier: .bloodPressureDiastolic)!,
+            HKObjectType.quantityType(forIdentifier: .bodyTemperature)!,
+            HKObjectType.quantityType(forIdentifier: .respiratoryRate)!
         ]
 
         do {
@@ -79,6 +93,19 @@ public final class HealthKitService {
         case activeEnergy
         case bodyMass
         case sleepDurationHours
+        
+        // Advanced Cardiac Metrics
+        case heartRateVariability      // HRV SDNN
+        case heartRateRecovery         // Post-exercise recovery
+        case vo2Max                    // Cardiovascular fitness
+        case walkingHeartRateAverage   // Heart rate during walking
+        case oxygenSaturation          // Blood oxygen level
+        
+        // Additional Vitals
+        case bloodPressureSystolic
+        case bloodPressureDiastolic
+        case bodyTemperature
+        case respiratoryRate
         
         /// Get localized display name for this metric
         public var displayName: String {
@@ -227,6 +254,60 @@ public final class HealthKitService {
             return .init(
                 type: HKObjectType.quantityType(forIdentifier: .bodyMass)!,
                 unit: .gramUnit(with: .kilo),
+                options: .discreteAverage
+            )
+        case .heartRateVariability:
+            return .init(
+                type: HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN)!,
+                unit: HKUnit.secondUnit(with: .milli),
+                options: .discreteAverage
+            )
+        case .heartRateRecovery:
+            return .init(
+                type: HKObjectType.quantityType(forIdentifier: .heartRateRecoveryOneMinute)!,
+                unit: HKUnit.count().unitDivided(by: .minute()),
+                options: .discreteAverage
+            )
+        case .vo2Max:
+            return .init(
+                type: HKObjectType.quantityType(forIdentifier: .vo2Max)!,
+                unit: HKUnit.literUnit(with: .milli).unitDivided(by: .gramUnit(with: .kilo)).unitDivided(by: .minute()),
+                options: .discreteAverage
+            )
+        case .walkingHeartRateAverage:
+            return .init(
+                type: HKObjectType.quantityType(forIdentifier: .walkingHeartRateAverage)!,
+                unit: HKUnit.count().unitDivided(by: .minute()),
+                options: .discreteAverage
+            )
+        case .oxygenSaturation:
+            return .init(
+                type: HKObjectType.quantityType(forIdentifier: .oxygenSaturation)!,
+                unit: HKUnit.percent(),
+                options: .discreteAverage
+            )
+        case .bloodPressureSystolic:
+            return .init(
+                type: HKObjectType.quantityType(forIdentifier: .bloodPressureSystolic)!,
+                unit: HKUnit.millimeterOfMercury(),
+                options: .discreteAverage
+            )
+        case .bloodPressureDiastolic:
+            return .init(
+                type: HKObjectType.quantityType(forIdentifier: .bloodPressureDiastolic)!,
+                unit: HKUnit.millimeterOfMercury(),
+                options: .discreteAverage
+            )
+        case .bodyTemperature:
+            return .init(
+                type: HKObjectType.quantityType(forIdentifier: .bodyTemperature)!,
+                unit: HKUnit.degreeCelsius(),
+                options: .discreteAverage
+            )
+        case .respiratoryRate:
+            return .init(
+                type: HKObjectType.quantityType(forIdentifier: .respiratoryRate)!,
+                unit: HKUnit.count().unitDivided(by: .minute()),
                 options: .discreteAverage
             )
         case .sleepDurationHours:

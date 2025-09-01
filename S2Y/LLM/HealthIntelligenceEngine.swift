@@ -513,6 +513,8 @@ public final class HealthIntelligenceEngine: ObservableObject {
             return "Incorporate more physical activities like dancing, gardening, or sports"
         case .bodyMass:
             return "Focus on balanced nutrition and gradual, sustainable changes"
+        default:
+            return "Focus on improving your \(metric.displayName.lowercased()) with consistent habits and monitoring"
         }
     }
     
@@ -585,6 +587,8 @@ public final class HealthIntelligenceEngine: ObservableObject {
             return currentValue * 0.95 // Lower is better for heart rate
         case .bodyMass:
             return currentValue // Weight goals need more context
+        default:
+            return currentValue * improvementFactor
         }
     }
 }
@@ -688,7 +692,7 @@ public struct HealthInsight: Identifiable {
     }
 }
 
-public enum InsightType {
+public enum InsightType: Codable {
     case trend
     case alert
     case achievement
