@@ -26,4 +26,16 @@ enum StorageKeys {
     static let disableScheduler = "debug.disable-scheduler"
     /// Disable Bluetooth features at runtime
     static let disableBluetooth = "debug.disable-bluetooth"
+
+    // MARK: - Voice & Language
+    /// Enable or disable voice features globally
+    static let voiceEnabled = "voice.enabled"
+    /// Speak assistant responses using TTS
+    static let voiceSpeakResponses = "voice.speak-responses"
+    /// Preferred input language code for speech recognition (e.g., en-US). Empty = system
+    static let voiceInputLanguageCode = "voice.input-language"
+    /// Preferred output language code for speech synthesis (e.g., en-US). Empty = system
+    static let voiceOutputLanguageCode = "voice.output-language"
+    /// Speech rate for TTS (0.0 - 1.0)
+    static let voiceSpeechRate = "voice.speech-rate"
 }
