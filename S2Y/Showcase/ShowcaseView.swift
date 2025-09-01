@@ -67,6 +67,7 @@ struct ShowcaseView: View {
             accountSection
             if !FeatureFlags.disableFirebase { firebaseSection }
             healthKitSection
+            healthAssistantSettingsSection
             notificationsSection
             questionnaireSection
             schedulerSection
@@ -92,16 +93,37 @@ struct ShowcaseView: View {
     #endif
 
     @ViewBuilder
-    private var bluetoothSection: some View {
-        Section("Bluetooth Health Devices") {
-            NavigationLink("Manage Devices") {
-                BluetoothDevicesView()
-                    .navigationTitle("Bluetooth Devices")
+    private var healthAssistantSettingsSection: some View {
+        Section("Health Assistant") {
+            NavigationLink("Health Assistant Settings") {
+                HealthAssistantSettingsView()
+                    .navigationTitle("Health Assistant Settings")
             }
-            
-            Text("Connect health devices like blood pressure monitors, weight scales, and pulse oximeters.")
+            Text("Configure LLM service and runtime debug toggles (e.g., disable Time Sensitive Notifications, Scheduler, Bluetooth).")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var bluetoothSection: some View {
+        Group {
+            if !UserDefaults.standard.bool(forKey: StorageKeys.disableBluetooth) {
+                Section("Bluetooth Health Devices") {
+                    NavigationLink("Manage Devices") {
+                        BluetoothDevicesView()
+                            .navigationTitle("Bluetooth Devices")
+                    }
+                    Text("Connect health devices like blood pressure monitors, weight scales, and pulse oximeters.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Section("Bluetooth Health Devices") {
+                    Text("Disabled for runtime debugging")
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
@@ -174,10 +196,19 @@ struct ShowcaseView: View {
 
     @ViewBuilder
     private var schedulerSection: some View {
-        Section("Scheduler") {
-            NavigationLink("Open Schedule") {
-                ScheduleView(presentingAccount: .constant(false))
-                    .navigationTitle("Schedule")
+        Group {
+            if !UserDefaults.standard.bool(forKey: StorageKeys.disableScheduler) {
+                Section("Scheduler") {
+                    NavigationLink("Open Schedule") {
+                        ScheduleView(presentingAccount: .constant(false))
+                            .navigationTitle("Schedule")
+                    }
+                }
+            } else {
+                Section("Scheduler") {
+                    Text("Disabled for runtime debugging")
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }

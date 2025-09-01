@@ -49,7 +49,13 @@ struct NotificationPermissions: View {
                             if ProcessInfo.processInfo.isPreviewSimulator {
                                 try await _Concurrency.Task.sleep(for: .seconds(5))
                             } else {
-                                try await requestNotificationAuthorization(options: [.alert, .sound, .badge])
+                                var opts: UNAuthorizationOptions = [.alert, .sound, .badge]
+                                if !UserDefaults.standard.bool(forKey: StorageKeys.disableTimeSensitiveNotifications) {
+                                    if #available(iOS 15.0, *) {
+                                        opts.insert(.timeSensitive)
+                                    }
+                                }
+                                try await requestNotificationAuthorization(options: opts)
                             }
                         } catch {
                             print("Could not request notification permissions.")

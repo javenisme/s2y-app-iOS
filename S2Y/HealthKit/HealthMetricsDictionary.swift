@@ -65,6 +65,7 @@ public struct HealthMetricsDictionary {
     public enum MetricCategory: String, Sendable, Codable, CaseIterable {
         case activity = "activity"
         case vitals = "vitals"
+        case cardiac = "cardiac"
         case body = "body"
         case sleep = "sleep"
         case nutrition = "nutrition"
@@ -74,6 +75,7 @@ public struct HealthMetricsDictionary {
             switch self {
             case .activity: return "Activity"
             case .vitals: return "Vitals"
+            case .cardiac: return "Cardiac Health"
             case .body: return "Body Measurements"
             case .sleep: return "Sleep"
             case .nutrition: return "Nutrition"
@@ -85,6 +87,7 @@ public struct HealthMetricsDictionary {
             switch self {
             case .activity: return "活动"
             case .vitals: return "生命体征"
+            case .cardiac: return "心脏健康"
             case .body: return "身体测量"
             case .sleep: return "睡眠"
             case .nutrition: return "营养"
@@ -170,6 +173,127 @@ public struct HealthMetricsDictionary {
             category: .sleep,
             normalRange: MetricInfo.Range(min: 7, max: 9, unit: "hours"),
             isHigherBetter: true
+        ),
+        
+        // MARK: - Advanced Cardiac Metrics
+        
+        .heartRateVariability: MetricInfo(
+            identifier: "heartRateVariability",
+            displayName: "Heart Rate Variability (HRV)",
+            displayNameCN: "心率变异性",
+            unit: "ms",
+            unitCN: "毫秒",
+            description: "Standard deviation of heart rate intervals, indicating cardiac health",
+            descriptionCN: "心率间期的标准差，反映心脏健康状况",
+            category: .cardiac,
+            normalRange: MetricInfo.Range(min: 20, max: 50, unit: "ms"),
+            isHigherBetter: true
+        ),
+        
+        .heartRateRecovery: MetricInfo(
+            identifier: "heartRateRecovery",
+            displayName: "Heart Rate Recovery",
+            displayNameCN: "心率恢复",
+            unit: "bpm",
+            unitCN: "次/分",
+            description: "Heart rate decrease one minute after exercise ends",
+            descriptionCN: "运动结束后一分钟内心率下降幅度",
+            category: .cardiac,
+            normalRange: MetricInfo.Range(min: 12, max: 25, unit: "bpm"),
+            isHigherBetter: true
+        ),
+        
+        .vo2Max: MetricInfo(
+            identifier: "vo2Max",
+            displayName: "VO₂ Max",
+            displayNameCN: "最大摄氧量",
+            unit: "ml/kg/min",
+            unitCN: "毫升/公斤/分钟",
+            description: "Maximum oxygen consumption during exercise",
+            descriptionCN: "运动时最大氧气消耗量",
+            category: .cardiac,
+            normalRange: MetricInfo.Range(min: 35, max: 55, unit: "ml/kg/min"),
+            isHigherBetter: true
+        ),
+        
+        .walkingHeartRateAverage: MetricInfo(
+            identifier: "walkingHeartRateAverage",
+            displayName: "Walking Heart Rate",
+            displayNameCN: "步行心率",
+            unit: "bpm",
+            unitCN: "次/分",
+            description: "Average heart rate during walking activities",
+            descriptionCN: "步行活动时的平均心率",
+            category: .cardiac,
+            normalRange: MetricInfo.Range(min: 90, max: 130, unit: "bpm"),
+            isHigherBetter: false
+        ),
+        
+        .oxygenSaturation: MetricInfo(
+            identifier: "oxygenSaturation",
+            displayName: "Blood Oxygen",
+            displayNameCN: "血氧饱和度",
+            unit: "%",
+            unitCN: "%",
+            description: "Percentage of oxygen in the blood",
+            descriptionCN: "血液中氧气的百分比",
+            category: .vitals,
+            normalRange: MetricInfo.Range(min: 95, max: 100, unit: "%"),
+            isHigherBetter: true
+        ),
+        
+        // MARK: - Additional Vitals
+        
+        .bloodPressureSystolic: MetricInfo(
+            identifier: "bloodPressureSystolic",
+            displayName: "Systolic Blood Pressure",
+            displayNameCN: "收缩压",
+            unit: "mmHg",
+            unitCN: "毫米汞柱",
+            description: "Blood pressure when heart contracts",
+            descriptionCN: "心脏收缩时的血压",
+            category: .vitals,
+            normalRange: MetricInfo.Range(min: 90, max: 120, unit: "mmHg"),
+            isHigherBetter: false
+        ),
+        
+        .bloodPressureDiastolic: MetricInfo(
+            identifier: "bloodPressureDiastolic",
+            displayName: "Diastolic Blood Pressure",
+            displayNameCN: "舒张压",
+            unit: "mmHg",
+            unitCN: "毫米汞柱",
+            description: "Blood pressure when heart relaxes",
+            descriptionCN: "心脏舒张时的血压",
+            category: .vitals,
+            normalRange: MetricInfo.Range(min: 60, max: 80, unit: "mmHg"),
+            isHigherBetter: false
+        ),
+        
+        .bodyTemperature: MetricInfo(
+            identifier: "bodyTemperature",
+            displayName: "Body Temperature",
+            displayNameCN: "体温",
+            unit: "°C",
+            unitCN: "摄氏度",
+            description: "Core body temperature",
+            descriptionCN: "核心体温",
+            category: .vitals,
+            normalRange: MetricInfo.Range(min: 36.1, max: 37.2, unit: "°C"),
+            isHigherBetter: false
+        ),
+        
+        .respiratoryRate: MetricInfo(
+            identifier: "respiratoryRate",
+            displayName: "Respiratory Rate",
+            displayNameCN: "呼吸频率",
+            unit: "breaths/min",
+            unitCN: "次/分钟",
+            description: "Number of breaths per minute",
+            descriptionCN: "每分钟呼吸次数",
+            category: .vitals,
+            normalRange: MetricInfo.Range(min: 12, max: 20, unit: "breaths/min"),
+            isHigherBetter: false
         )
     ]
     
@@ -252,7 +376,7 @@ public struct HealthMetricsDictionary {
         switch kind {
         case .steps:
             return String(format: "%.0f %@", value, unit)
-        case .heartRateAverage, .restingHeartRate:
+        case .heartRateAverage, .restingHeartRate, .walkingHeartRateAverage, .heartRateRecovery:
             return String(format: "%.0f %@", value, unit)
         case .activeEnergy:
             return String(format: "%.0f %@", value, unit)
@@ -260,6 +384,18 @@ public struct HealthMetricsDictionary {
             return String(format: "%.1f %@", value, unit)
         case .sleepDurationHours:
             return String(format: "%.1f %@", value, unit)
+        case .heartRateVariability:
+            return String(format: "%.1f %@", value, unit)
+        case .vo2Max:
+            return String(format: "%.1f %@", value, unit)
+        case .oxygenSaturation:
+            return String(format: "%.1f %@", value, unit)
+        case .bloodPressureSystolic, .bloodPressureDiastolic:
+            return String(format: "%.0f %@", value, unit)
+        case .bodyTemperature:
+            return String(format: "%.1f %@", value, unit)
+        case .respiratoryRate:
+            return String(format: "%.0f %@", value, unit)
         }
     }
 }
@@ -275,6 +411,15 @@ extension HealthKitService.MetricKind: RawRepresentable {
         case .activeEnergy: "activeEnergy"
         case .bodyMass: "bodyMass"
         case .sleepDurationHours: "sleepDurationHours"
+        case .heartRateVariability: "heartRateVariability"
+        case .heartRateRecovery: "heartRateRecovery"
+        case .vo2Max: "vo2Max"
+        case .walkingHeartRateAverage: "walkingHeartRateAverage"
+        case .oxygenSaturation: "oxygenSaturation"
+        case .bloodPressureSystolic: "bloodPressureSystolic"
+        case .bloodPressureDiastolic: "bloodPressureDiastolic"
+        case .bodyTemperature: "bodyTemperature"
+        case .respiratoryRate: "respiratoryRate"
         }
     }
     
@@ -286,6 +431,15 @@ extension HealthKitService.MetricKind: RawRepresentable {
         case "activeEnergy": self = .activeEnergy
         case "bodyMass": self = .bodyMass
         case "sleepDurationHours": self = .sleepDurationHours
+        case "heartRateVariability": self = .heartRateVariability
+        case "heartRateRecovery": self = .heartRateRecovery
+        case "vo2Max": self = .vo2Max
+        case "walkingHeartRateAverage": self = .walkingHeartRateAverage
+        case "oxygenSaturation": self = .oxygenSaturation
+        case "bloodPressureSystolic": self = .bloodPressureSystolic
+        case "bloodPressureDiastolic": self = .bloodPressureDiastolic
+        case "bodyTemperature": self = .bodyTemperature
+        case "respiratoryRate": self = .respiratoryRate
         default: return nil
         }
     }

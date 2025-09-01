@@ -96,24 +96,11 @@ struct HealthTrendChart: View {
     }
     
     private func metricUnit(kind: HealthKitService.MetricKind) -> String {
-        switch kind {
-        case .steps: return "steps"
-        case .heartRateAverage, .restingHeartRate: return "bpm"
-        case .activeEnergy: return "kcal"
-        case .bodyMass: return "kg"
-        case .sleepDurationHours: return "hours"
-        }
+        return HealthMetricsDictionary.unit(for: kind)
     }
     
     private func metricTitle(kind: HealthKitService.MetricKind) -> String {
-        switch kind {
-        case .steps: return "Steps"
-        case .heartRateAverage: return "Average Heart Rate"
-        case .restingHeartRate: return "Resting Heart Rate"
-        case .activeEnergy: return "Active Energy"
-        case .bodyMass: return "Body Mass"
-        case .sleepDurationHours: return "Sleep Duration"
-        }
+        return HealthMetricsDictionary.displayName(for: kind)
     }
 }
 
@@ -234,24 +221,11 @@ struct HealthComparisonChart: View {
     }
     
     private func metricUnit(kind: HealthKitService.MetricKind) -> String {
-        switch kind {
-        case .steps: return "steps"
-        case .heartRateAverage, .restingHeartRate: return "bpm"
-        case .activeEnergy: return "kcal"
-        case .bodyMass: return "kg"
-        case .sleepDurationHours: return "hours"
-        }
+        return HealthMetricsDictionary.unit(for: kind)
     }
     
     private func metricTitle(kind: HealthKitService.MetricKind) -> String {
-        switch kind {
-        case .steps: return "Steps"
-        case .heartRateAverage: return "Average Heart Rate"
-        case .restingHeartRate: return "Resting Heart Rate"
-        case .activeEnergy: return "Active Energy"
-        case .bodyMass: return "Body Mass"
-        case .sleepDurationHours: return "Sleep Duration"
-        }
+        return HealthMetricsDictionary.displayName(for: kind)
     }
 }
 

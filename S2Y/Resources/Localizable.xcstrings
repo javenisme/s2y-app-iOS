@@ -148,6 +148,12 @@
     "Authorized" : {
 
     },
+    "Available" : {
+
+    },
+    "Available Devices" : {
+
+    },
     "Average" : {
 
     },
@@ -167,7 +173,10 @@
     "Bearer Token" : {
 
     },
-    "Bluetooth" : {
+    "Bluetooth Devices" : {
+
+    },
+    "Bluetooth Health Devices" : {
 
     },
     "Cache Management" : {
@@ -207,10 +216,28 @@
         }
       }
     },
+    "Compatibility" : {
+
+    },
     "Configuration information is saved in device Keychain to ensure data security" : {
 
     },
+    "Configure LLM service and runtime debug toggles (e.g., disable Time Sensitive Notifications, Scheduler, Bluetooth)." : {
+
+    },
     "Configure LLM service to enable intelligent health analysis features" : {
+
+    },
+    "Connect" : {
+
+    },
+    "Connect health devices like blood pressure monitors, weight scales, and pulse oximeters." : {
+
+    },
+    "Connected" : {
+
+    },
+    "Connected Devices" : {
 
     },
     "Consent" : {
@@ -297,10 +324,34 @@
     "Date" : {
 
     },
-    "Devices" : {
+    "Debug Runtime Toggles" : {
+
+    },
+    "Device Details" : {
+
+    },
+    "Device Discovery" : {
+
+    },
+    "Disable Bluetooth Features" : {
+
+    },
+    "Disable Scheduler" : {
+
+    },
+    "Disable Time Sensitive Notifications" : {
+
+    },
+    "Disabled for runtime debugging" : {
+
+    },
+    "Disconnect" : {
 
     },
     "Done" : {
+
+    },
+    "Enable Bluetooth in system settings to connect health devices." : {
 
     },
     "Firebase" : {
@@ -658,6 +709,9 @@
     "Manage Account" : {
 
     },
+    "Manage Devices" : {
+
+    },
     "Model Path" : {
 
     },
@@ -761,13 +815,13 @@
         }
       }
     },
+    "Open Bluetooth Settings" : {
+
+    },
     "Open Notification Settings" : {
 
     },
     "Open Schedule" : {
-
-    },
-    "Open System Settings" : {
 
     },
     "Operation completed" : {
@@ -826,6 +880,9 @@
     "Request Permissions" : {
 
     },
+    "RSSI: %lld dBm" : {
+
+    },
     "Run Onboarding Again" : {
 
     },
@@ -833,6 +890,12 @@
 
     },
     "Save Configuration" : {
+
+    },
+    "Scan" : {
+
+    },
+    "Scanning for health devices..." : {
 
     },
     "Schedule" : {
@@ -961,12 +1024,6 @@
         }
       }
     },
-    "SpeziBluetooth added. Enable Bluetooth in Settings to use." : {
-
-    },
-    "SpeziDevices added. Integrate specific device plugins as needed." : {
-
-    },
     "Start Questionnaire" : {
       "localizations" : {
         "de" : {
@@ -989,7 +1046,16 @@
         }
       }
     },
+    "Stop" : {
+
+    },
     "Success" : {
+
+    },
+    "Supported Health Devices" : {
+
+    },
+    "Supported Measurements" : {
 
     },
     "Swift Package Manager" : {
@@ -1014,6 +1080,12 @@
         }
       }
     },
+    "System Settings" : {
+
+    },
+    "Tap scan to find nearby health devices" : {
+
+    },
     "The Spezi Framework" : {
       "localizations" : {
         "de" : {
@@ -1035,6 +1107,9 @@
           }
         }
       }
+    },
+    "These devices can automatically sync health data to HealthKit when connected." : {
+
     },
     "This type of event is currently unsupported. Please contact the developer of this app." : {
       "localizations" : {
@@ -1087,6 +1162,9 @@
 
     },
     "Upload Sample to Storage" : {
+
+    },
+    "Use these during on-device debugging to temporarily disable certain features." : {
 
     },
     "User ID" : {

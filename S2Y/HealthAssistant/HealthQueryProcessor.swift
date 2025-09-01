@@ -192,24 +192,11 @@ enum HealthQueryProcessor {
     
     // Helper functions
     private static func metricTitle(kind: HealthKitService.MetricKind) -> String {
-        switch kind {
-        case .steps: return "Steps"
-        case .heartRateAverage: return "Average Heart Rate"
-        case .restingHeartRate: return "Resting Heart Rate"
-        case .activeEnergy: return "Active Energy"
-        case .bodyMass: return "Body Mass"
-        case .sleepDurationHours: return "Sleep Duration"
-        }
+        HealthMetricsDictionary.displayName(for: kind)
     }
     
     private static func metricUnit(kind: HealthKitService.MetricKind) -> String {
-        switch kind {
-        case .steps: return "steps"
-        case .heartRateAverage, .restingHeartRate: return "bpm"
-        case .activeEnergy: return "kcal"
-        case .bodyMass: return "kg"
-        case .sleepDurationHours: return "hours"
-        }
+        HealthMetricsDictionary.unit(for: kind)
     }
     
     private static func metricIcon(kind: HealthKitService.MetricKind) -> String {
@@ -217,8 +204,16 @@ enum HealthQueryProcessor {
         case .steps: return "figure.walk"
         case .heartRateAverage, .restingHeartRate: return "heart.fill"
         case .activeEnergy: return "flame.fill"
-        case .bodyMass: return "scalemass"
+        case .bodyMass: return "scalemass.fill"
         case .sleepDurationHours: return "bed.double.fill"
+        case .heartRateVariability: return "waveform.path.ecg"
+        case .heartRateRecovery: return "arrow.down.heart"
+        case .vo2Max: return "lungs.fill"
+        case .walkingHeartRateAverage: return "figure.walk.circle"
+        case .oxygenSaturation: return "lungs"
+        case .bloodPressureSystolic, .bloodPressureDiastolic: return "gauge.medium"
+        case .bodyTemperature: return "thermometer"
+        case .respiratoryRate: return "wind"
         }
     }
 }

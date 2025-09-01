@@ -95,24 +95,12 @@ enum QueryPlanner {
     }
 
     private static func metricUnit(kind: HealthKitService.MetricKind) -> String {
-        switch kind {
-        case .steps: return "步/天"
-        case .heartRateAverage, .restingHeartRate: return "次/分"
-        case .activeEnergy: return "千卡/天"
-        case .bodyMass: return "千克"
-        case .sleepDurationHours: return "小时/天"
-        }
+        // Use dictionary to avoid non-exhaustive switches
+        return HealthMetricsDictionary.unit(for: kind, locale: Locale(identifier: "zh_CN"))
     }
 
     private static func metricTitle(kind: HealthKitService.MetricKind) -> String {
-        switch kind {
-        case .steps: return "步数"
-        case .heartRateAverage: return "平均心率"
-        case .restingHeartRate: return "静息心率"
-        case .activeEnergy: return "活动能量"
-        case .bodyMass: return "体重"
-        case .sleepDurationHours: return "睡眠时长"
-        }
+        return HealthMetricsDictionary.displayName(for: kind, locale: Locale(identifier: "zh_CN"))
     }
 
     private static func formatComparison(

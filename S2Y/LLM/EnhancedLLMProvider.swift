@@ -106,7 +106,7 @@ public final class EnhancedLLMProvider: ObservableObject {
             // Determine if we should retry
             if attempt < maxRetries && shouldRetry(error: error) {
                 let delay = baseRetryDelay * pow(2.0, Double(attempt - 1)) // Exponential backoff
-                logger.info("Retrying LLM request after \(delay) seconds (attempt \(attempt + 1)/\(maxRetries))")
+                logger.info("Retrying LLM request after \(delay) seconds (attempt \(attempt + 1)/\(self.maxRetries))")
                 
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 return try await sendMessageWithRetry(message, includeContext: includeContext, attempt: attempt + 1)

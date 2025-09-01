@@ -192,7 +192,7 @@ public final class ChatHistoryManager: ObservableObject {
     }
     
     /// Import conversation data
-    public func importConversationData(_ data: Data) throws {
+    public func importConversationData(_ data: Data) async throws {
         let importData = try JSONDecoder().decode(ChatExportData.self, from: data)
         
         // Merge imported conversations (avoid duplicates)
@@ -252,7 +252,7 @@ public final class ChatHistoryManager: ObservableObject {
             conversations = Array(conversations.prefix(maxStoredConversations))
         }
         
-        logger.debug("Cleaned up old conversations. Current count: \(conversations.count)")
+        logger.debug("Cleaned up old conversations. Current count: \(self.conversations.count)")
     }
     
     private func loadStoredData() {
@@ -301,7 +301,7 @@ public final class ChatHistoryManager: ObservableObject {
         do {
             let data = try JSONEncoder().encode(conversations)
             try data.write(to: storageURL)
-            logger.debug("Saved \(conversations.count) conversations to file")
+            logger.debug("Saved \(self.conversations.count) conversations to file")
         } catch {
             logger.error("Failed to save conversations: \(error)")
         }
@@ -311,7 +311,7 @@ public final class ChatHistoryManager: ObservableObject {
         do {
             let data = try JSONEncoder().encode(favoriteInsights)
             try data.write(to: favoritesURL)
-            logger.debug("Saved \(favoriteInsights.count) favorite insights to file")
+            logger.debug("Saved \(self.favoriteInsights.count) favorite insights to file")
         } catch {
             logger.error("Failed to save favorite insights: \(error)")
         }
@@ -413,4 +413,4 @@ extension HealthInsight: Codable {
     }
 }
 
-extension InsightType: Codable {}
+// Moved Codable conformance to the enum declaration file to avoid cross-file synthesis issues
