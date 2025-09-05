@@ -11,6 +11,7 @@
 .swiftpm
 .derivedData
 .build
+build/
 .docs
 !TemplateApplication.xcodeproj
 
@@ -46,3 +47,10 @@ firebase-debug.*.log*
 
 # Swift Package List
 TemplateApplication/package-list.json
+*.DependencyMetadataFileList
+*.DependencyStaticMetadataFileList
+*.o
+*.resp
+*.d
+*.dia
+*.scan

@@ -7,6 +7,7 @@
 //
 
 import FirebaseFirestore
+import FirebaseAuth
 import FirebaseStorage
 import Spezi
 import SpeziAccount
@@ -31,10 +32,14 @@ final class FirebaseConfiguration: Module, DefaultInitializable, @unchecked Send
     
     @MainActor var userDocumentReference: DocumentReference {
         get throws {
+            // Prefer the authenticated Firebase UID to satisfy security rules
+            if let uid = Auth.auth().currentUser?.uid {
+                return Self.userCollection.document(uid)
+            }
+            // Fallback to account details if available
             guard let details = account?.details else {
                 throw ConfigurationError.userNotAuthenticatedYet
             }
-            
             return userDocumentReference(for: details.accountId)
         }
     }

@@ -10,7 +10,6 @@
 import Security
 import SwiftUI
 import AVFoundation
-import Speech
 
 struct EnhancedHealthAssistantView: View {
     @State private var inputText: String = ""
@@ -18,7 +17,6 @@ struct EnhancedHealthAssistantView: View {
     @State private var isProcessing = false
     @State private var errorMessage: String?
     @State private var showingSettings = false
-    @StateObject private var speechManager = SpeechManager()
     @AppStorage(StorageKeys.voiceEnabled) private var voiceEnabled = true
     @AppStorage(StorageKeys.voiceSpeakResponses) private var voiceSpeakResponses = true
     @AppStorage(StorageKeys.voiceInputLanguageCode) private var voiceInputLanguage = ""
@@ -26,6 +24,7 @@ struct EnhancedHealthAssistantView: View {
     @AppStorage(StorageKeys.voiceSpeechRate) private var voiceSpeechRate: Double = 0.5
     
     private let healthService = HealthKitService.shared
+    private let tts = AVSpeechSynthesizer()
     
     var body: some View {
         NavigationView {
@@ -160,30 +159,7 @@ struct EnhancedHealthAssistantView: View {
                     .lineLimit(1...4)
                     .disabled(isProcessing)
                 
-                if voiceEnabled {
-                    Button {
-                        Task {
-                            if speechManager.isRecording {
-                                speechManager.stopRecording()
-                                if !speechManager.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    inputText = speechManager.transcript
-                                    await sendMessage()
-                                }
-                            } else {
-                                do {
-                                    try await speechManager.startRecording(languageCode: voiceInputLanguage)
-                                } catch {
-                                    errorMessage = error.localizedDescription
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: speechManager.isRecording ? "mic.circle.fill" : "mic.circle")
-                            .foregroundColor(speechManager.isRecording ? .red : .blue)
-                            .font(.system(size: 28))
-                    }
-                    .disabled(isProcessing)
-                }
+                // Voice input removed
 
                 Button {
                     Task { await sendMessage() }
@@ -239,10 +215,17 @@ struct EnhancedHealthAssistantView: View {
             let assistantMessage = EnhancedChatMessage(role: .assistant, content: contentFromResult(result))
             messages.append(assistantMessage)
 
-            if voiceEnabled && voiceSpeakResponses {
-                if case let .text(text) = assistantMessage.content {
-                    speechManager.speak(text, languageCode: voiceOutputLanguage, rate: voiceSpeechRate)
-                }
+            if voiceEnabled && voiceSpeakResponses, case let .text(text) = assistantMessage.content {
+                let requested = (voiceOutputLanguage.isEmpty ? Locale.autoupdatingCurrent.identifier : voiceOutputLanguage)
+                let utterance = AVSpeechUtterance(string: text)
+                let voices = AVSpeechSynthesisVoice.speechVoices()
+                let selectedVoice = AVSpeechSynthesisVoice(language: requested)
+                    ?? voices.first(where: { $0.language == requested })
+                    ?? voices.first(where: { $0.language.hasPrefix(String(requested.prefix(2))) })
+                utterance.voice = selectedVoice
+                let clamped = max(0.1, min(voiceSpeechRate, 0.7))
+                utterance.rate = Float(clamped)
+                tts.speak(utterance)
             }
         } catch {
             let errorResponse = EnhancedChatMessage(
