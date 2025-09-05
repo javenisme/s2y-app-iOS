@@ -354,6 +354,9 @@
     "Enable Bluetooth in system settings to connect health devices." : {
 
     },
+    "Enable Voice Features" : {
+
+    },
     "Firebase" : {
 
     },
@@ -505,6 +508,9 @@
       }
     },
     "https://api.cloudflare.com/..." : {
+
+    },
+    "Input Language" : {
 
     },
     "Interesting Modules" : {
@@ -880,6 +886,9 @@
     "Request Permissions" : {
 
     },
+    "Response Voice" : {
+
+    },
     "RSSI: %lld dBm" : {
 
     },
@@ -932,6 +941,9 @@
     "Set" : {
 
     },
+    "Set to 'System Default' to follow the device language." : {
+
+    },
     "Settings" : {
 
     },
@@ -957,6 +969,12 @@
           }
         }
       }
+    },
+    "Speak Assistant Responses" : {
+
+    },
+    "Speech Rate" : {
+
     },
     "Spezi Modules" : {
       "localizations" : {
@@ -1171,6 +1189,9 @@
 
     },
     "v4/accounts/.../ai-gateway/..." : {
+
+    },
+    "Voice & Language" : {
 
     },
     "Weekly Social Support Check" : {

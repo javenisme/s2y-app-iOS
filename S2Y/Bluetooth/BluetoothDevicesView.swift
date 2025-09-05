@@ -16,23 +16,21 @@ struct BluetoothDevicesView: View {
     @State private var selectedDevice: BluetoothHealthDevice?
     
     var body: some View {
-        NavigationView {
-            List {
-                scanningSection
-                connectedDevicesSectionIfNeeded
-                discoveredDevicesSectionIfNeeded
-                supportedDevicesSection
+        List {
+            scanningSection
+            connectedDevicesSectionIfNeeded
+            discoveredDevicesSectionIfNeeded
+            supportedDevicesSection
+        }
+        .navigationTitle("Bluetooth Devices")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                scanButton
             }
-            .navigationTitle("Bluetooth Devices")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    scanButton
-                }
-            }
-            .sheet(item: $selectedDevice) { device in
-                BluetoothDeviceDetailView(device: device)
-            }
+        }
+        .sheet(item: $selectedDevice) { device in
+            BluetoothDeviceDetailView(device: device)
         }
     }
     
@@ -255,21 +253,19 @@ struct BluetoothDeviceDetailView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
-            VStack(alignment: .leading, spacing: 20) {
-                deviceHeaderView
-                deviceInfoView
-                supportedMeasurementsView
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Device Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
+        VStack(alignment: .leading, spacing: 20) {
+            deviceHeaderView
+            deviceInfoView
+            supportedMeasurementsView
+            Spacer()
+        }
+        .padding()
+        .navigationTitle("Device Details")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
+                    dismiss()
                 }
             }
         }

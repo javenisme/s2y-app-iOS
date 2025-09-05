@@ -32,10 +32,7 @@ class S2YApplicationDelegate: SpeziAppDelegate {
                     storageProvider: FirestoreAccountStorage(storeIn: FirebaseConfiguration.userCollection),
                     configuration: [
                         .requires(\.userId),
-                        .requires(\.name),
-                        // additional values stored using the `FirestoreAccountStorage` within our Standard implementation
-                        .collects(\.genderIdentity),
-                        .collects(\.dateOfBirth)
+                        .requires(\.name)
                     ]
                 )
                 
