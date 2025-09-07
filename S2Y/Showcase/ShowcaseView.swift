@@ -75,6 +75,8 @@ struct ShowcaseView: View {
             bluetoothSection
             devicesSection
             onboardingSection
+            legalSection
+            supportSection
         }
     }
 
@@ -220,6 +222,29 @@ struct ShowcaseView: View {
                 completedOnboardingFlow = false
                 showingOnboarding = true
             }
+        }
+    }
+
+    @ViewBuilder
+    private var legalSection: some View {
+        Section("Legal & Privacy") {
+            NavigationLink("Privacy Policy") {
+                WebLinkView(title: "Privacy Policy", url: URL(string: "https://www.stanford.edu/site/privacy/")!)
+            }
+            NavigationLink("Open-Source Licenses") { ContributionsList(projectLicense: .mit) }
+        }
+    }
+
+    @ViewBuilder
+    private var supportSection: some View {
+        Section("Support") {
+            if let url = URL(string: "https://github.com/StanfordBDHG/S2Y/issues/new") {
+                Link("Report a Bug", destination: url)
+            }
+            if let url = URL(string: "https://spezi.stanford.edu") {
+                Link("Help Center", destination: url)
+            }
+            NavigationLink("About") { AboutView() }
         }
     }
 
