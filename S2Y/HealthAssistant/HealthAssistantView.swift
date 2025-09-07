@@ -10,6 +10,7 @@
 
 import Security
 import SwiftUI
+import OSLog
 
 // Simple Keychain wrapper
 struct Keychain {
@@ -57,6 +58,8 @@ struct HealthAssistantView: View {
     @State private var showingSettings = false
     
     private let healthService = HealthKitService.shared
+    private let enhancedProvider = EnhancedLLMProvider.shared
+    private let logger = Logger(subsystem: "com.s2y.app", category: "HealthAssistantView")
     
     var body: some View {
         NavigationView {
@@ -274,46 +277,31 @@ struct HealthAssistantView: View {
     }
     
     private func processWithLLM(_ query: String) async throws -> String {
-        guard let provider = try loadLLMProvider() else {
-            throw HealthAssistantError.llmNotConfigured
-        }
-        
-        let systemPrompt = """
-        你是一个专业的健康助手AI，专门帮助用户理解和分析他们的健康数据。
-        
-        请遵循以下原则：
-        1. 提供准确、有用的健康信息
-        2. 避免医疗诊断，建议用户咨询专业医生
-        3. 用友善、鼓励的语气回应
-        4. 如果用户询问具体的健康数据分析，建议他们使用更具体的查询语句
-        
-        用户问题：\(query)
-        """
-        
-        let messages = [LLMMessage(role: .user, content: systemPrompt)]
-        // Ensure provider is captured immutably as Sendable value
-        let localProvider = provider
-        return try await localProvider.complete(messages: messages)
-    }
-    
-    private func loadLLMProvider() throws -> (any LLMProvider)? {
-        let keychain = Keychain()
-        
-        // Try to load from Info.plist first
-        if let gatewayURL = Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.GatewayURL") as? String,
-           !gatewayURL.isEmpty,
-           let modelPath = Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.ModelPath") as? String {
-            
-            // Try to get token from keychain, then fallback to Info.plist
-            let token = keychain.get(key: "gateway.token") ?? 
-                       (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.BearerToken") as? String) ?? ""
-            
-            if !token.isEmpty {
-                return CloudflareLLMProvider(gatewayURL: gatewayURL, modelPath: modelPath, token: token)
+        do {
+            let response = try await enhancedProvider.sendMessage(query, includeContext: true)
+            return response.content
+        } catch let error as LLMError {
+            logger.error("Enhanced LLM error: \(error.localizedDescription)")
+            // Provide localized fallback to user
+            switch error {
+            case .apiKeyMissing:
+                return "LLM 服务未配置，请前往设置中配置网关与令牌。"
+            case .networkUnavailable:
+                return "当前网络不可用。我可以先基于本地健康数据提供一些建议，稍后再为您连接 AI 服务。"
+            case .authenticationFailed:
+                return "身份验证失败，请检查访问令牌是否有效。"
+            case .requestTimeout:
+                return "请求超时，请稍后再试。"
+            case .rateLimited:
+                return "请求过于频繁，请稍后重试。"
+            case .invalidResponse:
+                return "服务返回了无效响应，我会继续优化。请重试或换个问法。"
+            case .serverError(let code):
+                return "服务暂时不可用（\(code)），请稍后再试。"
+            case .unknown:
+                return "出现了意外错误。请稍后重试。"
             }
         }
-        
-        return nil
     }
 }
 
