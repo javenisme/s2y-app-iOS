@@ -35,8 +35,8 @@ struct HomeView: View {
                 ScheduleView(presentingAccount: $presentingAccount)
             }
                 .customizationID("home.schedule")
-            Tab("Contacts", systemImage: "person.fill", value: .contact) {
-                Contacts(presentingAccount: $presentingAccount)
+            Tab("Account", systemImage: "person.crop.circle", value: .contact) {
+                ProfileView()
             }
                 .customizationID("home.contacts")
             Tab("Settings", systemImage: "gear", value: .showcase) {
