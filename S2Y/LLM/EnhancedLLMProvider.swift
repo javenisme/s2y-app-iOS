@@ -10,6 +10,7 @@
 import Foundation
 import OSLog
 import Network
+import Security
 
 /// Enhanced LLM provider with robust error handling and fallback mechanisms
 @MainActor
@@ -86,14 +87,14 @@ public final class EnhancedLLMProvider: ObservableObject {
             }
             
             // Prepare message with context
-            let finalMessage = includeContext ? 
+            let finalMessage = includeContext ?
                 prepareMessageWithContext(message) : message
-            
-            // Placeholder for LLM response - integrate with actual provider
-            let response = "I understand you're asking about: \(finalMessage.prefix(50))... Let me analyze your health data."
-            
+
+            // Perform real LLM request via provider with retry
+            let responseText = try await performLLMRequest(finalMessage)
+
             return LLMResponse(
-                content: response,
+                content: responseText,
                 timestamp: Date(),
                 source: .llm,
                 confidence: 0.9,
@@ -132,6 +133,93 @@ public final class EnhancedLLMProvider: ObservableObject {
         
         Please respond considering the conversation context and any health data mentioned.
         """
+    }
+    
+    // MARK: - Provider integration
+    
+    private func performLLMRequest(_ message: String) async throws -> String {
+        // Load configuration
+        let (gatewayURL, modelPath) = try loadGatewayConfig()
+        let token = try loadBearerToken()
+        
+        // Build provider
+        let provider = CloudflareLLMProvider(gatewayURL: gatewayURL, modelPath: modelPath, token: token)
+        
+        // Compose messages: include minimal system guidance and the user message
+        let messages: [LLMMessage] = [
+            .init(role: .assistant, content: "You are a helpful health assistant. Keep responses concise, supportive, and avoid medical diagnosis."),
+            .init(role: .user, content: message)
+        ]
+        
+        do {
+            // Optional timeout guard
+            return try await withThrowingTaskGroup(of: String.self) { group in
+                group.addTask {
+                    try await provider.complete(messages: messages)
+                }
+                // Simple timeout of 20s
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 20_000_000_000)
+                    throw LLMError.requestTimeout
+                }
+                // First finished wins
+                let result = try await group.next()!
+                group.cancelAll()
+                return result
+            }
+        } catch {
+            throw mapToLLMError(error)
+        }
+    }
+    
+    private func loadGatewayConfig() throws -> (String, String) {
+        let gatewayURL = (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.GatewayURL") as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let modelPath = (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.ModelPath") as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !gatewayURL.isEmpty else { throw LLMError.apiKeyMissing }
+        return (gatewayURL, modelPath)
+    }
+    
+    private func loadBearerToken() throws -> String {
+        // Try HealthAssistant keychain style (account only)
+        if let token = readKeychainAccountOnly(account: "gateway.token"), !token.isEmpty {
+            return token
+        }
+        // Try demo keychain style (service + account)
+        if let token = readKeychain(service: "ai.cloudflare", account: "gateway.token"), !token.isEmpty {
+            return token
+        }
+        // Fallback to Info.plist
+        if let token = Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.BearerToken") as? String, !token.isEmpty {
+            return token
+        }
+        throw LLMError.apiKeyMissing
+    }
+    
+    private func readKeychainAccountOnly(account: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: kCFBooleanTrue as Any,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess, let data = item as? Data, let text = String(data: data, encoding: .utf8) else { return nil }
+        return text
+    }
+    
+    private func readKeychain(service: String, account: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess, let data = item as? Data, let text = String(data: data, encoding: .utf8) else { return nil }
+        return text
     }
     
     private func generateFallbackResponse(for message: String, error: LLMError) -> LLMResponse {
@@ -216,6 +304,21 @@ public final class EnhancedLLMProvider: ObservableObject {
     private func mapToLLMError(_ error: any Error) -> LLMError {
         if let llmError = error as? LLMError {
             return llmError
+        }
+        
+        if let providerError = error as? LLMProviderError {
+            switch providerError {
+            case .badURL:
+                return .invalidResponse
+            case .decodingFailed:
+                return .invalidResponse
+            case .httpStatus(let code, _):
+                if code == 401 || code == 403 { return .authenticationFailed }
+                if code == 408 { return .requestTimeout }
+                if code == 429 { return .rateLimited }
+                if (500..<600).contains(code) { return .serverError(code) }
+                return .unknown(error)
+            }
         }
         
         // Map common errors
