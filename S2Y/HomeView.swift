@@ -19,7 +19,7 @@ struct HomeView: View {
     }
     
     
-    @AppStorage(StorageKeys.homeTabSelection) private var selectedTab = Tabs.schedule
+    @AppStorage(StorageKeys.homeTabSelection) private var selectedTab = Tabs.healthAssistant
     @AppStorage(StorageKeys.tabViewCustomization) private var tabViewCustomization = TabViewCustomization()
     
     @State private var presentingAccount = false
@@ -28,7 +28,7 @@ struct HomeView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab("Health Assistant", systemImage: "heart.text.square", value: .healthAssistant) {
-                EnhancedHealthAssistantView()
+                HealthAssistantView()
             }
                 .customizationID("home.healthAssistant")
             Tab("Schedule", systemImage: "list.clipboard", value: .schedule) {
