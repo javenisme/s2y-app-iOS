@@ -35,11 +35,11 @@ struct HomeView: View {
                 ScheduleView(presentingAccount: $presentingAccount)
             }
                 .customizationID("home.schedule")
-            Tab("Account", systemImage: "person.crop.circle", value: .contact) {
-                ProfileView()
+            Tab("Contacts", systemImage: "person.crop.circle", value: .contact) {
+                Contacts(presentingAccount: $presentingAccount)
             }
                 .customizationID("home.contacts")
-            Tab("Settings", systemImage: "gear", value: .showcase) {
+            Tab("Showcase", systemImage: "gear", value: .showcase) {
                 ShowcaseView()
             }
                 .customizationID("home.showcase")
@@ -58,14 +58,18 @@ struct HomeView: View {
 
 #if DEBUG
 #Preview {
-    var details = AccountDetails()
-    details.userId = "lelandstanford@stanford.edu"
-    details.name = PersonNameComponents(givenName: "Leland", familyName: "Stanford")
-    
-    return HomeView()
+    HomeView()
         .previewWith(standard: S2YApplicationStandard()) {
             S2YApplicationScheduler()
-            AccountConfiguration(service: InMemoryAccountService(), activeDetails: details)
+            AccountConfiguration(
+                service: InMemoryAccountService(),
+                activeDetails: {
+                    var d = AccountDetails()
+                    d.userId = "lelandstanford@stanford.edu"
+                    d.name = PersonNameComponents(givenName: "Leland", familyName: "Stanford")
+                    return d
+                }()
+            )
         }
 }
 #endif
