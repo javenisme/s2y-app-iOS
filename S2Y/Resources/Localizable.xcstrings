@@ -39,7 +39,19 @@
     "🧑" : {
 
     },
+    "A health assistant app built with Stanford Spezi." : {
+
+    },
+    "About" : {
+
+    },
     "Account" : {
+
+    },
+    "Account & Settings" : {
+
+    },
+    "Account disabled (Firebase off)" : {
 
     },
     "Account is disabled (Firebase is turned off). Enable Firebase to use account features." : {
@@ -111,6 +123,9 @@
         }
       }
     },
+    "AI模型建议" : {
+
+    },
     "Allow Notifications" : {
       "localizations" : {
         "de" : {
@@ -137,6 +152,9 @@
 
     },
     "Analyzing your health data..." : {
+
+    },
+    "App" : {
 
     },
     "Ask about your health data..." : {
@@ -485,6 +503,9 @@
         }
       }
     },
+    "Help Center" : {
+
+    },
     "HL7 FHIR" : {
       "localizations" : {
         "de" : {
@@ -668,6 +689,12 @@
         }
       }
     },
+    "Legal" : {
+
+    },
+    "Legal & Privacy" : {
+
+    },
     "LELAND_STANFORD_BIO" : {
       "localizations" : {
         "de" : {
@@ -712,10 +739,19 @@
         }
       }
     },
+    "Links" : {
+
+    },
+    "Log out" : {
+
+    },
     "Manage Account" : {
 
     },
     "Manage Devices" : {
+
+    },
+    "MIT License" : {
 
     },
     "Model Path" : {
@@ -830,6 +866,9 @@
     "Open Schedule" : {
 
     },
+    "Open-Source Licenses" : {
+
+    },
     "Operation completed" : {
 
     },
@@ -874,6 +913,12 @@
     "Previous Avg:" : {
 
     },
+    "Privacy Policy" : {
+
+    },
+    "Project Website" : {
+
+    },
     "Query your health data using natural language and get personalized insights and recommendations" : {
 
     },
@@ -881,6 +926,9 @@
 
     },
     "Recommendation" : {
+
+    },
+    "Report a Bug" : {
 
     },
     "Request Permissions" : {
@@ -893,6 +941,9 @@
 
     },
     "Run Onboarding Again" : {
+
+    },
+    "S2Y Health Assistant" : {
 
     },
     "Save" : {
@@ -944,7 +995,10 @@
     "Set to 'System Default' to follow the device language." : {
 
     },
-    "Settings" : {
+    "Showcase" : {
+
+    },
+    "Sign In / Create Account" : {
 
     },
     "Social Support Questionnaire" : {
@@ -969,6 +1023,9 @@
           }
         }
       }
+    },
+    "Source Code" : {
+
     },
     "Speak Assistant Responses" : {
 
@@ -1068,6 +1125,9 @@
 
     },
     "Success" : {
+
+    },
+    "Support" : {
 
     },
     "Supported Health Devices" : {
@@ -1197,6 +1257,9 @@
     "Weekly Social Support Check" : {
 
     },
+    "Welcome" : {
+
+    },
     "WELCOME_AREA1_DESCRIPTION" : {
       "localizations" : {
         "de" : {
@@ -1310,22 +1373,88 @@
         }
       }
     },
+    "下载后可完全离线使用，保护您的隐私" : {
+
+    },
+    "下载本地AI模型" : {
+
+    },
+    "下载本地模型" : {
+
+    },
+    "云端" : {
+
+    },
+    "云端模式" : {
+
+    },
+    "使用率" : {
+
+    },
     "健康助手" : {
 
     },
     "健康助手图标" : {
 
     },
+    "关于本地AI" : {
+
+    },
     "关闭" : {
+
+    },
+    "内存使用情况" : {
+
+    },
+    "剩余时间: %@" : {
 
     },
     "发送消息" : {
 
     },
+    "取消下载" : {
+
+    },
+    "完成" : {
+
+    },
+    "快速查询" : {
+
+    },
+    "智能健康助手" : {
+
+    },
+    "暂无内存数据" : {
+
+    },
+    "本地" : {
+
+    },
+    "本地AI模型" : {
+
+    },
+    "本地AI模型已就绪！" : {
+
+    },
+    "本地AI模式 - 完全隐私保护" : {
+
+    },
+    "本地AI状态" : {
+
+    },
+    "本地模式" : {
+
+    },
     "正在分析您的健康数据..." : {
 
     },
+    "正在收集设备内存信息..." : {
+
+    },
     "设置" : {
+
+    },
+    "询问关于您健康数据的问题..." : {
 
     },
     "询问您的健康数据..." : {

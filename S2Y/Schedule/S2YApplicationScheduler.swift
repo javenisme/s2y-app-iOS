@@ -14,9 +14,8 @@ import SpeziScheduler
 import SpeziViews
 
 
-@Observable
 final class S2YApplicationScheduler: Module, DefaultInitializable, EnvironmentAccessible {
-    @Dependency(Scheduler.self) @ObservationIgnored private var scheduler
+    @Dependency(Scheduler.self) private var scheduler
     
     @MainActor var viewState: ViewState = .idle
     

@@ -25,6 +25,7 @@ import SpeziQuestionnaire
 import SpeziScheduler
 import SpeziSchedulerUI
 import SpeziViews
+import SpeziLicense
 import SwiftUI
 
 
@@ -52,7 +53,7 @@ struct ShowcaseView: View {
     var body: some View {
         NavigationStack {
             contentList
-                .navigationTitle("Settings")
+                .navigationTitle("Account & Settings")
                 .viewStateAlert(state: $viewState)
                 .sheet(isPresented: $showingAccountSheet) { AccountSheet(dismissAfterSignIn: false) }
                 .sheet(isPresented: $showingQuestionnaire) { questionnaireSheet }

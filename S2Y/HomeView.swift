@@ -57,13 +57,17 @@ struct HomeView: View {
 
 
 #Preview {
-    var details = AccountDetails()
-    details.userId = "lelandstanford@stanford.edu"
-    details.name = PersonNameComponents(givenName: "Leland", familyName: "Stanford")
-    
-    return HomeView()
+    HomeView()
         .previewWith(standard: S2YApplicationStandard()) {
             S2YApplicationScheduler()
-            AccountConfiguration(service: InMemoryAccountService(), activeDetails: details)
+            AccountConfiguration(
+                service: InMemoryAccountService(),
+                activeDetails: {
+                    var d = AccountDetails()
+                    d.userId = "lelandstanford@stanford.edu"
+                    d.name = PersonNameComponents(givenName: "Leland", familyName: "Stanford")
+                    return d
+                }()
+            )
         }
 }

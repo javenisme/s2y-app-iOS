@@ -7,7 +7,7 @@
 //
 
 import SwiftUI
-import SpeziAccount
+@_spi(TestingSupport) import SpeziAccount
 import SpeziLicense
 
 
@@ -100,12 +100,17 @@ private extension String {
 
 #if DEBUG
 #Preview {
-    var details = AccountDetails()
-    details.userId = "lelandstanford@stanford.edu"
-    details.name = PersonNameComponents(givenName: "Leland", familyName: "Stanford")
-    return ProfileView()
+    ProfileView()
         .previewWith {
-            AccountConfiguration(service: InMemoryAccountService(), activeDetails: details)
+            AccountConfiguration(
+                service: InMemoryAccountService(),
+                activeDetails: {
+                    var d = AccountDetails()
+                    d.userId = "lelandstanford@stanford.edu"
+                    d.name = PersonNameComponents(givenName: "Leland", familyName: "Stanford")
+                    return d
+                }()
+            )
         }
 }
 #endif

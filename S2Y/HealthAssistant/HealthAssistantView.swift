@@ -56,6 +56,8 @@ struct HealthAssistantView: View {
     @State private var isProcessing = false
     @State private var errorMessage: String?
     @State private var showingSettings = false
+    @State private var showingModelDownload = false
+    @AppStorage("PreferLocalModel") private var preferLocalModel = false
     
     private let healthService = HealthKitService.shared
     private let enhancedProvider = EnhancedLLMProvider.shared
@@ -80,16 +82,33 @@ struct HealthAssistantView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        Image(systemName: "gear")
-                            .accessibilityLabel("设置")
+                    HStack(spacing: 12) {
+                        Button {
+                            preferLocalModel.toggle()
+                        } label: {
+                            Image(systemName: preferLocalModel ? "brain.head.profile.fill" : "cloud.fill")
+                                .accessibilityLabel(preferLocalModel ? "本地模式" : "云端模式")
+                        }
+                        Button {
+                            showingModelDownload = true
+                        } label: {
+                            Image(systemName: "arrow.down.circle")
+                                .accessibilityLabel("下载本地模型")
+                        }
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Image(systemName: "gear")
+                                .accessibilityLabel("设置")
+                        }
                     }
                 }
             }
             .sheet(isPresented: $showingSettings) {
                 HealthAssistantSettingsView()
+            }
+            .sheet(isPresented: $showingModelDownload) {
+                ModelDownloadView()
             }
         }
         .task {
@@ -267,40 +286,15 @@ struct HealthAssistantView: View {
     }
     
     private func processHealthQuery(_ query: String) async throws -> String {
-        // Try to parse as structured query first
-        if let intent = QueryPlanner.parse(query) {
-            return try await QueryPlanner.run(intent: intent)
-        }
-        
-        // Fall back to LLM for general queries
+        // Always route to Cloudflare LLM (Omer)
         return try await processWithLLM(query)
     }
     
     private func processWithLLM(_ query: String) async throws -> String {
-        do {
-            let response = try await enhancedProvider.sendMessage(query, includeContext: true)
-            return response.content
-        } catch let error as LLMError {
-            logger.error("Enhanced LLM error: \(error.localizedDescription)")
-            // Provide localized fallback to user
-            switch error {
-            case .apiKeyMissing:
-                return "LLM 服务未配置，请前往设置中配置网关与令牌。"
-            case .networkUnavailable:
-                return "当前网络不可用。我可以先基于本地健康数据提供一些建议，稍后再为您连接 AI 服务。"
-            case .authenticationFailed:
-                return "身份验证失败，请检查访问令牌是否有效。"
-            case .requestTimeout:
-                return "请求超时，请稍后再试。"
-            case .rateLimited:
-                return "请求过于频繁，请稍后重试。"
-            case .invalidResponse:
-                return "服务返回了无效响应，我会继续优化。请重试或换个问法。"
-            case .serverError(let code):
-                return "服务暂时不可用（\(code)），请稍后再试。"
-            case .unknown:
-                return "出现了意外错误。请稍后重试。"
-            }
+        if preferLocalModel {
+            return await enhancedProvider.sendMessageLocal(query)
+        } else {
+            return await enhancedProvider.sendMessageIntelligent(query)
         }
     }
 }

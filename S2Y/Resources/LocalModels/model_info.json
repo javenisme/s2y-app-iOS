@@ -1,0 +1,81 @@
+{
+  "model": {
+    "name": "Phi-3.5-mini-instruct",
+    "version": "1.0.0",
+    "provider": "Microsoft",
+    "license": "MIT",
+    "description": "Phi-3.5 Mini model optimized for health data analysis",
+    "languages": ["zh", "en"],
+    "specialization": "health_analytics"
+  },
+  "technical": {
+    "architecture": "transformer",
+    "parameters": "3.8B",
+    "quantization": "4-bit",
+    "precision": "int4",
+    "model_size_mb": 1536,
+    "context_length": 4096,
+    "max_tokens": 512
+  },
+  "requirements": {
+    "min_ios_version": "18.0",
+    "min_memory_mb": 2048,
+    "min_storage_mb": 2048,
+    "apple_silicon": true,
+    "neural_engine": false
+  },
+  "performance": {
+    "load_time_seconds": 8,
+    "inference_time_ms": 1500,
+    "tokens_per_second": 15,
+    "memory_usage_mb": 1800
+  },
+  "files": {
+    "model_file": "phi-3.5-mini-4bit.mlx",
+    "tokenizer_file": "tokenizer.json",
+    "config_file": "config.json",
+    "checksum_file": "checksums.txt"
+  },
+  "health_optimization": {
+    "enabled": true,
+    "prompt_templates": {
+      "system_prompt": "specialized_health_assistant",
+      "safety_guidelines": "medical_safety_v1",
+      "data_formatting": "healthkit_optimized"
+    },
+    "supported_metrics": [
+      "steps",
+      "heartRate",
+      "sleepAnalysis",
+      "activeEnergyBurned",
+      "heartRateVariability",
+      "vo2Max",
+      "bloodPressure",
+      "bodyMass",
+      "respiratoryRate",
+      "oxygenSaturation",
+      "bodyTemperature"
+    ]
+  },
+  "deployment": {
+    "bundle_in_app": false,
+    "download_on_demand": true,
+    "download_url": "https://models.s2y.app/phi-3.5-mini/",
+    "fallback_models": ["llama-3.2-1b"],
+    "auto_update": true,
+    "update_check_interval": "7d"
+  },
+  "privacy": {
+    "data_processing": "local_only",
+    "telemetry": false,
+    "analytics": false,
+    "user_data_retention": "none"
+  },
+  "metadata": {
+    "created_at": "2025-01-14T00:00:00Z",
+    "updated_at": "2025-01-14T00:00:00Z",
+    "checksum": "sha256:pending",
+    "build_number": "1",
+    "maintainer": "Stanford S2Y Team"
+  }
+}
