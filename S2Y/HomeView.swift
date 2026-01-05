@@ -30,33 +30,32 @@ struct HomeView: View {
             Tab("Health Assistant", systemImage: "heart.text.square", value: .healthAssistant) {
                 HealthAssistantView()
             }
-                .customizationID("home.healthAssistant")
+            .customizationID("home.healthAssistant")
             Tab("Schedule", systemImage: "list.clipboard", value: .schedule) {
                 ScheduleView(presentingAccount: $presentingAccount)
             }
-                .customizationID("home.schedule")
-            Tab("Contacts", systemImage: "person.crop.circle", value: .contact) {
+            .customizationID("home.schedule")
+            Tab("Contacts", systemImage: "person.fill", value: .contact) {
                 Contacts(presentingAccount: $presentingAccount)
             }
-                .customizationID("home.contacts")
+            .customizationID("home.contacts")
             Tab("Showcase", systemImage: "gear", value: .showcase) {
                 ShowcaseView()
             }
-                .customizationID("home.showcase")
+            .customizationID("home.showcase")
         }
-            .tabViewStyle(.sidebarAdaptable)
-            .tabViewCustomization($tabViewCustomization)
-            .sheet(isPresented: $presentingAccount) {
-                AccountSheet(dismissAfterSignIn: false) // presentation was user initiated, do not automatically dismiss
-            }
-            .accountRequired(!FeatureFlags.disableFirebase && !FeatureFlags.skipOnboarding) {
-                AccountSheet()
-            }
+        .tabViewStyle(.sidebarAdaptable)
+        .tabViewCustomization($tabViewCustomization)
+        .sheet(isPresented: $presentingAccount) {
+            AccountSheet(dismissAfterSignIn: false) // presentation was user initiated, do not automatically dismiss
+        }
+        .accountRequired(!FeatureFlags.disableFirebase && !FeatureFlags.skipOnboarding) {
+            AccountSheet()
+        }
     }
 }
 
 
-#if DEBUG
 #Preview {
     HomeView()
         .previewWith(standard: S2YApplicationStandard()) {
@@ -72,4 +71,3 @@ struct HomeView: View {
             )
         }
 }
-#endif

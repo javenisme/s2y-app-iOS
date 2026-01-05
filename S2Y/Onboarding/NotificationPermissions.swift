@@ -8,17 +8,18 @@
 
 import SpeziNotifications
 import SpeziOnboarding
+import SpeziViews
 import SwiftUI
 
 
 struct NotificationPermissions: View {
-    // OnboardingNavigationPath removed in 2.x
-    
+    @Environment(ManagedNavigationStack.Path.self) private var managedNavigationPath
+
     @Environment(\.requestNotificationAuthorization) private var requestNotificationAuthorization
-    
+
     @State private var notificationProcessing = false
-    
-    
+
+
     var body: some View {
         OnboardingView(
             header: {
@@ -61,22 +62,24 @@ struct NotificationPermissions: View {
                             print("Could not request notification permissions.")
                         }
                         notificationProcessing = false
+
+                        managedNavigationPath.nextStep()
                     }
                 )
             }
         )
-            .navigationBarBackButtonHidden(notificationProcessing)
-            // Small fix as otherwise "Login" or "Sign up" is still shown in the nav bar
-            .navigationTitle(Text(verbatim: ""))
+        .navigationBarBackButtonHidden(notificationProcessing)
+        .navigationTitle(Text(verbatim: ""))
+        .toolbar(.visible)
     }
 }
 
 
-#if DEBUG
 #Preview {
-    NotificationPermissions()
-        .previewWith {
-            S2YApplicationScheduler()
-        }
+    ManagedNavigationStack {
+        NotificationPermissions()
+    }
+    .previewWith {
+        S2YApplicationScheduler()
+    }
 }
-#endif

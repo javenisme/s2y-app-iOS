@@ -8,16 +8,17 @@
 
 import SpeziHealthKit
 import SpeziOnboarding
+import SpeziViews
 import SwiftUI
 
 
 struct HealthKitPermissions: View {
     @Environment(HealthKit.self) private var healthKit
-    // OnboardingNavigationPath removed in SpeziOnboarding 2.x
-    
+    @Environment(ManagedNavigationStack.Path.self) private var managedNavigationPath
+
     @State private var healthKitProcessing = false
-    
-    
+
+
     var body: some View {
         OnboardingView(
             header: {
@@ -37,7 +38,8 @@ struct HealthKitPermissions: View {
                         .padding(.vertical, 16)
                     Spacer()
                 }
-            }, footer: {
+            },
+            footer: {
                 OnboardingActionsView(
                     "Grant Access",
                     action: {
@@ -53,22 +55,24 @@ struct HealthKitPermissions: View {
                             print("Could not request HealthKit permissions.")
                         }
                         healthKitProcessing = false
+
+                        managedNavigationPath.nextStep()
                     }
                 )
             }
         )
-            .navigationBarBackButtonHidden(healthKitProcessing)
-            // Small fix as otherwise "Login" or "Sign up" is still shown in the nav bar
-            .navigationTitle(Text(verbatim: ""))
+        .navigationBarBackButtonHidden(healthKitProcessing)
+        .navigationTitle(Text(verbatim: ""))
+        .toolbar(.visible)
     }
 }
 
 
-#if DEBUG
 #Preview {
-    HealthKitPermissions()
-        .previewWith(standard: S2YApplicationStandard()) {
-            HealthKit()
-        }
+    ManagedNavigationStack {
+        HealthKitPermissions()
+    }
+    .previewWith(standard: S2YApplicationStandard()) {
+        HealthKit()
+    }
 }
-#endif

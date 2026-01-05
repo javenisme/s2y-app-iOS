@@ -6,46 +6,56 @@
 // SPDX-License-Identifier: MIT
 //
 
+import SpeziConsent
 import SpeziOnboarding
+import SpeziViews
 import SwiftUI
 
 
 /// - Note: The `OnboardingConsentView` exports the signed consent form as PDF to the Spezi `Standard`, necessitating the conformance of the `Standard` to the `OnboardingConstraint`.
 struct Consent: View {
-    // OnboardingNavigationPath removed in SpeziOnboarding 2.x
-    
-    
-    private var consentDocument: Data {
-        guard let path = Bundle.main.url(forResource: "ConsentDocument", withExtension: "md"),
-              let data = try? Data(contentsOf: path) else {
-            return Data(String(localized: "CONSENT_LOADING_ERROR").utf8)
-        }
-        return data
-    }
-    
+    @Environment(ManagedNavigationStack.Path.self) private var managedNavigationPath
+    @Environment(S2YApplicationStandard.self) private var standard
+    @State private var consentDocument: ConsentDocument?
+    @State private var viewState: ViewState = .idle
+
     var body: some View {
-        OnboardingView(
-            header: {
-                OnboardingTitleView(title: "Consent", subtitle: "")
-            },
-            content: {
-                ScrollView {
-                    Text(String(decoding: consentDocument, as: UTF8.self))
-                        .padding()
-                }
-            },
-            footer: {
-                OnboardingActionsView("Continue", action: {})
+        OnboardingConsentView(consentDocument: consentDocument, viewState: $viewState) {
+            guard let consentDocument else {
+                fatalError("Completing the consent document before loaded should not be possible.")
             }
-        )
+
+            try await standard.store(consent: consentDocument)
+            managedNavigationPath.nextStep()
+        }
+        .viewStateAlert(state: $viewState)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                // give your user the ability to obtain a PDF version of the consent document they just signed
+                ConsentShareButton(
+                    consentDocument: consentDocument,
+                    viewState: $viewState
+                )
+            }
+        }
+        .task {
+            guard let url = Bundle.main.url(forResource: "ConsentDocument", withExtension: "md") else {
+                fatalError("Failed to load the consent document in the application bundle.")
+            }
+
+            do {
+                consentDocument = try ConsentDocument(contentsOf: url)
+            } catch {
+                viewState = .error(AnyLocalizedError(error: error))
+            }
+        }
     }
 }
 
 
-#if DEBUG
 #Preview {
-    Consent()
-        .previewWith(standard: S2YApplicationStandard()) {
-        }
+    ManagedNavigationStack {
+        Consent()
+    }
+    .previewWith(standard: S2YApplicationStandard()) {}
 }
-#endif

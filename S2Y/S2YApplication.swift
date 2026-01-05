@@ -27,11 +27,11 @@ struct S2YApplication: App {
                     EmptyView()
                 }
             }
-                .sheet(isPresented: !$completedOnboardingFlow) {
-                    OnboardingFlow()
-                }
-                .testingSetup()
-                .spezi(appDelegate)
+            .sheet(isPresented: !$completedOnboardingFlow) {
+                OnboardingFlow()
+            }
+            .testingSetup()
+            .spezi(appDelegate)
         }
     }
 }
