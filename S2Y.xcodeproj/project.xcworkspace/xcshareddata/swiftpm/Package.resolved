@@ -1,5 +1,5 @@
 {
-  "originHash" : "0dccb33e57f3a3cc480cea0637558169d0060a3367566bcb75b54c3492ae2369",
+  "originHash" : "57c56eafcd9d40075eb20b727cfa8a4043083615f636026921206c5f5b00ee78",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -290,6 +290,15 @@
       }
     },
     {
+      "identity" : "speziconsent",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/StanfordSpezi/SpeziConsent.git",
+      "state" : {
+        "revision" : "cd08c54a4f7630fa9482da5f162b4fa258de2e32",
+        "version" : "0.1.2"
+      }
+    },
+    {
       "identity" : "spezicontact",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/StanfordSpezi/SpeziContact.git",
@@ -321,8 +330,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/StanfordSpezi/SpeziFoundation",
       "state" : {
-        "revision" : "89f3334e685ddad1bbf2e8b33fa0820620aec6c1",
-        "version" : "2.2.1"
+        "revision" : "7b1d3f4db9922f0b58f5e02064356e5f7cb77dfd",
+        "version" : "2.6.0"
       }
     },
     {
@@ -420,8 +429,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/StanfordSpezi/SpeziViews.git",
       "state" : {
-        "revision" : "9a7cd323ae6023a57bdf57af644538e723902f67",
-        "version" : "1.12.1"
+        "revision" : "91be5dfe4dbedbe2b10bee491c98cbefc5ac95fd",
+        "version" : "1.12.8"
       }
     },
     {
@@ -485,6 +494,15 @@
       "state" : {
         "revision" : "a0a57e949a8903563aba4615869310c0ebf14c03",
         "version" : "1.4.0"
+      }
+    },
+    {
+      "identity" : "swift-log",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-log",
+      "state" : {
+        "revision" : "bc386b95f2a16ccd0150a8235e7c69eab2b866ca",
+        "version" : "1.8.0"
       }
     },
     {
@@ -620,6 +638,15 @@
       "state" : {
         "revision" : "a853604c9e9a83ad9954c7e3d2a565273982471f",
         "version" : "7.0.2"
+      }
+    },
+    {
+      "identity" : "tppdf",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/techprimate/TPPDF.git",
+      "state" : {
+        "revision" : "975049c0e1022922580b7927e030901604024925",
+        "version" : "2.6.1"
       }
     },
     {
