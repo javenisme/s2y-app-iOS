@@ -1,9 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "" : {
-
-    },
     "%@ - %lld Day Trend" : {
       "localizations" : {
         "en" : {
@@ -256,9 +253,6 @@
 
     },
     "Connected Devices" : {
-
-    },
-    "Consent" : {
 
     },
     "Contact" : {

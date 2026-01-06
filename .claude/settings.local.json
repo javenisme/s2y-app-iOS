@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xcodebuild:*)"
+      "Bash(xcodebuild:*)",
+      "Bash(git add:*)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []
