@@ -49,7 +49,7 @@ struct HomeView: View {
         .sheet(isPresented: $presentingAccount) {
             AccountSheet(dismissAfterSignIn: false) // presentation was user initiated, do not automatically dismiss
         }
-        .accountRequired(!FeatureFlags.disableFirebase && !FeatureFlags.skipOnboarding) {
+        .accountRequired(false) {
             AccountSheet()
         }
     }
