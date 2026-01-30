@@ -17,14 +17,14 @@ struct HomeView: View {
         case contact
         case showcase
     }
-    
-    
+
+
     @AppStorage(StorageKeys.homeTabSelection) private var selectedTab = Tabs.healthAssistant
     @AppStorage(StorageKeys.tabViewCustomization) private var tabViewCustomization = TabViewCustomization()
-    
+
     @State private var presentingAccount = false
-    
-    
+
+
     var body: some View {
         TabView(selection: $selectedTab) {
             Tab("Health Assistant", systemImage: "heart.text.square", value: .healthAssistant) {

@@ -118,25 +118,25 @@ actor S2YApplicationStandard: Standard,
         formatter.dateFormat = "yyyy-MM-dd_HHmmss"
         let dateString = formatter.string(from: Date())
         let exportOptions = ConsentDocument.ExportConfiguration(paperSize: .usLetter)
-        
+
         guard !FeatureFlags.disableFirebase else {
             guard let basePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
                 logger.error("Could not create path for writing consent form to user document directory.")
                 return
             }
-            
+
             let filePath = basePath.appending(path: "consentForm_\(dateString).pdf")
             try await consent.export(using: exportOptions).pdf.write(to: filePath)
-            
+
             return
         }
-        
+
         do {
             guard let consentPDFData = try? await consent.export(using: exportOptions).pdf.dataRepresentation() else {
                 logger.error("Could not store consent form.")
                 return
             }
-            
+
             let metadata = StorageMetadata()
             metadata.contentType = "application/pdf"
             _ = try await configuration.userBucketReference

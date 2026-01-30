@@ -13,8 +13,8 @@ import SwiftUI
 
 struct Welcome: View {
     @Environment(ManagedNavigationStack.Path.self) private var managedNavigationPath
-    
-    
+
+
     var body: some View {
         OnboardingView(
             title: "Spezi Template Application",

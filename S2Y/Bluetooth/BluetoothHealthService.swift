@@ -8,8 +8,12 @@
 import Foundation
 import HealthKit
 import OSLog
+#if canImport(SpeziBluetooth)
 import SpeziBluetooth
+#endif
+#if canImport(SpeziDevices)
 import SpeziDevices
+#endif
 import SwiftUI
 
 /// Service for managing Bluetooth health device connections and data collection
