@@ -10,8 +10,12 @@ import class FirebaseFirestore.FirestoreSettings
 import class FirebaseFirestore.MemoryCacheSettings
 import Spezi
 import SpeziAccount
+#if canImport(SpeziBluetooth)
 import SpeziBluetooth
+#endif
+#if canImport(SpeziDevices)
 import SpeziDevices
+#endif
 import SpeziFirebaseAccount
 import SpeziFirebaseAccountStorage
 import SpeziFirebaseStorage
@@ -46,8 +50,10 @@ class S2YApplicationDelegate: SpeziAppDelegate {
             
             healthKit 
             
+            #if canImport(SpeziBluetooth)
             // Bluetooth configuration for health devices
             Bluetooth {}
+            #endif
             
             S2YApplicationScheduler()
             Scheduler()

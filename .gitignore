@@ -14,6 +14,7 @@
 build/
 .docs
 !TemplateApplication.xcodeproj
+!S2Y.xcodeproj
 
 # IDE related folders
 .idea
@@ -32,6 +33,7 @@ xcuserdata/
 report.junit
 report.html
 TemplateApplication.xcresult
+S2Y.xcresult
 
 # Logs
 logs

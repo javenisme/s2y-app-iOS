@@ -18,8 +18,12 @@ import SpeziLLM
 #if canImport(SpeziLLMOpenAI)
 import SpeziLLMOpenAI
 #endif
+#if canImport(SpeziBluetooth)
 import SpeziBluetooth
+#endif
+#if canImport(SpeziDevices)
 import SpeziDevices
+#endif
 import SpeziOnboarding
 import SpeziQuestionnaire
 import SpeziScheduler
@@ -110,6 +114,7 @@ struct ShowcaseView: View {
 
     @ViewBuilder
     private var bluetoothSection: some View {
+        #if canImport(SpeziBluetooth)
         Group {
             if !UserDefaults.standard.bool(forKey: StorageKeys.disableBluetooth) {
                 Section("Bluetooth Health Devices") {
@@ -128,6 +133,9 @@ struct ShowcaseView: View {
                 }
             }
         }
+        #else
+        EmptyView()
+        #endif
     }
 
     @ViewBuilder

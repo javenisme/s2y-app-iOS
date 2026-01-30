@@ -75,6 +75,6 @@ struct OnboardingFlow: View {
         .previewWith(standard: S2YApplicationStandard()) {
             HealthKit()
             AccountConfiguration(service: InMemoryAccountService())
-            TemplateApplicationScheduler()
+            S2YApplicationScheduler()
         }
 }
