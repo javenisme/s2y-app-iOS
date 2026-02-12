@@ -223,7 +223,7 @@ extension EnhancedLLMProvider {
         let sensitiveKeywords = [
             "个人", "隐私", "敏感", "私密", "保密",
             "症状", "疾病", "药物", "治疗", "诊断",
-            "��理", "情绪", "抑郁", "焦虑"
+            "心理", "情绪", "抑郁", "焦虑"
         ]
         
         let lowercaseQuery = query.lowercased()

@@ -249,11 +249,27 @@ private struct ModelConfiguration {
     
     // 模型文件路径
     var modelURL: URL? {
-        Bundle.main.url(forResource: "phi-3.5-mini-4bit", withExtension: "mlx")
+        if let downloadedModelURL = localModelsDirectory?
+            .appendingPathComponent("phi-3.5-mini-4bit.mlx"),
+           FileManager.default.fileExists(atPath: downloadedModelURL.path) {
+            return downloadedModelURL
+        }
+        return Bundle.main.url(forResource: "phi-3.5-mini-4bit", withExtension: "mlx")
     }
     
     var tokenizerURL: URL? {
-        Bundle.main.url(forResource: "tokenizer", withExtension: "json")
+        if let downloadedTokenizerURL = localModelsDirectory?
+            .appendingPathComponent("tokenizer.json"),
+           FileManager.default.fileExists(atPath: downloadedTokenizerURL.path) {
+            return downloadedTokenizerURL
+        }
+        return Bundle.main.url(forResource: "tokenizer", withExtension: "json")
+    }
+
+    private var localModelsDirectory: URL? {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+            .first?
+            .appendingPathComponent("LocalModels", isDirectory: true)
     }
 }
 

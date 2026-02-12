@@ -71,12 +71,21 @@ final class ModelDownloadManager: ObservableObject {
     /// 检查并下载必要的模型文件
     func downloadModelIfNeeded() async throws {
         logger.info("Starting model download check")
-        
-        guard downloadState == .idle else {
+
+        switch downloadState {
+        case .checking, .downloading, .validating:
             logger.warning("Download already in progress")
             return
+        case .idle, .completed, .failed:
+            break
         }
-        
+
+        // Allow retry/revalidation after previous completion or failure.
+        downloadState = .idle
+        downloadProgress = 0.0
+        lastError = nil
+        resetDownloadStats()
+
         downloadState = .checking
         
         do {
@@ -217,7 +226,7 @@ final class ModelDownloadManager: ObservableObject {
     
     private func downloadFile(from remoteURL: URL, to localURL: URL) async throws {
         return try await withCheckedThrowingContinuation { continuation in
-            downloadTask = downloadSession?.downloadTask(with: remoteURL) { [weak self] tempURL, response, error in
+            downloadTask = downloadSession?.downloadTask(with: remoteURL) { tempURL, _, error in
                 
                 if let error = error {
                     continuation.resume(throwing: DownloadError.networkError(error.localizedDescription))

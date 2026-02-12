@@ -276,7 +276,9 @@ struct ShowcaseView: View {
         let doc = FirebaseConfiguration.userCollection.document(accountId)
         doc.setData(["updatedAt": Timestamp(date: Date()), "demo": true], merge: true) { error in
             if let error {
-                viewState = .error(AnyLocalizedError(error: error))
+                DispatchQueue.main.async {
+                    viewState = .error(AnyLocalizedError(error: error))
+                }
             }
         }
     }
@@ -290,7 +292,9 @@ struct ShowcaseView: View {
         let data = Data("Hello Spezi".utf8)
         ref.putData(data) { _, error in
             if let error {
-                viewState = .error(AnyLocalizedError(error: error))
+                DispatchQueue.main.async {
+                    viewState = .error(AnyLocalizedError(error: error))
+                }
             }
         }
     }

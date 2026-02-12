@@ -409,34 +409,23 @@ extension HealthAssistantView {
         
         private func processUserMessage(_ message: String) async {
             logger.info("Processing user message with enhanced provider")
-            
-            do {
-                let response: String
-                
-                if useLocalModel {
-                    // 强制使用本地模型
-                    response = await enhancedProvider.sendMessageLocal(message)
-                } else {
-                    // 智能路由选择
-                    response = await enhancedProvider.sendMessageIntelligent(message)
-                }
-                
-                await MainActor.run {
-                    let assistantMessage = ChatMessage(role: .assistant, content: response)
-                    messages.append(assistantMessage)
-                    isProcessing = false
-                }
-                
-                logger.info("Successfully processed user message")
-                
-            } catch {
-                await MainActor.run {
-                    errorMessage = "处理消息时出现错误：\(error.localizedDescription)"
-                    isProcessing = false
-                }
-                
-                logger.error("Failed to process message: \(error)")
+
+            let response: String
+            if useLocalModel {
+                // 强制使用本地模型
+                response = await enhancedProvider.sendMessageLocal(message)
+            } else {
+                // 智能路由选择
+                response = await enhancedProvider.sendMessageIntelligent(message)
             }
+
+            await MainActor.run {
+                let assistantMessage = ChatMessage(role: .assistant, content: response)
+                messages.append(assistantMessage)
+                isProcessing = false
+            }
+
+            logger.info("Successfully processed user message")
         }
     }
 }
@@ -503,7 +492,7 @@ private struct EnhancedChatMessageView: View {
 
 struct ModelDownloadView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var downloadManager = ModelDownloadManager.shared
+    @StateObject private var downloadManager = ModelDownloadManager.shared
     
     var body: some View {
         NavigationView {

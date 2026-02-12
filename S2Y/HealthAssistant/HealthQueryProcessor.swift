@@ -102,7 +102,6 @@ enum HealthQueryProcessor {
         comparison: HealthKitService.Comparison
     ) -> HealthInsight? {
         let metricName = metricTitle(kind: kind)
-        let unit = metricUnit(kind: kind)
         
         // Analyze trend and comparison data
         let trendDirection = trend.changeRate >= 0.05 ? "Increase" : (trend.changeRate <= -0.05 ? "Decrease" : "Stable")
