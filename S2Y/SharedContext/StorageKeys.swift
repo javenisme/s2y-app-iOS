@@ -7,7 +7,7 @@
 //
 
 
-/// Constants shared across the Spezi Teamplate Application to access storage information including the `AppStorage` and `SceneStorage`
+/// Constants shared across S2Y to access storage information including `AppStorage` and `SceneStorage`.
 enum StorageKeys {
     // MARK: - Onboarding
     /// A `Bool` flag indicating of the onboarding was completed.

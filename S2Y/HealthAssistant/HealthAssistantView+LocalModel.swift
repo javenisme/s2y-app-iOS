@@ -52,7 +52,7 @@ extension HealthAssistantView {
                     
                     enhancedInputBar
                 }
-                .navigationTitle("智能健康助手")
+                .navigationTitle("Smart Health Assistant")
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
@@ -103,7 +103,7 @@ extension HealthAssistantView {
                     }
                     
                     VStack(spacing: 4) {
-                        Text("智能健康助手")
+                        Text("Smart Health Assistant")
                             .font(.title2)
                             .fontWeight(.bold)
                         
@@ -117,20 +117,20 @@ extension HealthAssistantView {
                 VStack(alignment: .leading, spacing: 12) {
                     featureRow(
                         icon: "chart.line.uptrend.xyaxis",
-                        title: "数据分析",
-                        description: "分析您的健康趋势和模式"
+                        title: "Data Analysis",
+                        description: "Analyze your health trends and patterns"
                     )
                     
                     featureRow(
                         icon: "lightbulb.max",
-                        title: "个性化建议",
-                        description: "基于您的数据提供定制建议"
+                        title: "Personalized Guidance",
+                        description: "Get recommendations tailored to your data"
                     )
                     
                     featureRow(
                         icon: "shield.lefthalf.filled",
-                        title: "隐私保护",
-                        description: useLocalModel ? "完全本地处理，数据不外泄" : "遵守严格的隐私保护政策"
+                        title: "Privacy Protection",
+                        description: useLocalModel ? "Fully local processing. Your data stays on-device." : "Protected by strict privacy policies"
                     )
                 }
                 .padding(.horizontal)
@@ -145,15 +145,15 @@ extension HealthAssistantView {
         
         private var quickQueryButtons: some View {
             VStack(spacing: 12) {
-                Text("快速查询")
+                Text("Quick Questions")
                     .font(.headline)
                     .fontWeight(.semibold)
                 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
-                    quickQueryButton("我今天的步数如何？", icon: "figure.walk")
-                    quickQueryButton("最近的睡眠质量怎样？", icon: "bed.double")
-                    quickQueryButton("心率变化有什么趋势？", icon: "heart.fill")
-                    quickQueryButton("本周的活动能量消耗", icon: "flame.fill")
+                    quickQueryButton("How are my step counts today?", icon: "figure.walk")
+                    quickQueryButton("How has my recent sleep quality been?", icon: "bed.double")
+                    quickQueryButton("What trend do you see in my heart rate?", icon: "heart.fill")
+                    quickQueryButton("This week's active energy burn", icon: "flame.fill")
                 }
             }
         }
@@ -237,7 +237,7 @@ extension HealthAssistantView {
                     HStack {
                         Image(systemName: "brain.head.profile.fill")
                             .foregroundColor(.green)
-                        Text("本地AI模式 - 完全隐私保护")
+                        Text("Local AI Mode - Fully Private")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         Spacer()
@@ -246,7 +246,7 @@ extension HealthAssistantView {
                 }
                 
                 HStack(spacing: 12) {
-                    TextField("询问关于您健康数据的问题...", text: $inputText, axis: .vertical)
+                    TextField("Ask a question about your health data...", text: $inputText, axis: .vertical)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .lineLimit(1...4)
                         .disabled(isProcessing)
@@ -278,7 +278,7 @@ extension HealthAssistantView {
                 HStack(spacing: 4) {
                     Image(systemName: useLocalModel ? "brain.head.profile.fill" : "cloud.fill")
                         .font(.caption)
-                    Text(useLocalModel ? "本地" : "云端")
+                    Text(useLocalModel ? "Local" : "Cloud")
                         .font(.caption2)
                         .fontWeight(.medium)
                 }
@@ -306,7 +306,7 @@ extension HealthAssistantView {
                 showingSettings = true
             }) {
                 Image(systemName: "gear")
-                    .accessibilityLabel("设置")
+                    .accessibilityLabel("Settings")
             }
         }
         
@@ -335,13 +335,13 @@ extension HealthAssistantView {
         private var localModelStatusText: String {
             switch localModelManager.modelStatus {
             case .loaded:
-                return "本地AI已就绪 • 完全隐私保护"
+                return "Local AI is ready • Fully private"
             case .loading:
-                return "本地AI加载中..."
+                return "Loading local AI..."
             case .error:
-                return "本地AI暂不可用 • 将使用云端服务"
+                return "Local AI is unavailable • Cloud mode will be used"
             case .notLoaded:
-                return "支持云端和本地AI模式"
+                return "Supports both cloud and local AI modes"
             }
         }
         
@@ -353,7 +353,7 @@ extension HealthAssistantView {
                     .font(.subheadline)
                     .foregroundColor(.primary)
                 Spacer()
-                Button("关闭") {
+                Button("Dismiss") {
                     errorMessage = nil
                 }
                 .font(.subheadline)
@@ -508,11 +508,11 @@ struct ModelDownloadView: View {
                         ))
                     
                     VStack(spacing: 8) {
-                        Text("本地AI模型")
+                        Text("Local AI Model")
                             .font(.title2)
                             .fontWeight(.bold)
                         
-                        Text("下载后可完全离线使用，保护您的隐私")
+                        Text("Download once for full offline usage and stronger privacy.")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -528,11 +528,11 @@ struct ModelDownloadView: View {
                 downloadActionButton
             }
             .padding()
-            .navigationTitle("本地AI模型")
+            .navigationTitle("Local AI Model")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") { dismiss() }
+                    Button("Done") { dismiss() }
                 }
             }
         }
@@ -561,7 +561,7 @@ struct ModelDownloadView: View {
                     }
                     
                     if !downloadManager.estimatedTimeRemaining.isEmpty {
-                        Text("剩余时间: \(downloadManager.estimatedTimeRemaining)")
+                        Text("Time remaining: \(downloadManager.estimatedTimeRemaining)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -577,7 +577,7 @@ struct ModelDownloadView: View {
     private var downloadActionButton: some View {
         switch downloadManager.downloadState {
         case .idle, .failed:
-            Button("下载本地AI模型") {
+            Button("Download Local AI Model") {
                 Task {
                     try await downloadManager.downloadModelIfNeeded()
                 }
@@ -586,7 +586,7 @@ struct ModelDownloadView: View {
             .controlSize(.large)
             
         case .downloading:
-            Button("取消下载") {
+            Button("Cancel Download") {
                 downloadManager.cancelDownload()
             }
             .buttonStyle(.bordered)
@@ -598,7 +598,7 @@ struct ModelDownloadView: View {
                     .font(.system(size: 32))
                     .foregroundColor(.green)
                 
-                Text("本地AI模型已就绪！")
+                Text("Local AI model is ready!")
                     .font(.headline)
                     .fontWeight(.semibold)
                     .foregroundColor(.green)

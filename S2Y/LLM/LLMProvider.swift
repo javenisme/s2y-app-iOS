@@ -35,11 +35,11 @@ public enum LLMProviderError: Error, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .badURL:
-            return "无效的服务地址。"
+            return "Invalid service URL."
         case let .httpStatus(code, _):
-            return "服务返回错误（\(code)）。"
+            return "Service returned an error (\(code))."
         case .decodingFailed:
-            return "无法解析返回结果。"
+            return "Unable to parse service response."
         }
     }
 }
@@ -132,5 +132,4 @@ public struct CloudflareLLMProvider: LLMProvider, Sendable {
         return reply.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
-
 

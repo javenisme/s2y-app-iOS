@@ -26,7 +26,7 @@ struct NotificationPermissions: View {
                 VStack {
                     OnboardingTitleView(
                         title: "Notifications",
-                        subtitle: "Spezi Scheduler Notifications."
+                        subtitle: "Health Assistant notifications."
                     )
                     Spacer()
                     Image(systemName: "bell.square.fill")

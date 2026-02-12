@@ -7,7 +7,7 @@
 //
 
 
-/// A collection of feature flags for the Template Application.
+/// A collection of feature flags for the S2Y application.
 enum FeatureFlags {
     /// Skips the onboarding flow to enable easier development of features in the application and to allow UI tests to skip the onboarding flow.
     static let skipOnboarding = CommandLine.arguments.contains("--skipOnboarding")

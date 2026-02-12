@@ -184,12 +184,12 @@ struct HealthAssistantSettingsView: View {
         [
             LanguageOption(id: "", title: "System Default"),
             LanguageOption(id: "en-US", title: "English (US)"),
-            LanguageOption(id: "zh-CN", title: "中文（普通话）"),
+            LanguageOption(id: "zh-CN", title: "Chinese (Mandarin)"),
             LanguageOption(id: "es-ES", title: "Español (ES)"),
             LanguageOption(id: "fr-FR", title: "Français (FR)"),
             LanguageOption(id: "de-DE", title: "Deutsch (DE)"),
-            LanguageOption(id: "ja-JP", title: "日本語"),
-            LanguageOption(id: "ko-KR", title: "한국어")
+            LanguageOption(id: "ja-JP", title: "Japanese"),
+            LanguageOption(id: "ko-KR", title: "Korean")
         ]
     }
     
@@ -244,5 +244,4 @@ struct HealthAssistantSettingsView: View {
         }
     }
 }
-
 

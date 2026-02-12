@@ -43,9 +43,9 @@ enum HealthAssistantError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .llmNotConfigured:
-            return "LLM 服务未配置"
+            return "LLM service is not configured"
         case .processingFailed:
-            return "处理请求失败"
+            return "Failed to process the request"
         }
     }
 }
@@ -78,7 +78,7 @@ struct HealthAssistantView: View {
                 
                 inputBar
             }
-            .navigationTitle("健康助手")
+            .navigationTitle("Health Assistant")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -87,19 +87,19 @@ struct HealthAssistantView: View {
                             preferLocalModel.toggle()
                         } label: {
                             Image(systemName: preferLocalModel ? "brain.head.profile.fill" : "cloud.fill")
-                                .accessibilityLabel(preferLocalModel ? "本地模式" : "云端模式")
+                                .accessibilityLabel(preferLocalModel ? "Local Mode" : "Cloud Mode")
                         }
                         Button {
                             showingModelDownload = true
                         } label: {
                             Image(systemName: "arrow.down.circle")
-                                .accessibilityLabel("下载本地模型")
+                                .accessibilityLabel("Download Local Model")
                         }
                         Button {
                             showingSettings = true
                         } label: {
                             Image(systemName: "gear")
-                                .accessibilityLabel("设置")
+                                .accessibilityLabel("Settings")
                         }
                     }
                 }
@@ -128,13 +128,13 @@ struct HealthAssistantView: View {
                     Image(systemName: "heart.text.square.fill")
                         .font(.system(size: 60))
                         .foregroundColor(.red)
-                        .accessibilityLabel("健康助手图标")
+                        .accessibilityLabel("Health Assistant Icon")
                     
-                    Text("健康助手")
+                    Text("Health Assistant")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                     
-                    Text("通过自然语言查询您的健康数据，获得个性化洞察和建议")
+                    Text("Ask natural language questions about your health data to get personalized insights and guidance.")
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -144,30 +144,30 @@ struct HealthAssistantView: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
                     QuickQueryCard(
                         icon: "figure.walk",
-                        title: "步数趋势",
-                        query: "我过去7天的步数趋势如何？",
-                        action: { inputText = "我过去7天的步数趋势如何？" }
+                        title: "Step Trends",
+                        query: "How have my step counts trended over the past 7 days?",
+                        action: { inputText = "How have my step counts trended over the past 7 days?" }
                     )
                     
                     QuickQueryCard(
                         icon: "heart.fill",
-                        title: "心率对比",
-                        query: "对比我本周和上周的平均心率",
-                        action: { inputText = "对比我本周和上周的平均心率" }
+                        title: "Heart Rate Comparison",
+                        query: "Compare my average heart rate this week versus last week.",
+                        action: { inputText = "Compare my average heart rate this week versus last week." }
                     )
                     
                     QuickQueryCard(
                         icon: "bed.double.fill",
-                        title: "睡眠分析",
-                        query: "我最近的睡眠质量怎么样？",
-                        action: { inputText = "我最近的睡眠质量怎么样？" }
+                        title: "Sleep Analysis",
+                        query: "How has my sleep quality been recently?",
+                        action: { inputText = "How has my sleep quality been recently?" }
                     )
                     
                     QuickQueryCard(
                         icon: "flame.fill",
-                        title: "活动能量",
-                        query: "我过去30天的活动能量变化",
-                        action: { inputText = "我过去30天的活动能量变化" }
+                        title: "Active Energy",
+                        query: "How has my active energy changed over the past 30 days?",
+                        action: { inputText = "How has my active energy changed over the past 30 days?" }
                     )
                 }
                 .padding(.horizontal)
@@ -190,7 +190,7 @@ struct HealthAssistantView: View {
                         HStack {
                             ProgressView()
                                 .scaleEffect(0.8)
-                            Text("正在分析您的健康数据...")
+                            Text("Analyzing your health data...")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -214,7 +214,7 @@ struct HealthAssistantView: View {
             Divider()
             
             HStack(spacing: 12) {
-                TextField("询问您的健康数据...", text: $inputText, axis: .vertical)
+                TextField("Ask about your health data...", text: $inputText, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(1...4)
                     .disabled(isProcessing)
@@ -227,7 +227,7 @@ struct HealthAssistantView: View {
                         .frame(width: 36, height: 36)
                         .background(inputText.isEmpty ? Color.gray : Color.blue)
                         .clipShape(Circle())
-                        .accessibilityLabel("发送消息")
+                        .accessibilityLabel("Send Message")
                 }
                 .disabled(inputText.isEmpty || isProcessing)
             }
@@ -239,11 +239,11 @@ struct HealthAssistantView: View {
         HStack {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundColor(.orange)
-                .accessibilityLabel("警告")
+                .accessibilityLabel("Warning")
             Text(message)
                 .font(.caption)
             Spacer()
-            Button("关闭") {
+            Button("Dismiss") {
                 errorMessage = nil
             }
             .font(.caption)
@@ -257,7 +257,7 @@ struct HealthAssistantView: View {
         do {
             try await healthService.requestAuthorization()
         } catch {
-            errorMessage = "HealthKit 授权失败: \(error.localizedDescription)"
+            errorMessage = "HealthKit authorization failed: \(error.localizedDescription)"
         }
     }
     
@@ -277,7 +277,7 @@ struct HealthAssistantView: View {
         } catch {
             let errorResponse = ChatMessage(
                 role: .assistant,
-                content: "抱歉，处理您的请求时遇到了错误：\(error.localizedDescription)"
+                content: "Sorry, I ran into an error while processing your request: \(error.localizedDescription)"
             )
             messages.append(errorResponse)
         }

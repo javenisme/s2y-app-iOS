@@ -51,17 +51,17 @@ final class ModelDownloadManager: ObservableObject {
         var description: String {
             switch self {
             case .idle:
-                return "准备下载"
+                return "Ready to download"
             case .checking:
-                return "检查模型文件"
+                return "Checking model files"
             case .downloading:
-                return "正在下载模型"
+                return "Downloading model"
             case .validating:
-                return "验证文件完整性"
+                return "Validating file integrity"
             case .completed:
-                return "下载完成"
+                return "Download complete"
             case .failed(let message):
-                return "下载失败: \(message)"
+                return "Download failed: \(message)"
             }
         }
     }
@@ -237,9 +237,9 @@ final class ModelDownloadManager: ObservableObject {
                     if let urlError = error as? URLError {
                         switch urlError.code {
                         case .cannotFindHost, .dnsLookupFailed:
-                            continuation.resume(throwing: DownloadError.networkError("无法解析下载域名，请检查下载地址配置或使用本地挂载文件"))
+                            continuation.resume(throwing: DownloadError.networkError("Unable to resolve download host. Verify URL configuration or use a local mounted model."))
                         case .notConnectedToInternet:
-                            continuation.resume(throwing: DownloadError.networkError("设备当前离线，请连接网络后重试"))
+                            continuation.resume(throwing: DownloadError.networkError("Device appears offline. Connect to the internet and retry."))
                         default:
                             continuation.resume(throwing: DownloadError.networkError(urlError.localizedDescription))
                         }
@@ -379,9 +379,9 @@ final class ModelDownloadManager: ObservableObject {
         let remainingTime = Double(remainingBytes) / bytesPerSecond
         
         if remainingTime < 60 {
-            estimatedTimeRemaining = String(format: "%.0f秒", remainingTime)
+            estimatedTimeRemaining = String(format: "%.0fs", remainingTime)
         } else {
-            estimatedTimeRemaining = String(format: "%.0f分钟", remainingTime / 60)
+            estimatedTimeRemaining = String(format: "%.0f min", remainingTime / 60)
         }
     }
 }
@@ -398,15 +398,15 @@ enum DownloadError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .networkError(let message):
-            return "网络错误: \(message)"
+            return "Network error: \(message)"
         case .fileSystemError(let message):
-            return "文件系统错误: \(message)"
+            return "File system error: \(message)"
         case .validationError(let message):
-            return "文件验证错误: \(message)"
+            return "Validation error: \(message)"
         case .configurationError(let message):
-            return "配置错误: \(message)"
+            return "Configuration error: \(message)"
         case .unknown(let message):
-            return "未知错误: \(message)"
+            return "Unknown error: \(message)"
         }
     }
 }

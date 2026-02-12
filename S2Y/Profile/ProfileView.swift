@@ -49,7 +49,7 @@ struct ProfileView: View {
                     if let url = URL(string: "https://github.com/StanfordBDHG/S2Y/issues/new") {
                         Link("Report a Bug", destination: url)
                     }
-                    if let url = URL(string: "https://spezi.stanford.edu") {
+                    if let url = URL(string: "https://github.com/StanfordBDHG/S2Y") {
                         Link("Help Center", destination: url)
                     }
                 }
@@ -114,4 +114,3 @@ private extension String {
         }
 }
 #endif
-

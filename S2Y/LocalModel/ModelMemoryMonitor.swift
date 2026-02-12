@@ -141,21 +141,21 @@ class ModelMemoryMonitor {
 
 /// 内存压力等级
 enum MemoryPressureLevel: String, CaseIterable {
-    case normal = "正常"
-    case moderate = "中等"
-    case high = "偏高"
-    case critical = "严重"
+    case normal = "Normal"
+    case moderate = "Moderate"
+    case high = "High"
+    case critical = "Critical"
     
     var description: String {
         switch self {
         case .normal:
-            return "内存使用正常，可以安全加载模型"
+            return "Memory usage is normal. Safe to load local model."
         case .moderate:
-            return "内存使用中等，建议谨慎加载模型"
+            return "Memory usage is moderate. Load model with caution."
         case .high:
-            return "内存使用偏高，不建议加载大型模型"
+            return "Memory usage is high. Large models are not recommended."
         case .critical:
-            return "内存使用严重，应立即释放内存"
+            return "Memory usage is critical. Free memory before loading a model."
         }
     }
     
@@ -241,13 +241,13 @@ enum ModelSizeRecommendation {
     var description: String {
         switch self {
         case .large:
-            return "可以加载大型模型 (如Phi-3.5 7B)"
+            return "Can load large models (e.g., Phi-3.5 7B)"
         case .medium:
-            return "推荐中等模型 (如Phi-3.5 Mini)"
+            return "Recommended: medium model (e.g., Phi-3.5 Mini)"
         case .small:
-            return "建���轻量模型 (如Llama-3.2 1B)"
+            return "Recommended: lightweight model (e.g., Llama-3.2 1B)"
         case .unavailable:
-            return "内存不足，无法加载本地模型"
+            return "Insufficient memory for local model loading"
         }
     }
 }

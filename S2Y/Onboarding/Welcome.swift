@@ -17,7 +17,7 @@ struct Welcome: View {
 
     var body: some View {
         OnboardingView(
-            title: "Spezi Template Application",
+            title: "S2Y Health Assistant",
             subtitle: "WELCOME_SUBTITLE",
             areas: [
                 OnboardingInformationView.Area(
@@ -25,7 +25,7 @@ struct Welcome: View {
                         Image(systemName: "apps.iphone")
                             .accessibilityHidden(true)
                     },
-                    title: "The Spezi Framework",
+                    title: "S2Y Platform",
                     description: "WELCOME_AREA1_DESCRIPTION"
                 ),
                 OnboardingInformationView.Area(
@@ -41,7 +41,7 @@ struct Welcome: View {
                         Image(systemName: "list.bullet.clipboard.fill")
                             .accessibilityHidden(true)
                     },
-                    title: "Spezi Modules",
+                    title: "Core Modules",
                     description: "WELCOME_AREA3_DESCRIPTION"
                 )
             ],

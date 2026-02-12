@@ -98,14 +98,14 @@ struct LocalModelStatusView: View {
     private var statusText: String {
         switch modelManager.modelStatus {
         case .loaded:
-            return "🧠 本地AI已就绪"
+            return "🧠 Local AI is ready"
         case .loading:
             let progress = Int(modelManager.loadingProgress * 100)
-            return "⏳ AI加载中... \(progress)%"
+            return "⏳ Loading AI... \(progress)%"
         case .error:
-            return "⚠️ 本地AI不可用"
+            return "⚠️ Local AI unavailable"
         case .notLoaded:
-            return "💤 本地AI未启用"
+            return "💤 Local AI disabled"
         }
     }
     
@@ -198,11 +198,11 @@ private struct MemoryDetailsView: View {
                 }
                 .padding()
             }
-            .navigationTitle("本地AI状态")
+            .navigationTitle("Local AI Status")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("完成") { dismiss() }
+                    Button("Done") { dismiss() }
                 }
             }
         }
@@ -211,20 +211,20 @@ private struct MemoryDetailsView: View {
     @ViewBuilder
     private func memoryOverviewSection(_ status: MemoryStatus) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("内存使用情况")
+            Text("Memory Usage")
                 .font(.headline)
                 .fontWeight(.semibold)
             
             VStack(spacing: 8) {
-                memoryUsageRow("总内存", value: "\(status.totalMB)MB", color: .primary)
-                memoryUsageRow("已使用", value: "\(status.usedMB)MB", color: .secondary)
-                memoryUsageRow("可用内存", value: "\(status.availableMB)MB", color: .green)
-                memoryUsageRow("应用占用", value: "\(status.appUsageMB)MB", color: .blue)
+                memoryUsageRow("Total Memory", value: "\(status.totalMB)MB", color: .primary)
+                memoryUsageRow("Used", value: "\(status.usedMB)MB", color: .secondary)
+                memoryUsageRow("Available", value: "\(status.availableMB)MB", color: .green)
+                memoryUsageRow("App Usage", value: "\(status.appUsageMB)MB", color: .blue)
                 
                 Divider()
                 
                 HStack {
-                    Text("使用率")
+                    Text("Usage")
                         .fontWeight(.medium)
                     Spacer()
                     Text(String(format: "%.1f%%", status.usagePercentage))
@@ -244,7 +244,7 @@ private struct MemoryDetailsView: View {
     @ViewBuilder
     private func memoryRecommendationSection(_ status: MemoryStatus) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("AI模型建议")
+            Text("AI Model Recommendation")
                 .font(.headline)
                 .fontWeight(.semibold)
             
@@ -274,11 +274,11 @@ private struct MemoryDetailsView: View {
                 .font(.system(size: 48))
                 .foregroundColor(.secondary)
             
-            Text("暂无内存数据")
+            Text("No memory data yet")
                 .font(.headline)
                 .foregroundColor(.secondary)
             
-            Text("正在收集设备内存信息...")
+            Text("Collecting device memory details...")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
@@ -287,15 +287,15 @@ private struct MemoryDetailsView: View {
     
     private var aboutLocalAISection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("关于本地AI")
+            Text("About Local AI")
                 .font(.headline)
                 .fontWeight(.semibold)
             
             VStack(alignment: .leading, spacing: 8) {
-                infoRow("模型", value: "Phi-3.5 Mini")
-                infoRow("大小", value: "约1.5GB")
-                infoRow("隐私", value: "完全本地处理")
-                infoRow("网络", value: "支持离线运行")
+                infoRow("Model", value: "Phi-3.5 Mini")
+                infoRow("Size", value: "About 1.5 GB")
+                infoRow("Privacy", value: "Fully on-device processing")
+                infoRow("Network", value: "Offline supported")
             }
             .padding()
             .background(Color(.systemGray6))

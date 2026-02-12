@@ -1,7 +1,7 @@
 ---
-title: Spezi Consent
+title: S2Y Consent
 ---
 
-Spezi can render consent documents in the markdown format: This is a *markdown* **example**.
+S2Y can render consent documents in markdown format. This is a *markdown* **example**.
 
 <signature id=sig1 />

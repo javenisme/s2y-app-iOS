@@ -204,7 +204,7 @@ class LocalHealthModelManager {
         
         // 确保响应不为空
         if cleanedText.isEmpty {
-            return "抱歉，我无法为您的健康查询生成合适的回复。请尝试重新提问或稍后再试。"
+            return "Sorry, I could not generate a useful response for your health query. Please try again."
         }
         
         return cleanedText
@@ -293,28 +293,28 @@ enum ModelError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .modelNotLoaded:
-            return "本地健康AI模型未加载"
+            return "Local health AI model is not loaded"
         case .insufficientMemory:
-            return "设备内存不足，无法加载AI模型"
+            return "Insufficient device memory to load AI model"
         case .modelFilesNotFound:
-            return "未找到AI模型文件，请检查应用安装"
+            return "AI model files not found. Check app installation."
         case .loadingFailed(let reason):
-            return "AI模型加载失败: \(reason)"
+            return "AI model loading failed: \(reason)"
         case .generationFailed(let reason):
-            return "AI响应生成失败: \(reason)"
+            return "AI response generation failed: \(reason)"
         }
     }
     
     var recoverySuggestion: String? {
         switch self {
         case .modelNotLoaded:
-            return "请稍等片刻让AI模型加载完成"
+            return "Please wait for the AI model to finish loading"
         case .insufficientMemory:
-            return "请关闭其他应用释放内存后重试"
+            return "Close other apps to free memory and try again"
         case .modelFilesNotFound:
-            return "请重新安装应用或联系技术支持"
+            return "Reinstall the app or contact technical support"
         case .loadingFailed, .generationFailed:
-            return "请重试，如果问题持续请联系技术支持"
+            return "Try again. If the issue persists, contact technical support"
         }
     }
 }

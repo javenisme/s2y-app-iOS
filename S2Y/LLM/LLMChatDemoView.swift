@@ -33,7 +33,7 @@ struct LLMChatDemoView: View {
     @State private var inputText: String = ""
     @State private var isSending = false
     @State private var messages: [DemoChatMessage] = [
-        .init(role: .assistant, content: "你好，我是 OpenAI 模型示例。请输入你的问题。")
+        .init(role: .assistant, content: "Hi, I'm an OpenAI demo assistant. Ask me anything.")
     ]
     @State private var errorText: String?
 
@@ -125,11 +125,11 @@ struct LLMChatDemoView: View {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         guard !cfToken.isEmpty else {
-            errorText = "缺少访问令牌。请在系统设置或 Keychain 中配置。"
+            errorText = "Missing access token. Configure it in system settings or Keychain."
             return
         }
         guard !gatewayURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorText = "缺少服务地址。请在 Info.plist 配置 CFWorkersAI.GatewayURL。"
+            errorText = "Missing service URL. Configure CFWorkersAI.GatewayURL in Info.plist."
             return
         }
         // modelPath 允许为空（当 gatewayURL 已为完整终端点时）
@@ -218,5 +218,4 @@ private func readKeychain(service: String, account: String) -> Data? {
     guard status == errSecSuccess, let data = item as? Data else { return nil }
     return data
 }
-
 

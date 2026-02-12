@@ -15,7 +15,7 @@ import SpeziViews
 import SwiftUI
 
 
-/// Displays an multi-step onboarding flow for the Spezi Template Application.
+/// Displays a multi-step onboarding flow for the S2Y Health Assistant app.
 struct OnboardingFlow: View {
     @Environment(HealthKit.self) private var healthKit
 

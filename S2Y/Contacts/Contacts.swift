@@ -12,7 +12,7 @@ import SpeziContact
 import SwiftUI
 
 
-/// Displays the contacts for the Spezi Template Application.
+/// Displays the contacts for the S2Y application.
 struct Contacts: View {
     let contacts = [
         Contact(

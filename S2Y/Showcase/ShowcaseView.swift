@@ -250,7 +250,7 @@ struct ShowcaseView: View {
             if let url = URL(string: "https://github.com/StanfordBDHG/S2Y/issues/new") {
                 Link("Report a Bug", destination: url)
             }
-            if let url = URL(string: "https://spezi.stanford.edu") {
+            if let url = URL(string: "https://github.com/StanfordBDHG/S2Y") {
                 Link("Help Center", destination: url)
             }
             NavigationLink("About") { AboutView() }
@@ -289,7 +289,7 @@ struct ShowcaseView: View {
             return
         }
         let ref = Storage.storage().reference().child("users/\(accountId)/demo.txt")
-        let data = Data("Hello Spezi".utf8)
+        let data = Data("Hello S2Y".utf8)
         ref.putData(data) { _, error in
             if let error {
                 DispatchQueue.main.async {

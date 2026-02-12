@@ -34,7 +34,7 @@ struct AboutView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    Text("A health assistant app built with Stanford Spezi.")
+                    Text("A health assistant app developed by Stanford Biodesign Digital Health.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -42,7 +42,7 @@ struct AboutView: View {
             }
 
             Section("Links") {
-                if let url = URL(string: "https://spezi.stanford.edu") { Link("Project Website", destination: url) }
+                if let url = URL(string: "https://github.com/StanfordBDHG/S2Y") { Link("Project Website", destination: url) }
                 if let url = URL(string: "https://github.com/StanfordBDHG/S2Y") { Link("Source Code", destination: url) }
                 if let url = URL(string: "https://github.com/StanfordBDHG/S2Y/issues/new") { Link("Report a Bug", destination: url) }
             }
@@ -62,4 +62,3 @@ struct AboutView: View {
     AboutView()
 }
 #endif
-
