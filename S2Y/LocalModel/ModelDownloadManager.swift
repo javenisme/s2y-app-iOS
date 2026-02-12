@@ -127,7 +127,10 @@ final class ModelDownloadManager: ObservableObject {
     /// 获取模型信息
     func getModelInfo() -> ModelInfo? {
         do {
-            let modelInfoURL = getLocalModelInfoURL()
+            guard let modelInfoURL = getLocalModelInfoURL() else {
+                logger.error("Model info URL not found; ensure model_info.json exists under LocalModels")
+                return nil
+            }
             let data = try Data(contentsOf: modelInfoURL)
             return try JSONDecoder().decode(ModelInfo.self, from: data)
         } catch {
@@ -189,7 +192,7 @@ final class ModelDownloadManager: ObservableObject {
         downloadState = .downloading
         downloadStartTime = Date()
         
-        let baseURL = modelInfo.deployment.download_url
+        let baseURL = resolveDownloadBaseURL(defaultURL: modelInfo.deployment.download_url)
         let localDir = getLocalModelDirectory()
         
         // 确保本地目录存在
@@ -202,7 +205,9 @@ final class ModelDownloadManager: ObservableObject {
         ]
         
         for (index, filename) in filesToDownload.enumerated() {
-            let remoteURL = URL(string: baseURL + filename)!
+            guard let remoteURL = URL(string: baseURL + filename) else {
+                throw DownloadError.configurationError("Invalid download URL: \(baseURL)\(filename)")
+            }
             let localURL = localDir.appendingPathComponent(filename)
             
             logger.info("Downloading \(filename) from \(remoteURL)")
@@ -229,7 +234,18 @@ final class ModelDownloadManager: ObservableObject {
             downloadTask = downloadSession?.downloadTask(with: remoteURL) { tempURL, _, error in
                 
                 if let error = error {
-                    continuation.resume(throwing: DownloadError.networkError(error.localizedDescription))
+                    if let urlError = error as? URLError {
+                        switch urlError.code {
+                        case .cannotFindHost, .dnsLookupFailed:
+                            continuation.resume(throwing: DownloadError.networkError("无法解析下载域名，请检查下载地址配置或使用本地挂载文件"))
+                        case .notConnectedToInternet:
+                            continuation.resume(throwing: DownloadError.networkError("设备当前离线，请连接网络后重试"))
+                        default:
+                            continuation.resume(throwing: DownloadError.networkError(urlError.localizedDescription))
+                        }
+                    } else {
+                        continuation.resume(throwing: DownloadError.networkError(error.localizedDescription))
+                    }
                     return
                 }
                 
@@ -256,6 +272,24 @@ final class ModelDownloadManager: ObservableObject {
             
             downloadTask?.resume()
         }
+    }
+
+    private func resolveDownloadBaseURL(defaultURL: String) -> String {
+        let normalizedDefault = defaultURL.hasSuffix("/") ? defaultURL : "\(defaultURL)/"
+
+        if let userDefaultsURL = UserDefaults.standard.string(forKey: "LocalModelDownloadURL"),
+           !userDefaultsURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let trimmed = userDefaultsURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.hasSuffix("/") ? trimmed : "\(trimmed)/"
+        }
+
+        if let plistURL = Bundle.main.object(forInfoDictionaryKey: "LocalModelDownloadURL") as? String,
+           !plistURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let trimmed = plistURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.hasSuffix("/") ? trimmed : "\(trimmed)/"
+        }
+
+        return normalizedDefault
     }
     
     private func validateFileIntegrity() async -> Bool {
@@ -297,11 +331,23 @@ final class ModelDownloadManager: ObservableObject {
         return documentsPath.appendingPathComponent("LocalModels")
     }
     
-    private func getLocalModelInfoURL() -> URL {
-        guard let url = Bundle.main.url(forResource: "model_info", withExtension: "json", subdirectory: "LocalModels") else {
-            fatalError("model_info.json not found in bundle")
+    private func getLocalModelInfoURL() -> URL? {
+        // Prefer bundled model_info.json in LocalModels subdirectory (folder-reference style).
+        if let bundledURL = Bundle.main.url(forResource: "model_info", withExtension: "json", subdirectory: "LocalModels") {
+            return bundledURL
         }
-        return url
+        // Fallback to bundled model_info.json at bundle root (group-style resource copy).
+        if let bundledRootURL = Bundle.main.url(forResource: "model_info", withExtension: "json") {
+            return bundledRootURL
+        }
+        // Optionally, check Documents/LocalModels for a dynamically provided model_info.json
+        let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let dynamicURL = documentsURL.appendingPathComponent("LocalModels").appendingPathComponent("model_info.json")
+        if fileManager.fileExists(atPath: dynamicURL.path) {
+            return dynamicURL
+        }
+        logger.error("model_info.json not found in bundle or documents")
+        return nil
     }
     
     private func resetDownloadStats() {
