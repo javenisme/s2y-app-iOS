@@ -18,6 +18,7 @@ public final class EnhancedHealthChatController: ObservableObject {
     // Core components
     private let contextManager = ConversationContextManager.shared
     private let llmProvider = EnhancedLLMProvider.shared
+    private let llmOrchestrator = LLMOrchestrator.shared
     private let clarificationEngine = ConversationClarificationEngine.shared
     private let healthIntelligence = HealthIntelligenceEngine.shared
     private let historyManager = ChatHistoryManager.shared
@@ -183,7 +184,7 @@ public final class EnhancedHealthChatController: ObservableObject {
         let enhancedPrompt = createEnhancedPrompt(from: healthResponse)
         
         // Get LLM response with fallback handling
-        let llmResponse = try await llmProvider.sendMessage(enhancedPrompt, includeContext: true)
+        let llmResponse = try await llmOrchestrator.complete(message: enhancedPrompt, includeContext: true)
         
         // Combine LLM response with health intelligence
         return EnhancedChatResponse(

@@ -19,7 +19,7 @@ extension HealthAssistantView {
         @State private var isProcessing = false
         @State private var errorMessage: String?
         @State private var showingSettings = false
-        @State private var useLocalModel = false
+        @AppStorage("PreferLocalModel") private var useLocalModel = false
         
         // 本地模型相关状态
         @State private var localModelManager = LocalHealthModelManager.shared
@@ -382,6 +382,21 @@ extension HealthAssistantView {
             
             // 预加载云端服务
             await enhancedProvider.preloadLocalModel()
+            
+            // Smoke test local LLM pipeline (non-blocking)
+            Task {
+                let result = await LocalLLMService.shared.runSmokeTest()
+                await MainActor.run {
+                    switch result {
+                    case .success(let text):
+                        logger.info("Smoke test succeeded: \(text.prefix(80))…")
+                        print("[SmokeTest] succeeded: \(text.prefix(80))…")
+                    case .failure(let error):
+                        logger.error("Smoke test failed: \(error.localizedDescription)")
+                        print("[SmokeTest] failed: \(error.localizedDescription)")
+                    }
+                }
+            }
         }
         
         private func processQuickQuery(_ query: String) {
@@ -409,6 +424,32 @@ extension HealthAssistantView {
         
         private func processUserMessage(_ message: String) async {
             logger.info("Processing user message with enhanced provider")
+
+            if useLocalModel {
+                await EnhancedLLMProvider.shared.preloadLocalModel()
+            }
+            
+            if useLocalModel {
+                do {
+                    logger.info("Using LocalLLMService (mock) for local generation")
+                    print("[LocalLLMService] Using mock container for local generation")
+                    try await LocalLLMService.shared.loadModel(.phi3_5Mini)
+                    let mockText = try await LocalLLMService.shared.generateComplete(
+                        prompt: message,
+                        parameters: LocalGenerateParameters(maxTokens: 128)
+                    )
+                    await MainActor.run {
+                        let assistantMessage = ChatMessage(role: .assistant, content: mockText)
+                        messages.append(assistantMessage)
+                        isProcessing = false
+                    }
+                    logger.info("LocalLLMService generation completed")
+                    return
+                } catch {
+                    logger.error("LocalLLMService generation failed: \(error.localizedDescription). Falling back to EnhancedLLMProvider.")
+                    print("[LocalLLMService] generation failed: \(error.localizedDescription). Fallback …")
+                }
+            }
 
             let response: String
             if useLocalModel {
@@ -609,3 +650,4 @@ struct ModelDownloadView: View {
         }
     }
 }
+

@@ -250,7 +250,7 @@ private struct ModelConfiguration {
     // 模型文件路径
     var modelURL: URL? {
         if let downloadedModelURL = localModelsDirectory?
-            .appendingPathComponent("phi-3.5-mini-4bit.mlx"),
+            .appendingPathComponent("model.safetensors"),
            FileManager.default.fileExists(atPath: downloadedModelURL.path) {
             return downloadedModelURL
         }

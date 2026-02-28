@@ -399,10 +399,6 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		56E7083D2BB06FCA00B08F0A /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			productRef = 56E7083C2BB06FCA00B08F0A /* SwiftPackageListPlugin */;
-		};
 		653A255F28338800005D4D48 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 653A254C283387FE005D4D48 /* S2Y */;
@@ -412,10 +408,6 @@
 			isa = PBXTargetDependency;
 			target = 653A254C283387FE005D4D48 /* S2Y */;
 			targetProxy = 653A256828338800005D4D48 /* PBXContainerItemProxy */;
-		};
-		654AE96F2E999FFA00EBDC7B /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			productRef = 654AE96E2E999FFA00EBDC7B /* SwiftLintBuildToolPlugin */;
 		};
 /* End PBXTargetDependency section */
 
@@ -559,7 +551,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = T4MJUC97EC;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = "S2Y/Supporting Files/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -567,7 +559,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = us.s2y.s2y-ios;
+				PRODUCT_BUNDLE_IDENTIFIER = us.s2y.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -586,11 +578,9 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "S2Y/Supporting Files/S2Y.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 637867499T;
+				DEVELOPMENT_TEAM = T4MJUC97EC;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = "S2Y/Supporting Files/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -598,10 +588,9 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = us.s2y.s2y-ios;
+				PRODUCT_BUNDLE_IDENTIFIER = us.s2y.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Spezi Template Application";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
@@ -620,7 +609,7 @@
 				DEVELOPMENT_TEAM = 637867499T;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = us.s2y.s2y-ios.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = "us.s2y.s2y-ios.tests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				"SWIFT_ELicenseRef-S2Y_LOC_STRINGS" = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -637,7 +626,7 @@
 				DEVELOPMENT_TEAM = 637867499T;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = us.s2y.s2y-ios.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = "us.s2y.s2y-ios.tests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				"SWIFT_ELicenseRef-S2Y_LOC_STRINGS" = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -653,7 +642,7 @@
 				DEVELOPMENT_TEAM = 637867499T;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = us.s2y.s2y-iosuitests;
+				PRODUCT_BUNDLE_IDENTIFIER = "us.s2y.s2y-iosuitests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				"SWIFT_ELicenseRef-S2Y_LOC_STRINGS" = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -669,7 +658,7 @@
 				DEVELOPMENT_TEAM = 637867499T;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = us.s2y.s2y-iosuitests;
+				PRODUCT_BUNDLE_IDENTIFIER = "us.s2y.s2y-iosuitests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				"SWIFT_ELicenseRef-S2Y_LOC_STRINGS" = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -975,16 +964,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 5661551B2AB8384200209B80 /* XCRemoteSwiftPackageReference "swift-package-list" */;
 			productName = SwiftPackageList;
-		};
-		56E7083C2BB06FCA00B08F0A /* SwiftPackageListPlugin */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 5661551B2AB8384200209B80 /* XCRemoteSwiftPackageReference "swift-package-list" */;
-			productName = "plugin:SwiftPackageListPlugin";
-		};
-		654AE96E2E999FFA00EBDC7B /* SwiftLintBuildToolPlugin */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 654AE96C2E999FEF00EBDC7B /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */;
-			productName = "plugin:SwiftLintBuildToolPlugin";
 		};
 		654AE9852E99A1A800EBDC7B /* SpeziConsent */ = {
 			isa = XCSwiftPackageProductDependency;

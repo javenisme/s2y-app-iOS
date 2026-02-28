@@ -213,6 +213,19 @@ struct HealthAssistantView: View {
         VStack(spacing: 0) {
             Divider()
             
+            if preferLocalModel {
+                HStack {
+                    Image(systemName: "brain.head.profile.fill")
+                        .foregroundColor(.green)
+                    Text("Local AI Mode - Fully Private")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.top, 6)
+            }
+            
             HStack(spacing: 12) {
                 TextField("Ask about your health data...", text: $inputText, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
@@ -292,7 +305,17 @@ struct HealthAssistantView: View {
     
     private func processWithLLM(_ query: String) async throws -> String {
         if preferLocalModel {
-            return await enhancedProvider.sendMessageLocal(query)
+            do {
+                try await LocalLLMService.shared.loadModel(.phi3_5Mini)
+                let mockText = try await LocalLLMService.shared.generateComplete(
+                    prompt: query,
+                    parameters: LocalGenerateParameters(maxTokens: 128)
+                )
+                return mockText
+            } catch {
+                logger.error("LocalLLMService failed: \(error.localizedDescription). Falling back to EnhancedLLMProvider.")
+                return await enhancedProvider.sendMessageLocal(query)
+            }
         } else {
             return await enhancedProvider.sendMessageIntelligent(query)
         }
@@ -370,3 +393,4 @@ struct QuickQueryCard: View {
         .buttonStyle(.plain)
     }
 }
+
