@@ -11,11 +11,11 @@
   "technical": {
     "architecture": "transformer",
     "parameters": "3.8B",
-    "quantization": "4-bit",
+    "quantization": "Q4_K_M",
     "precision": "int4",
-    "model_size_mb": 1536,
+    "model_size_mb": 2282,
     "context_length": 4096,
-    "max_tokens": 512
+    "max_tokens": 2048
   },
   "requirements": {
     "min_ios_version": "18.0",
@@ -31,7 +31,7 @@
     "memory_usage_mb": 1800
   },
   "files": {
-    "model_file": "phi-3.5-mini-4bit.mlx",
+    "model_file": "model.safetensors",
     "tokenizer_file": "tokenizer.json",
     "config_file": "config.json",
     "checksum_file": "checksums.txt"
@@ -58,8 +58,8 @@
     ]
   },
   "deployment": {
-    "bundle_in_app": false,
-    "download_on_demand": true,
+    "bundle_in_app": true,
+    "download_on_demand": false,
     "download_url": "https://models.s2y.app/phi-3.5-mini/",
     "fallback_models": ["llama-3.2-1b"],
     "auto_update": true,
