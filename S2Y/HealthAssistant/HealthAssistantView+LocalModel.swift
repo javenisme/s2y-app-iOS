@@ -67,7 +67,9 @@ extension HealthAssistantView {
                     }
                 }
                 .sheet(isPresented: $showingSettings) {
-                    HealthAssistantSettingsView()
+                    NavigationStack {
+                        HealthAssistantSettingsView(showsDismissButton: true)
+                    }
                 }
                 .sheet(isPresented: $showingModelDownload) {
                     ModelDownloadView()
@@ -650,4 +652,3 @@ struct ModelDownloadView: View {
         }
     }
 }
-

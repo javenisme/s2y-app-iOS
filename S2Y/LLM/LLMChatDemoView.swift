@@ -27,8 +27,8 @@ private struct DemoChatMessage: Identifiable, Hashable, Sendable {
 
 
 struct LLMChatDemoView: View {
-    @AppStorage("cf.gatewayURL") private var gatewayURL: String = Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.GatewayURL") as? String ?? ""
-    @State private var modelPath: String = Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.ModelPath") as? String ?? ""
+    @State private var gatewayURL: String = ""
+    @State private var modelPath: String = ""
     @State private var cfToken: String = (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.BearerToken") as? String) ?? ""
     @State private var inputText: String = ""
     @State private var isSending = false
@@ -45,7 +45,7 @@ struct LLMChatDemoView: View {
             inputBar
         }
         .navigationTitle("Chat")
-        .onAppear(perform: loadKey)
+        .onAppear(perform: loadConfiguration)
     }
 
     // Removed settings form per request; values now come from Info.plist and Keychain.
@@ -107,6 +107,19 @@ struct LLMChatDemoView: View {
             .disabled(isSending || inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding()
+    }
+
+    private func loadConfiguration() {
+        let defaults = UserDefaults.standard
+        gatewayURL = (defaults.string(forKey: StorageKeys.cloudflareGatewayURL)
+            ?? (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.GatewayURL") as? String)
+            ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        modelPath = (defaults.string(forKey: StorageKeys.cloudflareModelPath)
+            ?? (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.ModelPath") as? String)
+            ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        loadKey()
     }
 
     private func loadKey() {
@@ -218,4 +231,3 @@ private func readKeychain(service: String, account: String) -> Data? {
     guard status == errSecSuccess, let data = item as? Data else { return nil }
     return data
 }
-

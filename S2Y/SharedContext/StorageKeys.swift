@@ -28,6 +28,10 @@ enum StorageKeys {
     static let disableBluetooth = "debug.disable-bluetooth"
 
     // MARK: - Voice & Language
+    /// Device-level override for the Cloudflare AI gateway URL. Empty = bundled default.
+    static let cloudflareGatewayURL = "cf.gateway-url"
+    /// Device-level override for the Cloudflare AI model path. Empty = bundled default.
+    static let cloudflareModelPath = "cf.model-path"
     /// Enable or disable voice features globally
     static let voiceEnabled = "voice.enabled"
     /// Speak assistant responses using TTS

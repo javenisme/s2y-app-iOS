@@ -9,16 +9,21 @@
 // swiftlint:disable closure_body_length sorted_imports trailing_comma
 import Security
 import SwiftUI
-import AVFoundation
 
 struct HealthAssistantSettingsView: View {
+    let showsDismissButton: Bool
+
     @Environment(\.dismiss) private var dismiss
     @State private var gatewayURL: String = ""
     @State private var modelPath: String = ""
     @State private var bearerToken: String = ""
     @State private var showingTokenField = false
     @State private var showingSuccessAlert = false
+    @State private var successMessage = "Changes saved"
     @State private var errorMessage: String?
+    @State private var hasStoredToken = false
+    @AppStorage(StorageKeys.cloudflareGatewayURL) private var storedGatewayURL = ""
+    @AppStorage(StorageKeys.cloudflareModelPath) private var storedModelPath = ""
     @AppStorage(StorageKeys.disableTimeSensitiveNotifications) private var disableTSN = false
     @AppStorage(StorageKeys.disableScheduler) private var disableScheduler = false
     @AppStorage(StorageKeys.disableBluetooth) private var disableBluetooth = false
@@ -29,146 +34,155 @@ struct HealthAssistantSettingsView: View {
     @AppStorage(StorageKeys.voiceInputLanguageCode) private var voiceInputLanguageCode = ""
     @AppStorage(StorageKeys.voiceOutputLanguageCode) private var voiceOutputLanguageCode = ""
     @AppStorage(StorageKeys.voiceSpeechRate) private var voiceSpeechRate: Double = 0.5
+
+    init(showsDismissButton: Bool = false) {
+        self.showsDismissButton = showsDismissButton
+    }
     
     var body: some View {
         Form {
+            Section {
+                Text("Adjust how the assistant connects, speaks, and stores data on this device.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                TextField("Gateway URL", text: $gatewayURL)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+                    .autocorrectionDisabled()
+
+                TextField("Model Path", text: $modelPath, axis: .vertical)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .lineLimit(2...4)
+
+                LabeledContent("Configuration Source", value: usingBundledDefaults ? "App Defaults" : "Custom on This Device")
+
+                Button("Restore Default Service Settings") {
+                    restoreDefaultServiceConfiguration()
+                }
+                .disabled(usingBundledDefaults)
+            } header: {
+                Text("Cloud Service")
+            } footer: {
+                Text("Custom gateway values override the bundled defaults only on this device.")
+            }
+
+            Section {
+                Toggle("Enable Voice Features", isOn: $voiceEnabled)
+                Toggle("Speak Assistant Responses", isOn: $voiceSpeak)
+                    .disabled(!voiceEnabled)
+
+                Picker("Input Language", selection: $voiceInputLanguageCode) {
+                    ForEach(languageOptions) { option in
+                        Text(option.title).tag(option.id)
+                    }
+                }
+                .disabled(!voiceEnabled)
+
+                Picker("Response Voice", selection: $voiceOutputLanguageCode) {
+                    ForEach(languageOptions) { option in
+                        Text(option.title).tag(option.id)
+                    }
+                }
+                .disabled(!voiceEnabled)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    LabeledContent("Speech Rate", value: voiceSpeechRate.formatted(.number.precision(.fractionLength(2))))
+                        .font(.subheadline)
+                    Slider(value: $voiceSpeechRate, in: 0.2...0.7)
+                        .disabled(!voiceEnabled || !voiceSpeak)
+                }
+            } header: {
+                Text("Voice")
+            } footer: {
+                Text("Use System Default to follow the device language for speech recognition and spoken responses.")
+            }
+
+            Section {
+                LabeledContent("Bearer Token", value: hasStoredToken ? "Saved" : "Not Set")
+
+                if showingTokenField {
+                    SecureField("Bearer Token", text: $bearerToken)
+                        .textContentType(.password)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+
+                    Button("Save Token") {
+                        saveTokenToKeychain()
+                    }
+                    .disabled(bearerToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    Button("Cancel", role: .cancel) {
+                        cancelTokenEditing()
+                    }
+                } else {
+                    Button(hasStoredToken ? "Update Token" : "Set Token") {
+                        showingTokenField = true
+                    }
+
+                    if hasStoredToken {
+                        Button("Remove Token", role: .destructive) {
+                            clearTokenFromKeychain()
+                        }
+                    }
+                }
+            } header: {
+                Text("Authentication")
+            } footer: {
+                Text("The access token is stored in Keychain and never shown in plain text after it is saved.")
+            }
+
+            Section("Data") {
+                Button("Clear Health Data Cache", role: .destructive) {
+                    HealthKitCache.shared.clearAll()
+                    presentSuccess("Health data cache cleared")
+                }
+            }
+
+            #if DEBUG
+            Section {
+                Toggle("Disable Time Sensitive Notifications", isOn: $disableTSN)
+                Toggle("Disable Scheduler", isOn: $disableScheduler)
+                Toggle("Disable Bluetooth Features", isOn: $disableBluetooth)
+            } header: {
+                Text("Developer Overrides")
+            } footer: {
+                Text("Keep test-only overrides away from normal preferences so the main settings flow stays focused.")
+            }
+            #endif
+
+            if let errorMessage {
                 Section {
-                    Text("Configure LLM service to enable intelligent health analysis features")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
                 }
-                
-                Section("Service Configuration") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Gateway URL")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        TextField("https://api.cloudflare.com/...", text: $gatewayURL)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Model Path")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        TextField("v4/accounts/.../ai-gateway/...", text: $modelPath)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                }
-
-                Section("Voice & Language") {
-                    Toggle("Enable Voice Features", isOn: $voiceEnabled)
-                    Toggle("Speak Assistant Responses", isOn: $voiceSpeak)
-
-                    Picker("Input Language", selection: $voiceInputLanguageCode) {
-                        ForEach(languageOptions) { option in
-                            Text(option.title).tag(option.id)
-                        }
-                    }
-
-                    Picker("Response Voice", selection: $voiceOutputLanguageCode) {
-                        ForEach(languageOptions) { option in
-                            Text(option.title).tag(option.id)
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Speech Rate")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Slider(value: $voiceSpeechRate, in: 0.2...0.7)
-                    }
-                    Text("Set to 'System Default' to follow the device language.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                Section("Authentication") {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Bearer Token")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text(bearerToken.isEmpty ? "Not Set" : "Set")
-                                .foregroundColor(bearerToken.isEmpty ? .red : .green)
-                        }
-                        
-                        Spacer()
-                        
-                        Button(bearerToken.isEmpty ? "Set" : "Update") {
-                            showingTokenField = true
-                        }
-                    }
-                    
-                    if showingTokenField {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Please enter your Bearer Token")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            SecureField("Bearer Token", text: $bearerToken)
-                                .textFieldStyle(.roundedBorder)
-                            
-                            HStack {
-                                Button("Cancel") {
-                                    showingTokenField = false
-                                    bearerToken = loadTokenFromKeychain() ?? ""
-                                }
-                                .buttonStyle(.bordered)
-                                
-                                Button("Save") {
-                                    saveTokenToKeychain()
-                                    showingTokenField = false
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(bearerToken.isEmpty)
-                            }
-                        }
-                    }
-                }
-
-                Section("Debug Runtime Toggles") {
-                    Toggle("Disable Time Sensitive Notifications", isOn: $disableTSN)
-                    Toggle("Disable Scheduler", isOn: $disableScheduler)
-                    Toggle("Disable Bluetooth Features", isOn: $disableBluetooth)
-                    Text("Use these during on-device debugging to temporarily disable certain features.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                Section("Cache Management") {
-                    Button("Clear Health Data Cache") {
-                        HealthKitCache.shared.clearAll()
-                        showingSuccessAlert = true
-                    }
-                    .foregroundColor(.red)
-                }
-                
-                Section {
-                    Text("Configuration information is saved in device Keychain to ensure data security")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                if let errorMessage {
-                    Section {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                    }
-                }
-        }
-        .navigationTitle("Health Assistant Settings")
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Save Configuration") {
-                    saveConfiguration()
-                }
-                .disabled(gatewayURL.isEmpty)
             }
         }
-        .alert("Success", isPresented: $showingSuccessAlert) {
+        .navigationTitle("Health Assistant")
+        .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar {
+            if showsDismissButton {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+            }
+
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") {
+                    saveConfiguration()
+                }
+            }
+        }
+        .alert("Saved", isPresented: $showingSuccessAlert) {
             Button("OK", role: .cancel) { }
         } message: {
-            Text("Operation completed")
+            Text(successMessage)
         }
         .onAppear {
             loadConfiguration()
@@ -194,26 +208,33 @@ struct HealthAssistantSettingsView: View {
     }
     
     private func loadConfiguration() {
-        // Load from Info.plist
-        gatewayURL = Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.GatewayURL") as? String ?? ""
-        modelPath = Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.ModelPath") as? String ?? ""
-        
-        // Load token from keychain
-        if let token = loadTokenFromKeychain() {
-            bearerToken = token
-        }
+        gatewayURL = resolvedGatewayURL
+        modelPath = resolvedModelPath
+        hasStoredToken = loadTokenFromKeychain() != nil
+        bearerToken = ""
+        showingTokenField = false
     }
     
     private func saveConfiguration() {
-        // Note: In a real app, you might want to save these to UserDefaults
-        // or update the Info.plist dynamically. For now, we just validate and show success.
-        
-        if !gatewayURL.isEmpty {
-            showingSuccessAlert = true
-            errorMessage = nil
-        } else {
-            errorMessage = "Please fill in required fields"
+        let normalizedGatewayURL = gatewayURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedModelPath = modelPath.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !normalizedGatewayURL.isEmpty else {
+            errorMessage = "Enter a gateway URL or restore the bundled defaults."
+            return
         }
+
+        guard URL(string: normalizedGatewayURL) != nil else {
+            errorMessage = "Enter a valid gateway URL."
+            return
+        }
+
+        storedGatewayURL = normalizedGatewayURL == bundledGatewayURL ? "" : normalizedGatewayURL
+        storedModelPath = normalizedModelPath == bundledModelPath ? "" : normalizedModelPath
+        gatewayURL = resolvedGatewayURL
+        modelPath = resolvedModelPath
+        errorMessage = nil
+        presentSuccess("Health Assistant settings saved")
     }
     
     private func loadTokenFromKeychain() -> String? {
@@ -222,26 +243,87 @@ struct HealthAssistantSettingsView: View {
     }
     
     private func saveTokenToKeychain() {
-        let keychain = Keychain()
-        
         let query = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: "gateway.token",
-            kSecValueData as String: bearerToken.data(using: .utf8)!,
+            kSecValueData as String: bearerToken.data(using: .utf8) ?? Data(),
         ] as [String: Any]
-        
-        // Delete existing item
+
         SecItemDelete(query as CFDictionary)
-        
-        // Add new item
         let status = SecItemAdd(query as CFDictionary, nil)
-        
+
         if status == errSecSuccess {
-            showingSuccessAlert = true
+            hasStoredToken = true
+            bearerToken = ""
+            showingTokenField = false
             errorMessage = nil
+            presentSuccess("Access token saved to Keychain")
         } else {
-            errorMessage = "Failed to save token"
+            errorMessage = "Failed to save token."
         }
     }
-}
 
+    private func cancelTokenEditing() {
+        showingTokenField = false
+        bearerToken = ""
+    }
+
+    private func clearTokenFromKeychain() {
+        let accountOnlyQuery = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: "gateway.token",
+        ] as [String: Any]
+        let serviceQuery = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "ai.cloudflare",
+            kSecAttrAccount as String: "gateway.token",
+        ] as [String: Any]
+
+        SecItemDelete(accountOnlyQuery as CFDictionary)
+        SecItemDelete(serviceQuery as CFDictionary)
+
+        hasStoredToken = false
+        bearerToken = ""
+        showingTokenField = false
+        errorMessage = nil
+        presentSuccess("Access token removed")
+    }
+
+    private func restoreDefaultServiceConfiguration() {
+        storedGatewayURL = ""
+        storedModelPath = ""
+        gatewayURL = bundledGatewayURL
+        modelPath = bundledModelPath
+        errorMessage = nil
+    }
+
+    private func presentSuccess(_ message: String) {
+        successMessage = message
+        showingSuccessAlert = true
+    }
+
+    private var bundledGatewayURL: String {
+        (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.GatewayURL") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    private var bundledModelPath: String {
+        (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.ModelPath") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    private var resolvedGatewayURL: String {
+        let override = storedGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        return override.isEmpty ? bundledGatewayURL : override
+    }
+
+    private var resolvedModelPath: String {
+        let override = storedModelPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        return override.isEmpty ? bundledModelPath : override
+    }
+
+    private var usingBundledDefaults: Bool {
+        storedGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && storedModelPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}

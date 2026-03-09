@@ -105,7 +105,9 @@ struct HealthAssistantView: View {
                 }
             }
             .sheet(isPresented: $showingSettings) {
-                HealthAssistantSettingsView()
+                NavigationStack {
+                    HealthAssistantSettingsView(showsDismissButton: true)
+                }
             }
             .sheet(isPresented: $showingModelDownload) {
                 ModelDownloadView()
@@ -393,4 +395,3 @@ struct QuickQueryCard: View {
         .buttonStyle(.plain)
     }
 }
-

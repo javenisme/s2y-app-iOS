@@ -35,11 +35,12 @@ import SwiftUI
 
 struct ShowcaseView: View {
     @Environment(Account.self) private var account: Account?
-    @Environment(S2YApplicationStandard.self) private var standard
     @Environment(HealthKit.self) private var healthKit
     @Environment(\.notificationSettings) private var notificationSettings
 
     @AppStorage(StorageKeys.onboardingFlowComplete) private var completedOnboardingFlow = false
+    @AppStorage(StorageKeys.disableScheduler) private var disableScheduler = false
+    @AppStorage(StorageKeys.disableBluetooth) private var disableBluetooth = false
 
     @State private var showingAccountSheet = false
     @State private var showingQuestionnaire = false
@@ -57,7 +58,7 @@ struct ShowcaseView: View {
     var body: some View {
         NavigationStack {
             contentList
-                .navigationTitle("Account & Settings")
+                .navigationTitle("Settings")
                 .viewStateAlert(state: $viewState)
                 .sheet(isPresented: $showingAccountSheet) { AccountSheet(dismissAfterSignIn: false) }
                 .sheet(isPresented: $showingQuestionnaire) { questionnaireSheet }
@@ -69,191 +70,219 @@ struct ShowcaseView: View {
     @ViewBuilder
     private var contentList: some View {
         List {
-            accountSection
-            if !FeatureFlags.disableFirebase { firebaseSection }
-            healthKitSection
-            healthAssistantSettingsSection
-            notificationsSection
-            questionnaireSection
-            schedulerSection
-            // Chat moved to dedicated tab
-            bluetoothSection
-            devicesSection
-            onboardingSection
-            legalSection
+            assistantSection
+            permissionsSection
+            appSection
             supportSection
+            developerSection
         }
+        .listStyle(.insetGrouped)
     }
 
-    #if canImport(SpeziLLM)
     @ViewBuilder
-    private var llmSection: some View {
-        Section("LLM") {
-            #if canImport(SpeziLLMOpenAI)
-            NavigationLink("OpenAI Chat Demo") { LLMChatDemoView() }
-            #else
-            Text("LLM modules present, demo view unavailable in this build.")
-                .foregroundStyle(.secondary)
-            #endif
-        }
-    }
-    #endif
-
-    @ViewBuilder
-    private var healthAssistantSettingsSection: some View {
+    private var assistantSection: some View {
         Section("Health Assistant") {
-            NavigationLink("Health Assistant Settings") {
+            NavigationLink {
                 HealthAssistantSettingsView()
-                    .navigationTitle("Health Assistant Settings")
+            } label: {
+                settingsRow(
+                    title: "Assistant Preferences",
+                    subtitle: "Voice, cloud gateway, cache, and runtime overrides",
+                    systemImage: "heart.text.square"
+                )
             }
-            Text("Configure LLM service and runtime debug toggles (e.g., disable Time Sensitive Notifications, Scheduler, Bluetooth).")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
 
-    @ViewBuilder
-    private var bluetoothSection: some View {
-        #if canImport(SpeziBluetooth)
-        Group {
-            if !UserDefaults.standard.bool(forKey: StorageKeys.disableBluetooth) {
-                Section("Bluetooth Health Devices") {
-                    NavigationLink("Manage Devices") {
-                        BluetoothDevicesView()
-                            .navigationTitle("Bluetooth Devices")
-                    }
-                    Text("Connect health devices like blood pressure monitors, weight scales, and pulse oximeters.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            if !disableBluetooth {
+                NavigationLink {
+                    BluetoothDevicesView()
+                        .navigationTitle("Bluetooth Devices")
+                } label: {
+                    settingsRow(
+                        title: "Connected Devices",
+                        subtitle: "Manage Bluetooth health accessories",
+                        systemImage: "wave.3.right.circle",
+                        value: "Bluetooth"
+                    )
+                }
+            }
+
+            if !disableScheduler {
+                NavigationLink {
+                    ScheduleView(presentingAccount: .constant(false))
+                        .navigationTitle("Schedule")
+                } label: {
+                    settingsRow(
+                        title: "Reminders & Schedule",
+                        subtitle: "Review scheduled tasks and questionnaires",
+                        systemImage: "calendar.badge.clock"
+                    )
                 }
             } else {
-                Section("Bluetooth Health Devices") {
-                    Text("Disabled for runtime debugging")
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        #else
-        EmptyView()
-        #endif
-    }
-
-    @ViewBuilder
-    private var devicesSection: some View {
-        Section("System Settings") {
-            Button("Open Bluetooth Settings") { openAppSettings() }
-            Text("Enable Bluetooth in system settings to connect health devices.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    @ViewBuilder
-    private var accountSection: some View {
-        Section("Account") {
-            if let account, let details = account.details {
-                LabeledContent("User ID", value: details.userId)
-                LabeledContent("Name", value: PersonNameComponentsFormatter().string(from: details.name ?? PersonNameComponents()))
-                Button("Manage Account") { showingAccountSheet = true }
-            } else if FeatureFlags.disableFirebase {
-                Text("Account is disabled (Firebase is turned off). Enable Firebase to use account features.")
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("Not signed in")
-                    .foregroundStyle(.secondary)
-                // Only show the button if Account environment is available
-                if account != nil {
-                    Button("Manage Account") { showingAccountSheet = true }
-                }
+                settingsRow(
+                    title: "Reminders & Schedule",
+                    subtitle: "Scheduling is currently disabled by a developer override",
+                    systemImage: "calendar.badge.exclamationmark",
+                    value: "Off"
+                )
             }
         }
     }
 
     @ViewBuilder
-    private var firebaseSection: some View {
-        Section("Firebase") {
-            Button("Write Sample Firestore Document") { writeSampleFirestore() }
-            Button("Upload Sample to Storage") { uploadSampleStorage() }
-        }
-    }
-
-    @ViewBuilder
-    private var healthKitSection: some View {
-        Section("HealthKit") {
-            LabeledContent("Authorized", value: isHealthAuthorized ? "Yes" : "No")
-            if HKHealthStore.isHealthDataAvailable() && !isHealthAuthorized {
-                NavigationLink("Request Permissions") {
-                    HealthKitPermissions()
-                        .navigationTitle("Health Permissions")
-                }
+    private var permissionsSection: some View {
+        Section("Permissions") {
+            NavigationLink {
+                HealthKitPermissions()
+                    .navigationTitle("Health Permissions")
+            } label: {
+                settingsRow(
+                    title: "Health Access",
+                    subtitle: isHealthAuthorized ? "Permissions are already granted" : "Review what health data the assistant can access",
+                    systemImage: "heart.circle",
+                    value: isHealthAuthorized ? "Allowed" : "Review"
+                )
             }
-        }
-    }
 
-    @ViewBuilder
-    private var notificationsSection: some View {
-        Section("Notifications") {
-            LabeledContent("Authorized", value: notificationAuthorized ? "Yes" : "No")
-            Button("Open Notification Settings") { openAppSettings() }
-        }
-    }
-
-    @ViewBuilder
-    private var questionnaireSection: some View {
-        Section("Questionnaire") {
-            Button("Present Social Support Questionnaire") { showingQuestionnaire = true }
-        }
-    }
-
-    @ViewBuilder
-    private var schedulerSection: some View {
-        Group {
-            if !UserDefaults.standard.bool(forKey: StorageKeys.disableScheduler) {
-                Section("Scheduler") {
-                    NavigationLink("Open Schedule") {
-                        ScheduleView(presentingAccount: .constant(false))
-                            .navigationTitle("Schedule")
-                    }
-                }
-            } else {
-                Section("Scheduler") {
-                    Text("Disabled for runtime debugging")
-                        .foregroundStyle(.secondary)
-                }
+            Button(action: openAppSettings) {
+                settingsRow(
+                    title: "Notifications",
+                    subtitle: "Manage alerts and time-sensitive notifications in the Settings app",
+                    systemImage: "bell.badge",
+                    value: notificationAuthorized ? "On" : "Off"
+                )
             }
+            .buttonStyle(.plain)
+
+            Button(action: openAppSettings) {
+                settingsRow(
+                    title: "App Permissions",
+                    subtitle: disableBluetooth ? "Bluetooth features are currently disabled by a developer override" : "Review Bluetooth and other system permissions in the Settings app",
+                    systemImage: "switch.2",
+                    value: disableBluetooth ? "Debug Off" : nil
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 
     @ViewBuilder
-    private var onboardingSection: some View {
-        Section("Onboarding") {
-            Button("Run Onboarding Again") {
+    private var appSection: some View {
+        Section("App") {
+            Button {
+                showingQuestionnaire = true
+            } label: {
+                settingsRow(
+                    title: "Social Support Questionnaire",
+                    subtitle: "Preview the in-app questionnaire experience",
+                    systemImage: "list.bullet.clipboard"
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button {
                 completedOnboardingFlow = false
                 showingOnboarding = true
+            } label: {
+                settingsRow(
+                    title: "Run Onboarding Again",
+                    subtitle: "Revisit permissions and setup guidance",
+                    systemImage: "figure.walk.motion"
+                )
             }
-        }
-    }
-
-    @ViewBuilder
-    private var legalSection: some View {
-        Section("Legal & Privacy") {
-            NavigationLink("Privacy Policy") {
-                WebLinkView(title: "Privacy Policy", url: URL(string: "https://www.stanford.edu/site/privacy/")!)
-            }
-            NavigationLink("Open-Source Licenses") { ContributionsList(projectLicense: .mit) }
+            .buttonStyle(.plain)
         }
     }
 
     @ViewBuilder
     private var supportSection: some View {
-        Section("Support") {
+        Section("About & Support") {
+            NavigationLink("Privacy Policy") {
+                WebLinkView(title: "Privacy Policy", url: URL(string: "https://www.stanford.edu/site/privacy/")!)
+            }
+            NavigationLink("Open-Source Licenses") { ContributionsList(projectLicense: .mit) }
+            NavigationLink("About") { AboutView() }
             if let url = URL(string: "https://github.com/StanfordBDHG/S2Y/issues/new") {
                 Link("Report a Bug", destination: url)
             }
             if let url = URL(string: "https://github.com/StanfordBDHG/S2Y") {
                 Link("Help Center", destination: url)
             }
-            NavigationLink("About") { AboutView() }
+        }
+    }
+
+    @ViewBuilder
+    private var developerSection: some View {
+        #if DEBUG
+        Section {
+            if !FeatureFlags.disableFirebase {
+                Button("Write Sample Firestore Document") { writeSampleFirestore() }
+                Button("Upload Sample to Storage") { uploadSampleStorage() }
+            }
+
+            if let account, let details = account.details {
+                NavigationLink {
+                    ProfileView()
+                } label: {
+                    settingsRow(
+                        title: "Account",
+                        subtitle: details.userId,
+                        systemImage: "person.crop.circle"
+                    )
+                }
+            } else if account != nil {
+                Button("Manage Account") { showingAccountSheet = true }
+            }
+
+            #if canImport(SpeziLLMOpenAI)
+            NavigationLink {
+                LLMChatDemoView()
+            } label: {
+                settingsRow(
+                    title: "LLM Chat Demo",
+                    subtitle: "Internal test surface for the Cloudflare gateway",
+                    systemImage: "sparkles.rectangle.stack"
+                )
+            }
+            #endif
+        } header: {
+            Text("Developer")
+        } footer: {
+            Text("Developer tools are separated from day-to-day settings so the main experience stays focused.")
+        }
+        #endif
+    }
+
+    @ViewBuilder
+    private func settingsRow(
+        title: String,
+        subtitle: String? = nil,
+        systemImage: String,
+        value: String? = nil
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .semibold))
+                .frame(width: 24)
+                .foregroundStyle(.tint)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .foregroundStyle(.primary)
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer(minLength: 12)
+
+            if let value {
+                Text(value)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

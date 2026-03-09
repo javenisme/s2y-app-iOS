@@ -53,7 +53,9 @@ struct EnhancedHealthAssistantView: View {
                 }
             }
             .sheet(isPresented: $showingSettings) {
-                HealthAssistantSettingsView()
+                NavigationStack {
+                    HealthAssistantSettingsView(showsDismissButton: true)
+                }
             }
         }
         .task {

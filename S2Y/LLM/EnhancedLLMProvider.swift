@@ -173,8 +173,15 @@ public final class EnhancedLLMProvider: ObservableObject {
     }
     
     private func loadGatewayConfig() throws -> (String, String) {
-        let gatewayURL = (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.GatewayURL") as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let modelPath = (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.ModelPath") as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let defaults = UserDefaults.standard
+        let bundledGatewayURL = (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.GatewayURL") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let bundledModelPath = (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.ModelPath") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let gatewayURL = (defaults.string(forKey: StorageKeys.cloudflareGatewayURL) ?? bundledGatewayURL)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let modelPath = (defaults.string(forKey: StorageKeys.cloudflareModelPath) ?? bundledModelPath)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !gatewayURL.isEmpty else { throw LLMError.apiKeyMissing }
         return (gatewayURL, modelPath)
     }

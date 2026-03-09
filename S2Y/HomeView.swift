@@ -15,7 +15,7 @@ struct HomeView: View {
         case healthAssistant
         case schedule
         case contact
-        case showcase
+        case settings
     }
 
 
@@ -39,10 +39,10 @@ struct HomeView: View {
                 ProfileView()
             }
             .customizationID("home.contacts")
-            Tab("Settings", systemImage: "gear", value: .showcase) {
+            Tab("Settings", systemImage: "gearshape", value: .settings) {
                 ShowcaseView()
             }
-            .customizationID("home.showcase")
+            .customizationID("home.settings")
         }
         .tabViewStyle(.sidebarAdaptable)
         .tabViewCustomization($tabViewCustomization)
