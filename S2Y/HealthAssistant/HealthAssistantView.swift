@@ -8,9 +8,10 @@
 
 // swiftlint:disable closure_body_length
 
+import HealthKit
+import OSLog
 import Security
 import SwiftUI
-import OSLog
 
 // Simple Keychain wrapper
 struct Keychain {
@@ -54,7 +55,7 @@ struct HealthAssistantView: View {
     @State private var inputText: String = ""
     @State private var messages: [ChatMessage] = []
     @State private var isProcessing = false
-    @State private var errorMessage: String?
+    @State private var notice: AssistantNotice?
     @State private var showingSettings = false
     @State private var showingModelDownload = false
     @AppStorage("PreferLocalModel") private var preferLocalModel = false
@@ -62,20 +63,17 @@ struct HealthAssistantView: View {
     private let healthService = HealthKitService.shared
     private let enhancedProvider = EnhancedLLMProvider.shared
     private let logger = Logger(subsystem: "com.s2y.app", category: "HealthAssistantView")
+    private let isRunningInSimulator = ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 if messages.isEmpty {
                     welcomeView
                 } else {
                     messagesScrollView
                 }
-                
-                if let errorMessage {
-                    errorBanner(errorMessage)
-                }
-                
+
                 inputBar
             }
             .navigationTitle("Health Assistant")
@@ -83,12 +81,6 @@ struct HealthAssistantView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 12) {
-                        Button {
-                            preferLocalModel.toggle()
-                        } label: {
-                            Image(systemName: preferLocalModel ? "brain.head.profile.fill" : "cloud.fill")
-                                .accessibilityLabel(preferLocalModel ? "Local Mode" : "Cloud Mode")
-                        }
                         Button {
                             showingModelDownload = true
                         } label: {
@@ -98,7 +90,7 @@ struct HealthAssistantView: View {
                         Button {
                             showingSettings = true
                         } label: {
-                            Image(systemName: "gear")
+                            Image(systemName: "gearshape")
                                 .accessibilityLabel("Settings")
                         }
                     }
@@ -125,64 +117,40 @@ struct HealthAssistantView: View {
     }
     
     private var welcomeContent: some View {
-        VStack(spacing: 24) {
-                VStack(spacing: 16) {
-                    Image(systemName: "heart.text.square.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.red)
-                        .accessibilityLabel("Health Assistant Icon")
-                    
-                    Text("Health Assistant")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                    
-                    Text("Ask natural language questions about your health data to get personalized insights and guidance.")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+        VStack(alignment: .leading, spacing: 16) {
+            welcomeHero
+
+            if let notice {
+                noticeCard(notice: notice)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Suggested Questions")
+                    .font(.headline)
+                    .padding(.horizontal, 4)
+
+                ForEach(quickQuerySuggestions) { suggestion in
+                    QuickQueryRow(suggestion: suggestion) {
+                        inputText = suggestion.query
+                    }
                 }
-                
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
-                    QuickQueryCard(
-                        icon: "figure.walk",
-                        title: "Step Trends",
-                        query: "How have my step counts trended over the past 7 days?",
-                        action: { inputText = "How have my step counts trended over the past 7 days?" }
-                    )
-                    
-                    QuickQueryCard(
-                        icon: "heart.fill",
-                        title: "Heart Rate Comparison",
-                        query: "Compare my average heart rate this week versus last week.",
-                        action: { inputText = "Compare my average heart rate this week versus last week." }
-                    )
-                    
-                    QuickQueryCard(
-                        icon: "bed.double.fill",
-                        title: "Sleep Analysis",
-                        query: "How has my sleep quality been recently?",
-                        action: { inputText = "How has my sleep quality been recently?" }
-                    )
-                    
-                    QuickQueryCard(
-                        icon: "flame.fill",
-                        title: "Active Energy",
-                        query: "How has my active energy changed over the past 30 days?",
-                        action: { inputText = "How has my active energy changed over the past 30 days?" }
-                    )
-                }
-                .padding(.horizontal)
-                
-                Spacer(minLength: 100)
+            }
+
+            Spacer(minLength: 24)
         }
-        .padding(.top, 32)
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 24)
     }
     
     private var messagesScrollView: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 16) {
+                    if let notice {
+                        noticeCard(notice: notice)
+                    }
+
                     ForEach(messages) { message in
                         MessageBubble(message: message)
                             .id(message.id)
@@ -201,7 +169,7 @@ struct HealthAssistantView: View {
                 }
                 .padding()
             }
-            .onChange(of: messages.count) { _ in
+            .onChange(of: messages.count) {
                 if let lastMessage = messages.last {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
@@ -217,9 +185,7 @@ struct HealthAssistantView: View {
             
             if preferLocalModel {
                 HStack {
-                    Image(systemName: "brain.head.profile.fill")
-                        .foregroundColor(.green)
-                    Text("Local AI Mode - Fully Private")
+                    Label("Local AI enabled", systemImage: "brain.head.profile")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Spacer()
@@ -248,31 +214,57 @@ struct HealthAssistantView: View {
             }
             .padding()
         }
+        .background(.bar)
     }
     
-    private func errorBanner(_ message: String) -> some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle")
-                .foregroundColor(.orange)
-                .accessibilityLabel("Warning")
-            Text(message)
-                .font(.caption)
+    private func noticeCard(notice: AssistantNotice) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: notice.tone.systemImage)
+                .foregroundColor(notice.tone.tint)
+                .accessibilityLabel(notice.tone.accessibilityLabel)
+
+            Text(notice.message)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
             Spacer()
+
             Button("Dismiss") {
-                errorMessage = nil
+                self.notice = nil
             }
             .font(.caption)
+            .foregroundStyle(.secondary)
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(Color.orange.opacity(0.1))
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(notice.tone.tint.opacity(0.12))
+        )
     }
     
     private func initializeHealthKit() async {
+        if isRunningInSimulator {
+            notice = AssistantNotice(
+                message: "Simulator preview: use a physical iPhone for live Health data.",
+                tone: .info
+            )
+            return
+        }
+
+        guard HKHealthStore.isHealthDataAvailable() else {
+            notice = AssistantNotice(
+                message: "Health data is not available on this device yet. Open the app on an iPhone with Health access enabled to test live queries.",
+                tone: .warning
+            )
+            return
+        }
+
         do {
             try await healthService.requestAuthorization()
         } catch {
-            errorMessage = "HealthKit authorization failed: \(error.localizedDescription)"
+            notice = AssistantNotice(
+                message: "HealthKit authorization failed: \(error.localizedDescription)",
+                tone: .warning
+            )
         }
     }
     
@@ -283,7 +275,7 @@ struct HealthAssistantView: View {
         let query = inputText
         inputText = ""
         isProcessing = true
-        errorMessage = nil
+        notice = nil
         
         do {
             let response = try await processHealthQuery(query)
@@ -320,6 +312,155 @@ struct HealthAssistantView: View {
             }
         } else {
             return await enhancedProvider.sendMessageIntelligent(query)
+        }
+    }
+
+    private var welcomeHero: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.red.opacity(0.12))
+                        .frame(width: 54, height: 54)
+
+                    Image(systemName: "heart.text.square.fill")
+                        .font(.title3)
+                        .foregroundColor(.red)
+                        .accessibilityLabel("Health Assistant Icon")
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Ask about your health in plain language")
+                        .font(.title3.weight(.semibold))
+
+                    Text("Explore steps, heart rate, sleep, and activity trends without digging through charts first.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            HStack(spacing: 10) {
+                modeChip(
+                    title: preferLocalModel ? "Local AI" : "Cloud AI",
+                    systemImage: preferLocalModel ? "brain.head.profile" : "icloud",
+                    tint: preferLocalModel ? .green : .blue
+                ) {
+                    preferLocalModel.toggle()
+                }
+
+                statusChip(
+                    title: isRunningInSimulator ? "Simulator Preview" : (HKHealthStore.isHealthDataAvailable() ? "HealthKit Ready" : "Unavailable"),
+                    systemImage: isRunningInSimulator ? "iphone" : (HKHealthStore.isHealthDataAvailable() ? "heart.circle" : "exclamationmark.circle"),
+                    tint: isRunningInSimulator ? .orange : (HKHealthStore.isHealthDataAvailable() ? .pink : .orange)
+                )
+            }
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color(uiColor: .secondarySystemGroupedBackground))
+        )
+    }
+
+    private func modeChip(
+        title: String,
+        systemImage: String,
+        tint: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                Text(title)
+                    .fontWeight(.semibold)
+            }
+            .font(.subheadline)
+            .foregroundStyle(tint)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(tint.opacity(0.12))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func statusChip(title: String, systemImage: String, tint: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+            Text(title)
+                .fontWeight(.semibold)
+        }
+        .font(.subheadline)
+        .foregroundStyle(tint)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(tint.opacity(0.12))
+        .clipShape(Capsule())
+    }
+
+    private var quickQuerySuggestions: [QuickQuerySuggestion] {
+        [
+            QuickQuerySuggestion(
+                icon: "figure.walk",
+                title: "Step Trends",
+                subtitle: "7-day movement snapshot",
+                query: "How have my step counts trended over the past 7 days?"
+            ),
+            QuickQuerySuggestion(
+                icon: "heart.fill",
+                title: "Heart Rate Comparison",
+                subtitle: "This week versus last week",
+                query: "Compare my average heart rate this week versus last week."
+            ),
+            QuickQuerySuggestion(
+                icon: "bed.double.fill",
+                title: "Sleep Analysis",
+                subtitle: "Recent rest and recovery",
+                query: "How has my sleep quality been recently?"
+            ),
+            QuickQuerySuggestion(
+                icon: "flame.fill",
+                title: "Active Energy",
+                subtitle: "30-day activity change",
+                query: "How has my active energy changed over the past 30 days?"
+            )
+        ]
+    }
+}
+
+private struct AssistantNotice {
+    let message: String
+    let tone: Tone
+
+    enum Tone {
+        case info
+        case warning
+
+        var systemImage: String {
+            switch self {
+            case .info:
+                return "info.circle"
+            case .warning:
+                return "exclamationmark.triangle"
+            }
+        }
+
+        var tint: Color {
+            switch self {
+            case .info:
+                return .blue
+            case .warning:
+                return .orange
+            }
+        }
+
+        var accessibilityLabel: String {
+            switch self {
+            case .info:
+                return "Information"
+            case .warning:
+                return "Warning"
+            }
         }
     }
 }
@@ -362,35 +503,59 @@ struct MessageBubble: View {
     }
 }
 
-struct QuickQueryCard: View {
+private struct QuickQuerySuggestion: Identifiable {
+    let id = UUID()
     let icon: String
     let title: String
+    let subtitle: String
     let query: String
+}
+
+private struct QuickQueryRow: View {
+    let suggestion: QuickQuerySuggestion
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundColor(.blue)
-                    .accessibilityLabel(title)
-                
-                Text(title)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                
-                Text(query)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.blue.opacity(0.12))
+                        .frame(width: 48, height: 48)
+
+                    Image(systemName: suggestion.icon)
+                        .font(.title3)
+                        .foregroundColor(.blue)
+                        .accessibilityLabel(suggestion.title)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(suggestion.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    Text(suggestion.subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Text(suggestion.query)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 12)
+
+                Image(systemName: "arrow.up.left.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.tertiary)
             }
-            .padding()
-            .frame(height: 120)
-            .frame(maxWidth: .infinity)
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(12)
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color(uiColor: .secondarySystemGroupedBackground))
+            )
         }
         .buttonStyle(.plain)
     }
