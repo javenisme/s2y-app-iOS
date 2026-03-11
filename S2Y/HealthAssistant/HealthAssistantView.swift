@@ -52,6 +52,8 @@ enum HealthAssistantError: Error, LocalizedError {
 }
 
 struct HealthAssistantView: View {
+    @Environment(\.homeDrawerProgress) private var homeDrawerProgress
+
     @State private var inputText: String = ""
     @State private var messages: [ChatMessage] = []
     @State private var isProcessing = false
@@ -76,6 +78,7 @@ struct HealthAssistantView: View {
 
                 inputBar
             }
+            .blur(radius: homeDrawerProgress * 2)
             .navigationTitle("Health Assistant")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -215,6 +218,8 @@ struct HealthAssistantView: View {
             .padding()
         }
         .background(.bar)
+        .offset(y: homeDrawerProgress * 84)
+        .animation(.snappy(duration: 0.28, extraBounce: 0), value: homeDrawerProgress)
     }
     
     private func noticeCard(notice: AssistantNotice) -> some View {
