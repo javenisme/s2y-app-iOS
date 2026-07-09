@@ -28,7 +28,7 @@ jobs:
       contents: read
     with:
       artifactname: S2Y.xcresult
-      runsonlabels: '["macOS", "self-hosted"]'
+      runsonlabels: '["macos-15"]'
       checkout_submodules: true
       setupfirebaseemulator: true
       firebasejsonpath: ./firebase/firebase.json
