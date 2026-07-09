@@ -88,6 +88,8 @@ class LocalHealthModelManager {
         tokenizer = nil
         isModelLoaded = false
         modelStatus = .notLoaded
+        loadingProgress = 0.0
+        lastError = nil
         
         // 清理MLX缓存
         MLX.clearCache()

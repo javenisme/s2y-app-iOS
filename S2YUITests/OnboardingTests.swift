@@ -79,7 +79,7 @@ extension XCUIApplication {
     }
     
     private func navigateOnboardingFlowWelcome() throws {
-        XCTAssertTrue(staticTexts["Spezi\nTemplate Application"].waitForExistence(timeout: 5))
+        XCTAssertTrue(staticTexts["S2Y Health Assistant"].waitForExistence(timeout: 5))
         
         XCTAssertTrue(buttons["Learn More"].exists)
         buttons["Learn More"].tap()

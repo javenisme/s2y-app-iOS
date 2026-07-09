@@ -30,8 +30,9 @@ final class SchedulerTests: XCTestCase {
         // Waiting until the setup test accounts actions have been finished & sheets are dismissed.
         sleep(for: .seconds(5))
         
-        XCTAssertTrue(app.tabBars["Tab Bar"].buttons["Schedule"].exists)
-        app.tabBars["Tab Bar"].buttons["Schedule"].tap()
+        app.buttons["Open Navigation Drawer"].tap()
+        XCTAssertTrue(app.buttons["Schedule"].waitForExistence(timeout: 2))
+        app.buttons["Schedule"].tap()
         
         XCTAssertTrue(app.buttons["Start Questionnaire"].waitForExistence(timeout: 2))
         app.buttons["Start Questionnaire"].tap()

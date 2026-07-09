@@ -84,6 +84,8 @@ class LocalHealthModelManager_Simplified {
         isModelSimulationReady = false
         isModelLoaded = false
         modelStatus = .notLoaded
+        loadingProgress = 0.0
+        lastError = nil
     }
     
     // MARK: - Private Implementation

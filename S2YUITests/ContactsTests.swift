@@ -17,7 +17,7 @@ final class ContactsTests: XCTestCase {
         
         let app = XCUIApplication()
         app.launchArguments = ["--skipOnboarding"]
-        app.launch()
+        app.deleteAndLaunch(withSpringboardAppName: "Spezi")
     }
     
     
@@ -30,16 +30,15 @@ final class ContactsTests: XCTestCase {
         // Waiting until the setup test accounts actions have been finished & sheets are dismissed.
         sleep(for: .seconds(5))
         
-        XCTAssertTrue(app.tabBars["Tab Bar"].buttons["Contacts"].waitForExistence(timeout: 1))
-        app.tabBars["Tab Bar"].buttons["Contacts"].tap()
+        app.buttons["Open Navigation Drawer"].tap()
         
-        XCTAssertTrue(app.staticTexts["Contact: Leland Stanford"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.buttons["Open account"].waitForExistence(timeout: 2))
+        app.buttons["Open account"].tap()
         
-        XCTAssertTrue(app.buttons["Call"].exists)
-        XCTAssertTrue(app.buttons["Text"].exists)
-        XCTAssertTrue(app.buttons["Email"].exists)
-        XCTAssertTrue(app.buttons["Website"].exists)
-        
-        XCTAssertTrue(app.buttons["Address: 450 Serra Mall\nStanford CA 94305\nUSA"].exists)
+        XCTAssertTrue(app.navigationBars["Account"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Welcome"].exists)
+        XCTAssertTrue(app.staticTexts["Not signed in"].exists)
+        XCTAssertTrue(app.buttons["About"].exists)
+        XCTAssertTrue(app.buttons["Open-Source Licenses"].exists)
     }
 }

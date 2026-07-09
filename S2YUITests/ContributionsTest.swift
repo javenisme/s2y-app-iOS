@@ -29,11 +29,12 @@ final class ContributionsTest: XCTestCase {
         // Waiting until the setup test accounts actions have been finished & sheets are dismissed.
         sleep(for: .seconds(5))
         
-        XCTAssertTrue(app.navigationBars.buttons["Your Account"].waitForExistence(timeout: 6.0))
-        app.navigationBars.buttons["Your Account"].tap()
+        app.buttons["Open Navigation Drawer"].tap()
+        XCTAssertTrue(app.buttons["Open account"].waitForExistence(timeout: 6.0))
+        app.buttons["Open account"].tap()
         
-        XCTAssertTrue(app.buttons["License Information"].waitForExistence(timeout: 2))
-        app.buttons["License Information"].tap()
+        XCTAssertTrue(app.buttons["Open-Source Licenses"].waitForExistence(timeout: 2))
+        app.buttons["Open-Source Licenses"].tap()
         XCTAssertTrue(app.buttons["Spezi, MIT, Version: 1.0.0"].waitForExistence(timeout: 3))
     }
 }
