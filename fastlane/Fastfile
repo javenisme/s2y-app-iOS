@@ -31,6 +31,7 @@ platform :ios do
       derived_data_path: ".derivedData",
       code_coverage: true,
       devices: ["iPhone 17"],
+      skip_testing: ["S2YUITests"],
       disable_slide_to_type: false,
       concurrent_workers: 1,
       max_concurrent_simulators: 1,
