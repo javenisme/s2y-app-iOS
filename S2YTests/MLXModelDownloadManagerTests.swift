@@ -12,6 +12,7 @@ import XCTest
 // MARK: - MLXModelDownloadManager Tests
 // ============================================================
 
+@MainActor
 final class MLXModelDownloadManagerTests: XCTestCase {
     
     var manager: MLXModelDownloadManager!
@@ -79,9 +80,11 @@ final class MLXModelDownloadManagerTests: XCTestCase {
     // Helper function to test model sizes
     private func getModelFileSize(for config: LocalModelConfig) -> Int64 {
         switch config {
+        case .phi3_5Mini: return 10_485_760
         case .phi4Mini: return 2_500_000_000
         case .llama3_8b: return 4_900_000_000
         case .mistralNemo: return 7_000_000_000
+        case .tinyLlama: return 10_485_760
         }
     }
     
