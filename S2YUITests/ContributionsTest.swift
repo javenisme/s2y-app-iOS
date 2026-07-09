@@ -29,12 +29,13 @@ final class ContributionsTest: XCTestCase {
         // Waiting until the setup test accounts actions have been finished & sheets are dismissed.
         sleep(for: .seconds(5))
         
-        app.buttons["Open Navigation Drawer"].tap()
-        XCTAssertTrue(app.buttons["Open account"].waitForExistence(timeout: 6.0))
-        app.buttons["Open account"].tap()
+        app.openHomeDrawer()
+        XCTAssertTrue(app.buttons["drawer.account"].waitForExistence(timeout: 6.0))
+        app.buttons["drawer.account"].tap()
         
-        XCTAssertTrue(app.buttons["Open-Source Licenses"].waitForExistence(timeout: 2))
-        app.buttons["Open-Source Licenses"].tap()
-        XCTAssertTrue(app.buttons["Spezi, MIT, Version: 1.0.0"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["profile.licenses"].waitForExistence(timeout: 4))
+        app.buttons["profile.licenses"].tap()
+        XCTAssertTrue(app.navigationBars["Open-Source Licenses"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Spezi")).firstMatch.waitForExistence(timeout: 4))
     }
 }

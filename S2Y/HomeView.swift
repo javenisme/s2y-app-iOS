@@ -241,6 +241,8 @@ struct HomeView: View {
                 )
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Open account")
+            .accessibilityIdentifier("drawer.account")
         }
         .padding(.horizontal, 20)
         .padding(.top, 28)
@@ -286,6 +288,8 @@ struct HomeView: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(tab.title)
+        .accessibilityIdentifier("drawer.\(tab.rawValue)")
         .padding(.horizontal, 14)
     }
 
@@ -318,6 +322,7 @@ struct HomeView: View {
         .padding(.leading, 16)
         .padding(.top, 8)
         .accessibilityLabel(isDrawerOpen ? "Close Navigation Drawer" : "Open Navigation Drawer")
+        .accessibilityIdentifier("home.drawer.toggle")
     }
 
     private func closeDrawer() {

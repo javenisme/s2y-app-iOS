@@ -30,15 +30,27 @@ final class ContactsTests: XCTestCase {
         // Waiting until the setup test accounts actions have been finished & sheets are dismissed.
         sleep(for: .seconds(5))
         
-        app.buttons["Open Navigation Drawer"].tap()
+        app.openHomeDrawer()
         
-        XCTAssertTrue(app.buttons["Open account"].waitForExistence(timeout: 2))
-        app.buttons["Open account"].tap()
+        XCTAssertTrue(app.buttons["drawer.account"].waitForExistence(timeout: 6))
+        app.buttons["drawer.account"].tap()
         
         XCTAssertTrue(app.navigationBars["Account"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.staticTexts["Welcome"].exists)
         XCTAssertTrue(app.staticTexts["Not signed in"].exists)
         XCTAssertTrue(app.buttons["About"].exists)
         XCTAssertTrue(app.buttons["Open-Source Licenses"].exists)
+    }
+}
+
+
+extension XCUIApplication {
+    func openHomeDrawer() {
+        let drawerToggle = buttons["home.drawer.toggle"].firstMatch
+        if drawerToggle.waitForExistence(timeout: 6) {
+            drawerToggle.tap()
+        } else {
+            buttons["Open Navigation Drawer"].firstMatch.tap()
+        }
     }
 }
