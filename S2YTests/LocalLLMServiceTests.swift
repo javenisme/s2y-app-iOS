@@ -176,7 +176,8 @@ final class LocalLLMServiceTests: XCTestCase {
         
         // Should throw modelNotLoaded error
         do {
-            _ = try await stream.first(where: { _ in true })
+            var iterator = stream.makeAsyncIterator()
+            _ = try await iterator.next()
             XCTFail("Expected modelNotLoaded error")
         } catch {
             XCTAssertTrue(error is LocalLLMError)
