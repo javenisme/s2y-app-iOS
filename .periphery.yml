@@ -6,6 +6,10 @@
 # SPDX-License-Identifier: MIT
 #
 
-project: TemplateApplication.xcodeproj
+project: S2Y.xcodeproj
 schemes:
-- TemplateApplication
+- S2Y
+targets:
+- S2Y
+- S2YTests
+- S2YUITests

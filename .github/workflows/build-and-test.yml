@@ -24,7 +24,7 @@ jobs:
     permissions:
       contents: read
     with:
-      artifactname: TemplateApplication.xcresult
+      artifactname: S2Y.xcresult
       runsonlabels: '["macOS", "self-hosted"]'
       checkout_submodules: true
       setupfirebaseemulator: true
@@ -37,6 +37,6 @@ jobs:
     permissions:
       contents: read
     with:
-      coveragereports: TemplateApplication.xcresult
+      coveragereports: S2Y.xcresult
     secrets:
       token: ${{ secrets.CODECOV_TOKEN }}

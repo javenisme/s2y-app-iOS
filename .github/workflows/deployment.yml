@@ -107,7 +107,9 @@ jobs:
         run: |
           echo "Injecting Environment Variables In Deployment Workflow ..."
           if [[ -z "${{ inputs.version }}" ]]; then
-            IFS='.' read -r MAJOR MINOR PATCH <<< "${{ steps.get-latest-tag.outputs.tag }}"
+            TAG="${{ steps.get-latest-tag.outputs.tag }}"
+            TAG="${TAG#v}"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$TAG"
 
             PATCH=$((PATCH + 1))
             NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
@@ -137,7 +139,7 @@ jobs:
     with:
       runsonlabels: '["macOS", "self-hosted"]'
       environment: ${{ needs.determineenvironment.outputs.environment }}
-      googleserviceinfoplistpath: 'TemplateApplication/Supporting Files/GoogleService-Info.plist'
+      googleserviceinfoplistpath: 'S2Y/Supporting Files/GoogleService-Info.plist'
       setupsigning: true
       fastlanelane: deploy environment:"${{ needs.determineenvironment.outputs.environment }}" versionname:"${{ needs.vars.outputs.version }}" releasenotes:"${{ inputs.releasenotes }}" ${{ inputs.buildnumber && format('buildnumber:"{0}"', inputs.buildnumber) || '' }}
     secrets: inherit

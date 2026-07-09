@@ -10,7 +10,7 @@ import XCTest
 import XCTestExtensions
 
 
-class SchedulerTests: XCTestCase {
+final class SchedulerTests: XCTestCase {
     @MainActor
     override func setUp() async throws {
         continueAfterFailure = false
@@ -22,13 +22,13 @@ class SchedulerTests: XCTestCase {
     
     
     @MainActor
-    func testScheduler() async throws {
+    func testScheduler() throws {
         let app = XCUIApplication()
         
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 2.0))
         
         // Waiting until the setup test accounts actions have been finished & sheets are dismissed.
-        try await Task.sleep(for: .seconds(5))
+        sleep(for: .seconds(5))
         
         XCTAssertTrue(app.tabBars["Tab Bar"].buttons["Schedule"].exists)
         app.tabBars["Tab Bar"].buttons["Schedule"].tap()
