@@ -85,11 +85,11 @@ class S2YApplicationDelegate: SpeziAppDelegate {
     
     private var healthKit: HealthKit {
         HealthKit {
-            CollectSample(.stepCount)
-            CollectSample(.heartRate)
-            CollectSample(.restingHeartRate)
-            CollectSample(.activeEnergyBurned)
-            CollectSample(.bodyMass)
+            CollectSamples(.stepCount)
+            CollectSamples(.heartRate)
+            CollectSamples(.restingHeartRate)
+            CollectSamples(.activeEnergyBurned)
+            CollectSamples(.bodyMass)
         }
     }
 }

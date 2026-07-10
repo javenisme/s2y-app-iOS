@@ -28,5 +28,5 @@ jobs:
       pages: write
       id-token: write
     with:
-      scheme: 'TemplateApplication'
+      scheme: 'S2Y'
       dryrun: ${{ github.ref_name != 'main' }}

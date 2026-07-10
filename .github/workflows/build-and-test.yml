@@ -9,6 +9,9 @@
 name: Build and Test
 
 on:
+  push:
+    branches:
+      - 'codex/**'
   pull_request:
   workflow_dispatch:
   workflow_call:
@@ -24,8 +27,8 @@ jobs:
     permissions:
       contents: read
     with:
-      artifactname: TemplateApplication.xcresult
-      runsonlabels: '["macOS", "self-hosted"]'
+      artifactname: S2Y.xcresult
+      runsonlabels: '["macos-15"]'
       checkout_submodules: true
       setupfirebaseemulator: true
       firebasejsonpath: ./firebase/firebase.json
@@ -33,10 +36,11 @@ jobs:
   uploadcoveragereport:
     name: Upload Coverage Report
     needs: buildandtest
+    if: ${{ !startsWith(github.ref, 'refs/heads/codex/') }}
     uses: StanfordBDHG/.github/.github/workflows/create-and-upload-coverage-report.yml@v2
     permissions:
       contents: read
     with:
-      coveragereports: TemplateApplication.xcresult
+      coveragereports: S2Y.xcresult
     secrets:
       token: ${{ secrets.CODECOV_TOKEN }}

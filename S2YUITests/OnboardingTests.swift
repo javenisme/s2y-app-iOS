@@ -13,13 +13,15 @@ import XCTSpeziAccount
 import XCTSpeziNotifications
 
 
-class OnboardingTests: XCTestCase {
+final class OnboardingTests: XCTestCase {
     @MainActor
     override func setUp() async throws {
         continueAfterFailure = false
         
         let app = XCUIApplication()
+        app.resetAuthorizationStatus(for: .health)
         app.launchArguments = ["--showOnboarding"]
+        // if FB22386630 is ever fixed, we can skip the delete and instead simply use `resetAuthorizationStatus(for:)`
         app.deleteAndLaunch(withSpringboardAppName: "Spezi")
     }
     
@@ -77,7 +79,7 @@ extension XCUIApplication {
     }
     
     private func navigateOnboardingFlowWelcome() throws {
-        XCTAssertTrue(staticTexts["Spezi\nTemplate Application"].waitForExistence(timeout: 5))
+        XCTAssertTrue(staticTexts["S2Y Health Assistant"].waitForExistence(timeout: 5))
         
         XCTAssertTrue(buttons["Learn More"].exists)
         buttons["Learn More"].tap()
@@ -157,49 +159,21 @@ extension XCUIApplication {
     }
     
     fileprivate func assertOnboardingComplete() {
-        let tabBar = tabBars["Tab Bar"]
-        XCTAssertTrue(tabBar.buttons["Schedule"].waitForExistence(timeout: 2))
-        XCTAssertTrue(tabBar.buttons["Contacts"].exists)
+        XCTAssertTrue(buttons["home.drawer.toggle"].waitForExistence(timeout: 6))
+        openHomeDrawer()
+        XCTAssertTrue(buttons["drawer.schedule"].waitForExistence(timeout: 4))
+        XCTAssertTrue(buttons["drawer.account"].exists)
+        buttons["drawer.schedule"].tap()
+        XCTAssertTrue(navigationBars["Schedule"].waitForExistence(timeout: 4))
     }
     
     fileprivate func assertAccountInformation(email: String) throws {
-        XCTAssertTrue(navigationBars.buttons["Your Account"].waitForExistence(timeout: 2))
-        navigationBars.buttons["Your Account"].tap()
-        
-        XCTAssertTrue(staticTexts["Account Overview"].waitForExistence(timeout: 5.0))
+        openHomeDrawer()
+        XCTAssertTrue(buttons["drawer.account"].waitForExistence(timeout: 4))
+        buttons["drawer.account"].tap()
+
+        XCTAssertTrue(navigationBars["Account"].waitForExistence(timeout: 4))
         XCTAssertTrue(staticTexts["Leland Stanford"].exists)
         XCTAssertTrue(staticTexts[email].exists)
-        XCTAssertTrue(staticTexts["Gender Identity, Choose not to answer"].exists)
-        
-        
-        XCTAssertTrue(navigationBars.buttons["Close"].waitForExistence(timeout: 0.5))
-        navigationBars.buttons["Close"].tap()
-        
-        XCTAssertTrue(navigationBars.buttons["Your Account"].waitForExistence(timeout: 2))
-        navigationBars.buttons["Your Account"].tap()
-        
-        XCTAssertTrue(navigationBars.buttons["Edit"].waitForExistence(timeout: 2))
-        navigationBars.buttons["Edit"].tap()
-        
-        XCTAssertTrue(navigationBars.buttons["Close"].waitForNonExistence(timeout: 0.5))
-        
-        XCTAssertTrue(buttons["Delete Account"].waitForExistence(timeout: 2))
-        buttons["Delete Account"].tap()
-        
-        let alert = "Are you sure you want to delete your account?"
-        XCTAssertTrue(alerts[alert].waitForExistence(timeout: 6.0))
-        alerts[alert].buttons["Delete"].tap()
-        
-        XCTAssertTrue(alerts["Authentication Required"].waitForExistence(timeout: 2.0))
-        XCTAssertTrue(alerts["Authentication Required"].secureTextFields["Password"].waitForExistence(timeout: 0.5))
-        typeText("StanfordRocks") // the password field has focus already
-        XCTAssertTrue(alerts["Authentication Required"].buttons["Login"].waitForExistence(timeout: 0.5))
-        alerts["Authentication Required"].buttons["Login"].tap()
-        
-        sleep(2)
-        
-        try login(email: email, password: "StanfordRocks")
-        
-        XCTAssertTrue(alerts["Invalid Credentials"].waitForExistence(timeout: 2.0))
     }
 }

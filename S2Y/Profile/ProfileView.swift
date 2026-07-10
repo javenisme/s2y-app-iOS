@@ -42,7 +42,9 @@ struct ProfileView: View {
 
                 Section("App") {
                     NavigationLink("About") { AboutView() }
+                        .accessibilityIdentifier("profile.about")
                     NavigationLink("Open-Source Licenses") { ContributionsList(projectLicense: .mit) }
+                        .accessibilityIdentifier("profile.licenses")
                 }
 
                 Section("Support") {

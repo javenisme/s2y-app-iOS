@@ -7,12 +7,14 @@
 //
 
 @testable import S2Y
-import XCTest
+import Testing
 
 
-class S2YTests: XCTestCase {
+@Suite("S2Y Tests")
+struct S2YTests {
+    @Test("Contacts count")
     @MainActor
-    func testContactsCount() throws {
-        XCTAssertEqual(Contacts(presentingAccount: .constant(true)).contacts.count, 1)
+    func contactsCount() {
+        #expect(Contacts(presentingAccount: .constant(true)).contacts.count == 1)
     }
 }

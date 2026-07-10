@@ -12,13 +12,15 @@ import XCTest
 // MARK: - LocalLLMService Tests
 // ============================================================
 
+@MainActor
 final class LocalLLMServiceTests: XCTestCase {
     
     var service: LocalLLMService!
     
     override func setUp() async throws {
         try await super.setUp()
-        service = LocalLLMService()
+        service = LocalLLMService.shared
+        await service.unloadModel()
     }
     
     override func tearDown() async throws {
@@ -55,10 +57,12 @@ final class LocalLLMServiceTests: XCTestCase {
     func testModelConfig_allCases() {
         let allCases = LocalModelConfig.allCases
         
-        XCTAssertEqual(allCases.count, 3)
+        XCTAssertEqual(allCases.count, 5)
+        XCTAssertTrue(allCases.contains(.phi3_5Mini))
         XCTAssertTrue(allCases.contains(.phi4Mini))
         XCTAssertTrue(allCases.contains(.llama3_8b))
         XCTAssertTrue(allCases.contains(.mistralNemo))
+        XCTAssertTrue(allCases.contains(.tinyLlama))
     }
     
     // MARK: - Initial State Tests
@@ -113,7 +117,10 @@ final class LocalLLMServiceTests: XCTestCase {
             }
         } else {
             // Should throw insufficient memory error
-            await XCTAssertThrowsError(try await service.loadModel(largeConfig)) { error in
+            do {
+                try await service.loadModel(largeConfig)
+                XCTFail("Expected insufficientMemory error")
+            } catch {
                 XCTAssertTrue(error is LocalLLMError)
                 if let llmError = error as? LocalLLMError {
                     if case .insufficientMemory = llmError {
@@ -168,14 +175,21 @@ final class LocalLLMServiceTests: XCTestCase {
         let stream = service.generate(prompt: "Hello")
         
         // Should throw modelNotLoaded error
-        await XCTAssertThrowsError(try await stream.first(where: { _ in true })) { error in
+        do {
+            var iterator = stream.makeAsyncIterator()
+            _ = try await iterator.next()
+            XCTFail("Expected modelNotLoaded error")
+        } catch {
             XCTAssertTrue(error is LocalLLMError)
         }
     }
     
     func testGenerateComplete_notLoaded() async throws {
         // Try to generate without loading model
-        await XCTAssertThrowsError(try await service.generateComplete(prompt: "Hello")) { error in
+        do {
+            _ = try await service.generateComplete(prompt: "Hello")
+            XCTFail("Expected modelNotLoaded error")
+        } catch {
             XCTAssertTrue(error is LocalLLMError)
             if let llmError = error as? LocalLLMError {
                 if case .modelNotLoaded = llmError {
