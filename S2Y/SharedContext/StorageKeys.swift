@@ -32,6 +32,14 @@ enum StorageKeys {
     static let cloudflareGatewayURL = "cf.gateway-url"
     /// Device-level override for the Cloudflare AI model path. Empty = bundled default.
     static let cloudflareModelPath = "cf.model-path"
+    /// Device-level override for the Omer Mobile API base URL. Empty = bundled default.
+    static let omerMobileGatewayURL = "omer.mobile.gateway-url"
+    /// Device-level override for the Omer Mobile API route. Empty = bundled default.
+    static let omerMobileModelPath = "omer.mobile.model-path"
+    /// Explicit Omer transport protocol. Empty = bundled default.
+    static let omerTransport = "omer.transport"
+    /// Allow selected HealthKit summaries to be sent to Omer.
+    static let shareHealthDataWithOmer = "omer.share-health-data"
     /// Enable or disable voice features globally
     static let voiceEnabled = "voice.enabled"
     /// Speak assistant responses using TTS

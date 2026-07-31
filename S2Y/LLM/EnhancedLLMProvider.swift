@@ -7,9 +7,10 @@
 
 // swiftlint:disable line_length force_cast
 
+import FirebaseAuth
 import Foundation
-import OSLog
 import Network
+import OSLog
 import Security
 
 /// Enhanced LLM provider with robust error handling and fallback mechanisms
@@ -25,7 +26,7 @@ public final class EnhancedLLMProvider: ObservableObject {
     @Published public private(set) var lastError: LLMError?
     @Published public private(set) var retryCount = 0
     
-    private let maxRetries = 3
+    private let maxRetries = 2
     private let baseRetryDelay: TimeInterval = 1.0
     private let contextManager = ConversationContextManager.shared
     
@@ -43,6 +44,10 @@ public final class EnhancedLLMProvider: ObservableObject {
         // Reset retry count for new requests
         retryCount = 0
         lastError = nil
+
+        if includeContext && UserDefaults.standard.bool(forKey: StorageKeys.shareHealthDataWithOmer) {
+            await refreshRelevantHealthContext(for: message)
+        }
         
         // Add message to context
         let contextMessage = ContextMessage(role: .user, content: message)
@@ -59,24 +64,15 @@ public final class EnhancedLLMProvider: ObservableObject {
         } catch let error as LLMError {
             lastError = error
             logger.error("LLM request failed: \(error.localizedDescription)")
-            
-            // Return fallback response
-            let fallbackResponse = generateFallbackResponse(for: message, error: error)
-            let fallbackMessage = ContextMessage(
-                role: .assistant, 
-                content: fallbackResponse.content,
-                metadata: MessageMetadata(intent: "fallback")
-            )
-            contextManager.addMessage(fallbackMessage)
-            
-            return fallbackResponse
+            throw error
         }
     }
     
     private func sendMessageWithRetry(
         _ message: String,
         includeContext: Bool,
-        attempt: Int = 1
+        attempt: Int = 1,
+        requestID: UUID = UUID()
     ) async throws -> LLMResponse {
         retryCount = attempt - 1
         
@@ -86,12 +82,12 @@ public final class EnhancedLLMProvider: ObservableObject {
                 throw LLMError.networkUnavailable
             }
             
-            // Prepare message with context
-            let finalMessage = includeContext ?
-                prepareMessageWithContext(message) : message
-
             // Perform real LLM request via provider with retry
-            let responseText = try await performLLMRequest(finalMessage)
+            let responseText = try await performLLMRequest(
+                message,
+                includeContext: includeContext,
+                requestID: requestID
+            )
 
             return LLMResponse(
                 content: responseText,
@@ -101,102 +97,165 @@ public final class EnhancedLLMProvider: ObservableObject {
                 contextUsed: includeContext
             )
             
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
-            logger.warning("LLM request attempt \(attempt) failed: \(error.localizedDescription)")
+            try Task.checkCancellation()
+            if let urlError = error as? URLError, urlError.code == .cancelled {
+                throw CancellationError()
+            }
+            let mappedError = mapToLLMError(error)
+            logger.warning("LLM request attempt \(attempt) failed: \(mappedError.localizedDescription)")
             
             // Determine if we should retry
-            if attempt < maxRetries && shouldRetry(error: error) {
+            if attempt < maxRetries && shouldRetry(error: mappedError) {
                 let delay = baseRetryDelay * pow(2.0, Double(attempt - 1)) // Exponential backoff
                 logger.info("Retrying LLM request after \(delay) seconds (attempt \(attempt + 1)/\(self.maxRetries))")
                 
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                return try await sendMessageWithRetry(message, includeContext: includeContext, attempt: attempt + 1)
+                return try await sendMessageWithRetry(
+                    message,
+                    includeContext: includeContext,
+                    attempt: attempt + 1,
+                    requestID: requestID
+                )
             }
-            
-            // Convert to LLMError
-            throw mapToLLMError(error)
+            throw mappedError
         }
-    }
-    
-    private func prepareMessageWithContext(_ message: String) -> String {
-        let context = contextManager.getContextForLLM()
-        if context.isEmpty {
-            return message
-        }
-        
-        return """
-        Context from previous conversation:
-        \(context)
-        
-        Current user message:
-        \(message)
-        
-        Please respond considering the conversation context and any health data mentioned.
-        """
     }
     
     // MARK: - Provider integration
-    
-    private func performLLMRequest(_ message: String) async throws -> String {
-        // Load configuration
-        let (gatewayURL, modelPath) = try loadGatewayConfig()
-        let token = try loadBearerToken()
-        
-        // Build provider
-        let provider = CloudflareLLMProvider(gatewayURL: gatewayURL, modelPath: modelPath, token: token)
-        
-        // Compose messages: include minimal system guidance and the user message
-        let messages: [LLMMessage] = [
-            .init(role: .assistant, content: "You are a helpful health assistant. Keep responses concise, supportive, and avoid medical diagnosis."),
-            .init(role: .user, content: message)
-        ]
-        
+
+    private func refreshRelevantHealthContext(for message: String) async {
+        guard let intent = QueryPlanner.parse(message) else { return }
+        let metric: HealthKitService.MetricKind
+        switch intent {
+        case .compare(let kind, _), .trend(let kind, _):
+            metric = kind
+        }
+
         do {
-            // Optional timeout guard
-            return try await withThrowingTaskGroup(of: String.self) { group in
-                group.addTask {
-                    try await provider.complete(messages: messages)
-                }
-                // Simple timeout of 20s
-                group.addTask {
-                    try await Task.sleep(nanoseconds: 20_000_000_000)
-                    throw LLMError.requestTimeout
-                }
-                // First finished wins
-                let result = try await group.next()!
-                group.cancelAll()
-                return result
-            }
+            let summary = try await QueryPlanner.run(intent: intent)
+            contextManager.updateHealthContext(metric: metric, value: summary)
         } catch {
-            throw mapToLLMError(error)
+            logger.info("No shareable HealthKit summary was available for this request")
         }
     }
     
-    private func loadGatewayConfig() throws -> (String, String) {
+    private func performLLMRequest(_ message: String, includeContext: Bool, requestID: UUID) async throws -> String {
+        let (gatewayURL, modelPath, transport) = try loadServiceConfig()
+        let token = try await loadAccessToken(for: transport)
+
+        let client = OmerAPIClient(
+            configuration: .init(
+                gatewayURL: gatewayURL,
+                modelPath: modelPath,
+                bearerToken: token,
+                transport: transport
+            )
+        )
+
+        let messages = includeContext ? contextManager.currentContext.messages.map { contextMessage in
+            LLMMessage(
+                role: contextMessage.role == .assistant ? .assistant : .user,
+                content: contextMessage.content
+            )
+        } : [.init(role: .user, content: message)]
+        let response = try await client.complete(
+            query: message,
+            messages: messages,
+            healthContext: includeContext && UserDefaults.standard.bool(forKey: StorageKeys.shareHealthDataWithOmer)
+                ? contextManager.getRelevantHealthContext()
+                : [:],
+            conversationID: contextManager.currentContext.sessionId,
+            requestID: requestID
+        )
+        return formatOmerResponse(response)
+    }
+
+    private func formatOmerResponse(_ response: OmerAPIClient.Response) -> String {
+        var content = response.answer.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowercased = content.lowercased()
+
+        if !lowercased.contains("medical diagnosis")
+            && !lowercased.contains("医疗诊断")
+            && !lowercased.contains("clinical diagnosis") {
+            content += "\n\n基于科学研究的健康建议，不构成医疗诊断。"
+        }
+
+        let citations = response.citations.prefix(3)
+        if !citations.isEmpty {
+            let sourceLines = citations.enumerated().map { index, citation in
+                let label = citation.title ?? citation.source ?? "Source \(index + 1)"
+                if let url = citation.url {
+                    return "\(index + 1). \(label) - \(url)"
+                }
+                return "\(index + 1). \(label)"
+            }
+            content += "\n\nSources:\n" + sourceLines.joined(separator: "\n")
+        }
+
+        return content
+    }
+    
+    private func loadServiceConfig() throws -> (String, String, OmerTransport) {
         let defaults = UserDefaults.standard
-        let bundledGatewayURL = (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.GatewayURL") as? String)?
+        let bundledTransport = Bundle.main.object(forInfoDictionaryKey: "Omer.Transport") as? String
+        let transportValue = defaults.string(forKey: StorageKeys.omerTransport) ?? bundledTransport
+        let transport = OmerTransport(rawValue: transportValue ?? "") ?? .legacyAutoRAG
+        let keys: (gateway: String, path: String, bundledGateway: String, bundledPath: String) = switch transport {
+        case .mobileV1:
+            (
+                StorageKeys.omerMobileGatewayURL,
+                StorageKeys.omerMobileModelPath,
+                "Omer.MobileGatewayURL",
+                "Omer.MobileModelPath"
+            )
+        case .legacyAutoRAG:
+            (
+                StorageKeys.cloudflareGatewayURL,
+                StorageKeys.cloudflareModelPath,
+                "CFWorkersAI.GatewayURL",
+                "CFWorkersAI.ModelPath"
+            )
+        }
+        let bundledGatewayURL = (Bundle.main.object(forInfoDictionaryKey: keys.bundledGateway) as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let bundledModelPath = (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.ModelPath") as? String)?
+        let bundledModelPath = (Bundle.main.object(forInfoDictionaryKey: keys.bundledPath) as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let gatewayURL = (defaults.string(forKey: StorageKeys.cloudflareGatewayURL) ?? bundledGatewayURL)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let modelPath = (defaults.string(forKey: StorageKeys.cloudflareModelPath) ?? bundledModelPath)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let storedGatewayURL = defaults.string(forKey: keys.gateway)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let storedModelPath = defaults.string(forKey: keys.path)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let gatewayURL = storedGatewayURL.isEmpty ? bundledGatewayURL : storedGatewayURL
+        let modelPath = storedModelPath.isEmpty ? bundledModelPath : storedModelPath
         guard !gatewayURL.isEmpty else { throw LLMError.apiKeyMissing }
-        return (gatewayURL, modelPath)
+        return (gatewayURL, modelPath, transport)
+    }
+
+    private func loadAccessToken(for transport: OmerTransport) async throws -> String {
+        switch transport {
+        case .mobileV1:
+            guard let user = Auth.auth().currentUser else { throw LLMError.authenticationFailed }
+            do {
+                return try await user.getIDToken(forcingRefresh: false)
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                throw LLMError.authenticationFailed
+            }
+        case .legacyAutoRAG:
+            return try loadBearerToken()
+        }
     }
     
     private func loadBearerToken() throws -> String {
-        // Try HealthAssistant keychain style (account only)
-        if let token = readKeychainAccountOnly(account: "gateway.token"), !token.isEmpty {
-            return token
-        }
-        // Try demo keychain style (service + account)
+        // Prefer the service-scoped item written by current settings.
         if let token = readKeychain(service: "ai.cloudflare", account: "gateway.token"), !token.isEmpty {
             return token
         }
-        // Fallback to Info.plist
-        if let token = Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.BearerToken") as? String, !token.isEmpty {
+        // Preserve compatibility with older app builds.
+        if let token = readKeychainAccountOnly(account: "gateway.token"), !token.isEmpty {
             return token
         }
         throw LLMError.apiKeyMissing
@@ -297,10 +356,12 @@ public final class EnhancedLLMProvider: ObservableObject {
         // Don't retry certain types of errors
         if let llmError = error as? LLMError {
             switch llmError {
-            case .apiKeyMissing, .authenticationFailed, .invalidResponse:
+            case .apiKeyMissing, .authenticationFailed, .invalidResponse, .rateLimited:
                 return false
-            case .networkUnavailable, .requestTimeout, .rateLimited, .serverError, .unknown:
+            case .networkUnavailable, .requestTimeout, .serverError:
                 return true
+            case .unknown:
+                return false
             }
         }
         
@@ -324,7 +385,7 @@ public final class EnhancedLLMProvider: ObservableObject {
                 if code == 408 { return .requestTimeout }
                 if code == 429 { return .rateLimited }
                 if (500..<600).contains(code) { return .serverError(code) }
-                return .unknown(error)
+                return .invalidResponse
             }
         }
         

@@ -22,12 +22,16 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>CFWorkersAI.BearerToken</key>
-	<string></string>
 	<key>CFWorkersAI.GatewayURL</key>
 	<string>https://api.cloudflare.com/client/v4/accounts/115e03820979674efcc9baa1d9fcd081/autorag/rags/s2y-ai-omer/ai-search</string>
 	<key>CFWorkersAI.ModelPath</key>
 	<string></string>
+	<key>Omer.Transport</key>
+	<string>omer-mobile-v1</string>
+	<key>Omer.MobileGatewayURL</key>
+	<string>https://s2y-omer.vercel.app</string>
+	<key>Omer.MobileModelPath</key>
+	<string>/api/mobile/v1/chat</string>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
 	<key>ITSAppUsesNonExemptEncryption</key>

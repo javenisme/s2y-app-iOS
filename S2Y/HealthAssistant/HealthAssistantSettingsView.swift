@@ -16,6 +16,8 @@ struct HealthAssistantSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var gatewayURL: String = ""
     @State private var modelPath: String = ""
+    @State private var transport: OmerTransport = .legacyAutoRAG
+    @State private var shareHealthData = false
     @State private var bearerToken: String = ""
     @State private var showingTokenField = false
     @State private var showingSuccessAlert = false
@@ -24,6 +26,10 @@ struct HealthAssistantSettingsView: View {
     @State private var hasStoredToken = false
     @AppStorage(StorageKeys.cloudflareGatewayURL) private var storedGatewayURL = ""
     @AppStorage(StorageKeys.cloudflareModelPath) private var storedModelPath = ""
+    @AppStorage(StorageKeys.omerMobileGatewayURL) private var storedMobileGatewayURL = ""
+    @AppStorage(StorageKeys.omerMobileModelPath) private var storedMobileModelPath = ""
+    @AppStorage(StorageKeys.omerTransport) private var storedTransport = ""
+    @AppStorage(StorageKeys.shareHealthDataWithOmer) private var storedShareHealthData = false
     @AppStorage(StorageKeys.disableTimeSensitiveNotifications) private var disableTSN = false
     @AppStorage(StorageKeys.disableScheduler) private var disableScheduler = false
     @AppStorage(StorageKeys.disableBluetooth) private var disableBluetooth = false
@@ -42,18 +48,23 @@ struct HealthAssistantSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Text("Adjust how the assistant connects, speaks, and stores data on this device.")
+                Text("Adjust how the assistant connects to Omer, speaks, and stores data on this device.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                TextField("Gateway URL", text: $gatewayURL)
+                Picker("Connection", selection: $transport) {
+                    Text("Omer Mobile API").tag(OmerTransport.mobileV1)
+                    Text("Legacy AutoRAG").tag(OmerTransport.legacyAutoRAG)
+                }
+
+                TextField("Omer Gateway URL", text: $gatewayURL)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)
                     .autocorrectionDisabled()
 
-                TextField("Model Path", text: $modelPath, axis: .vertical)
+                TextField("Route / Model Path", text: $modelPath, axis: .vertical)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .lineLimit(2...4)
@@ -65,9 +76,9 @@ struct HealthAssistantSettingsView: View {
                 }
                 .disabled(usingBundledDefaults)
             } header: {
-                Text("Cloud Service")
+                Text("Omer Service")
             } footer: {
-                Text("Custom gateway values override the bundled defaults only on this device.")
+                Text("Custom Omer endpoint values override the bundled s2y-omer/Cloudflare defaults only on this device.")
             }
 
             Section {
@@ -101,45 +112,60 @@ struct HealthAssistantSettingsView: View {
                 Text("Use System Default to follow the device language for speech recognition and spoken responses.")
             }
 
-            Section {
-                LabeledContent("Bearer Token", value: hasStoredToken ? "Saved" : "Not Set")
+            if transport == .legacyAutoRAG {
+                Section {
+                    LabeledContent("Bearer Token", value: hasStoredToken ? "Saved" : "Not Set")
 
-                if showingTokenField {
-                    SecureField("Bearer Token", text: $bearerToken)
-                        .textContentType(.password)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                    if showingTokenField {
+                        SecureField("Bearer Token", text: $bearerToken)
+                            .textContentType(.password)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
 
-                    Button("Save Token") {
-                        saveTokenToKeychain()
-                    }
-                    .disabled(bearerToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        Button("Save Token") {
+                            saveTokenToKeychain()
+                        }
+                        .disabled(bearerToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                    Button("Cancel", role: .cancel) {
-                        cancelTokenEditing()
-                    }
-                } else {
-                    Button(hasStoredToken ? "Update Token" : "Set Token") {
-                        showingTokenField = true
-                    }
+                        Button("Cancel", role: .cancel) {
+                            cancelTokenEditing()
+                        }
+                    } else {
+                        Button(hasStoredToken ? "Update Token" : "Set Token") {
+                            showingTokenField = true
+                        }
 
-                    if hasStoredToken {
-                        Button("Remove Token", role: .destructive) {
-                            clearTokenFromKeychain()
+                        if hasStoredToken {
+                            Button("Remove Token", role: .destructive) {
+                                clearTokenFromKeychain()
+                            }
                         }
                     }
+                } header: {
+                    Text("Authentication")
+                } footer: {
+                    Text("Legacy AutoRAG tokens are stored in Keychain. Never distribute a provider token in the App bundle.")
                 }
-            } header: {
-                Text("Authentication")
-            } footer: {
-                Text("The access token is stored in Keychain and never shown in plain text after it is saved.")
+            } else {
+                Section {
+                    LabeledContent("Identity", value: "S2Y Account")
+                } header: {
+                    Text("Authentication")
+                } footer: {
+                    Text("Omer uses a short-lived Firebase identity token for the signed-in S2Y account.")
+                }
             }
 
-            Section("Data") {
+            Section {
+                Toggle("Share Relevant Health Summaries with Omer", isOn: $shareHealthData)
                 Button("Clear Health Data Cache", role: .destructive) {
                     HealthKitCache.shared.clearAll()
                     presentSuccess("Health data cache cleared")
                 }
+            } header: {
+                Text("Data")
+            } footer: {
+                Text("Health summaries stay on this device unless sharing is enabled. Omer receives only the currently relevant summary fields.")
             }
 
             #if DEBUG
@@ -187,6 +213,9 @@ struct HealthAssistantSettingsView: View {
         .onAppear {
             loadConfiguration()
         }
+        .onChange(of: transport) { _, newValue in
+            loadEndpointDraft(for: newValue)
+        }
     }
 
     private struct LanguageOption: Identifiable {
@@ -208,8 +237,9 @@ struct HealthAssistantSettingsView: View {
     }
     
     private func loadConfiguration() {
-        gatewayURL = resolvedGatewayURL
-        modelPath = resolvedModelPath
+        transport = resolvedTransport
+        loadEndpointDraft(for: transport)
+        shareHealthData = storedShareHealthData
         hasStoredToken = loadTokenFromKeychain() != nil
         bearerToken = ""
         showingTokenField = false
@@ -224,33 +254,62 @@ struct HealthAssistantSettingsView: View {
             return
         }
 
-        guard URL(string: normalizedGatewayURL) != nil else {
+        guard let serviceURL = URL(string: normalizedGatewayURL), serviceURL.host != nil else {
             errorMessage = "Enter a valid gateway URL."
             return
         }
 
-        storedGatewayURL = normalizedGatewayURL == bundledGatewayURL ? "" : normalizedGatewayURL
-        storedModelPath = normalizedModelPath == bundledModelPath ? "" : normalizedModelPath
-        gatewayURL = resolvedGatewayURL
-        modelPath = resolvedModelPath
+        guard transport != .mobileV1 || serviceURL.scheme?.lowercased() == "https" else {
+            errorMessage = "Omer Mobile API requires HTTPS."
+            return
+        }
+
+        if transport == .mobileV1 {
+            guard serviceURL.host?.lowercased() != "api.cloudflare.com" else {
+                errorMessage = "Enter the deployed s2y-omer service URL, not the Cloudflare API URL."
+                return
+            }
+            storedMobileGatewayURL = normalizedGatewayURL == bundledGatewayURL ? "" : normalizedGatewayURL
+            storedMobileModelPath = normalizedModelPath == bundledModelPath ? "" : normalizedModelPath
+        } else {
+            storedGatewayURL = normalizedGatewayURL == bundledGatewayURL ? "" : normalizedGatewayURL
+            storedModelPath = normalizedModelPath == bundledModelPath ? "" : normalizedModelPath
+        }
+        storedTransport = transport == bundledTransport ? "" : transport.rawValue
+        storedShareHealthData = shareHealthData
+        loadEndpointDraft(for: transport)
         errorMessage = nil
         presentSuccess("Health Assistant settings saved")
     }
     
     private func loadTokenFromKeychain() -> String? {
-        let keychain = Keychain()
-        return keychain.get(key: "gateway.token")
+        let serviceQuery = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "ai.cloudflare",
+            kSecAttrAccount as String: "gateway.token",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ] as [String: Any]
+        var item: CFTypeRef?
+        if SecItemCopyMatching(serviceQuery as CFDictionary, &item) == errSecSuccess,
+           let data = item as? Data {
+            return String(data: data, encoding: .utf8)
+        }
+        return Keychain().get(key: "gateway.token")
     }
     
     private func saveTokenToKeychain() {
         let query = [
             kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "ai.cloudflare",
             kSecAttrAccount as String: "gateway.token",
-            kSecValueData as String: bearerToken.data(using: .utf8) ?? Data(),
         ] as [String: Any]
 
         SecItemDelete(query as CFDictionary)
-        let status = SecItemAdd(query as CFDictionary, nil)
+        var item = query
+        item[kSecValueData as String] = bearerToken.data(using: .utf8) ?? Data()
+        item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        let status = SecItemAdd(item as CFDictionary, nil)
 
         if status == errSecSuccess {
             hasStoredToken = true
@@ -292,8 +351,11 @@ struct HealthAssistantSettingsView: View {
     private func restoreDefaultServiceConfiguration() {
         storedGatewayURL = ""
         storedModelPath = ""
-        gatewayURL = bundledGatewayURL
-        modelPath = bundledModelPath
+        storedMobileGatewayURL = ""
+        storedMobileModelPath = ""
+        storedTransport = ""
+        transport = bundledTransport
+        loadEndpointDraft(for: transport)
         errorMessage = nil
     }
 
@@ -303,27 +365,49 @@ struct HealthAssistantSettingsView: View {
     }
 
     private var bundledGatewayURL: String {
-        (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.GatewayURL") as? String)?
+        let key = transport == .mobileV1 ? "Omer.MobileGatewayURL" : "CFWorkersAI.GatewayURL"
+        return (Bundle.main.object(forInfoDictionaryKey: key) as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
     private var bundledModelPath: String {
-        (Bundle.main.object(forInfoDictionaryKey: "CFWorkersAI.ModelPath") as? String)?
+        let key = transport == .mobileV1 ? "Omer.MobileModelPath" : "CFWorkersAI.ModelPath"
+        return (Bundle.main.object(forInfoDictionaryKey: key) as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
     private var resolvedGatewayURL: String {
-        let override = storedGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let storedValue = transport == .mobileV1 ? storedMobileGatewayURL : storedGatewayURL
+        let override = storedValue.trimmingCharacters(in: .whitespacesAndNewlines)
         return override.isEmpty ? bundledGatewayURL : override
     }
 
     private var resolvedModelPath: String {
-        let override = storedModelPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let storedValue = transport == .mobileV1 ? storedMobileModelPath : storedModelPath
+        let override = storedValue.trimmingCharacters(in: .whitespacesAndNewlines)
         return override.isEmpty ? bundledModelPath : override
     }
 
+    private var bundledTransport: OmerTransport {
+        let rawValue = Bundle.main.object(forInfoDictionaryKey: "Omer.Transport") as? String
+        return OmerTransport(rawValue: rawValue ?? "") ?? .legacyAutoRAG
+    }
+
+    private var resolvedTransport: OmerTransport {
+        OmerTransport(rawValue: storedTransport) ?? bundledTransport
+    }
+
+    private func loadEndpointDraft(for transport: OmerTransport) {
+        gatewayURL = resolvedGatewayURL
+        modelPath = resolvedModelPath
+        errorMessage = nil
+    }
+
     private var usingBundledDefaults: Bool {
-        storedGatewayURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && storedModelPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let endpointUsesDefaults = transport == .mobileV1
+            ? storedMobileGatewayURL.isEmpty && storedMobileModelPath.isEmpty
+            : storedGatewayURL.isEmpty && storedModelPath.isEmpty
+        return endpointUsesDefaults
+            && storedTransport.isEmpty
     }
 }

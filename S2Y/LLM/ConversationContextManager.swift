@@ -33,7 +33,7 @@ public final class ConversationContextManager: ObservableObject {
         // Update context metadata
         updateContextMetadata(for: message)
         
-        logger.debug("Added message to context: \(message.role.rawValue) - \(message.content.prefix(50))...")
+        logger.debug("Added \(message.role.rawValue, privacy: .public) message to local conversation context")
     }
     
     /// Get conversation context for LLM
@@ -58,7 +58,7 @@ public final class ConversationContextManager: ObservableObject {
     public func updateHealthContext(metric: HealthKitService.MetricKind, value: String) {
         currentContext.healthContext[metric.rawValue] = value
         currentContext.lastHealthUpdate = Date()
-        logger.debug("Updated health context: \(metric.rawValue) = \(value)")
+        logger.debug("Updated local health context for \(metric.rawValue, privacy: .public)")
     }
     
     /// Get relevant health context for current conversation

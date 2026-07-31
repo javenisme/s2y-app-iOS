@@ -60,6 +60,7 @@ struct HealthAssistantView: View {
     @State private var notice: AssistantNotice?
     @State private var showingSettings = false
     @State private var showingModelDownload = false
+    @State private var sendTask: Task<Void, Never>?
     @AppStorage("PreferLocalModel") private var preferLocalModel = false
     
     private let healthService = HealthKitService.shared
@@ -110,6 +111,10 @@ struct HealthAssistantView: View {
         }
         .task {
             await initializeHealthKit()
+        }
+        .onDisappear {
+            sendTask?.cancel()
+            sendTask = nil
         }
     }
     
@@ -163,7 +168,7 @@ struct HealthAssistantView: View {
                         HStack {
                             ProgressView()
                                 .scaleEffect(0.8)
-                            Text("Analyzing your health data...")
+                            Text(preferLocalModel ? "Generating locally..." : "Contacting Omer...")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -204,7 +209,8 @@ struct HealthAssistantView: View {
                     .disabled(isProcessing)
                 
                 Button {
-                    Task { await sendMessage() }
+                    sendTask?.cancel()
+                    sendTask = Task { await sendMessage() }
                 } label: {
                     Image(systemName: "paperplane.fill")
                         .foregroundColor(.white)
@@ -281,11 +287,24 @@ struct HealthAssistantView: View {
         inputText = ""
         isProcessing = true
         notice = nil
+        defer {
+            isProcessing = false
+            sendTask = nil
+        }
         
         do {
             let response = try await processHealthQuery(query)
+            try Task.checkCancellation()
             let assistantMessage = ChatMessage(role: .assistant, content: response)
             messages.append(assistantMessage)
+            if !preferLocalModel, enhancedProvider.lastError != nil {
+                notice = AssistantNotice(
+                    message: "Omer was unavailable, so this response was generated locally.",
+                    tone: .warning
+                )
+            }
+        } catch is CancellationError {
+            return
         } catch {
             let errorResponse = ChatMessage(
                 role: .assistant,
@@ -293,8 +312,6 @@ struct HealthAssistantView: View {
             )
             messages.append(errorResponse)
         }
-        
-        isProcessing = false
     }
     
     private func processHealthQuery(_ query: String) async throws -> String {
@@ -346,7 +363,7 @@ struct HealthAssistantView: View {
 
             HStack(spacing: 10) {
                 modeChip(
-                    title: preferLocalModel ? "Local AI" : "Cloud AI",
+                    title: preferLocalModel ? "Local AI" : "Omer",
                     systemImage: preferLocalModel ? "brain.head.profile" : "icloud",
                     tint: preferLocalModel ? .green : .blue
                 ) {

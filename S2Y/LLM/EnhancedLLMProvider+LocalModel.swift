@@ -110,6 +110,8 @@ extension EnhancedLLMProvider {
         do {
             let response = try await sendMessage(message)
             return response.content
+        } catch is CancellationError {
+            return ""
         } catch {
             logger.error("Cloud model processing failed: \(error.localizedDescription)")
             
