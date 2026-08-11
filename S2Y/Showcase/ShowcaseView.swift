@@ -132,8 +132,7 @@ struct ShowcaseView: View {
     private var permissionsSection: some View {
         Section("Permissions") {
             NavigationLink {
-                HealthKitPermissions()
-                    .navigationTitle("Health Permissions")
+                HealthAccessSettingsView()
             } label: {
                 settingsRow(
                     title: "Health Access",
@@ -333,6 +332,64 @@ struct ShowcaseView: View {
             return
         }
         UIApplication.shared.open(url)
+    }
+}
+
+private struct HealthAccessSettingsView: View {
+    @Environment(HealthKit.self) private var healthKit
+
+    @State private var isRequesting = false
+    @State private var errorMessage: String?
+
+    private var isAuthorized: Bool {
+        !ProcessInfo.processInfo.isPreviewSimulator && healthKit.isFullyAuthorized
+    }
+
+    var body: some View {
+        List {
+            Section {
+                LabeledContent("Health Access", value: isAuthorized ? "Allowed" : "Not Allowed")
+
+                Button(isAuthorized ? "Review Health Access" : "Allow Health Access") {
+                    _Concurrency.Task { await requestAuthorization() }
+                }
+                .disabled(isRequesting)
+            } footer: {
+                Text("iOS controls individual Health permissions. You can review the system prompt without restarting onboarding.")
+            }
+
+            if isRequesting {
+                Section {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                        Text("Requesting Health access…")
+                    }
+                }
+            }
+
+            if let errorMessage {
+                Section {
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Health Permissions")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @MainActor
+    private func requestAuthorization() async {
+        isRequesting = true
+        errorMessage = nil
+        defer { isRequesting = false }
+
+        do {
+            try await healthKit.askForAuthorization()
+        } catch {
+            errorMessage = "Health access could not be updated: \(error.localizedDescription)"
+        }
     }
 }
 

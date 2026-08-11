@@ -39,3 +39,38 @@ final class ContributionsTest: XCTestCase {
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Spezi")).firstMatch.waitForExistence(timeout: 4))
     }
 }
+
+
+final class HealthAssistantChatUITests: XCTestCase {
+    @MainActor
+    func testOmerFallbackRespondsInSimulator() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--setupTestAccount", "--skipOnboarding"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Omer fallback"].waitForExistence(timeout: 10))
+
+        let input = app.textFields["health-assistant-input"]
+        XCTAssertTrue(input.waitForExistence(timeout: 5))
+        input.tap()
+        input.typeText("Reply briefly: simulator chat connectivity check.")
+
+        let sendButton = app.buttons["health-assistant-send"]
+        XCTAssertTrue(sendButton.isEnabled)
+        sendButton.tap()
+
+        let response = app.staticTexts
+            .matching(identifier: "health-assistant-response")
+            .matching(NSPredicate(format: "label != ''"))
+            .firstMatch
+        XCTAssertTrue(response.waitForExistence(timeout: 60))
+        XCTAssertFalse(
+            response.label.contains("neither on-device AI nor Omer"),
+            "Unexpected fallback failure: \(response.label)"
+        )
+        XCTAssertFalse(
+            response.label.contains("Omer backend returned an error"),
+            "Unexpected Omer failure: \(response.label)"
+        )
+    }
+}

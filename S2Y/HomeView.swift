@@ -137,7 +137,6 @@ struct HomeView: View {
             .shadow(color: Color.black.opacity(isDrawerOpen ? 0.14 : 0), radius: 28, x: 0, y: 18)
             .offset(x: isDrawerOpen ? drawerWidth * 0.78 : 0)
             .scaleEffect(isDrawerOpen ? 0.96 : 1, anchor: .trailing)
-            .allowsHitTesting(!isDrawerOpen)
     }
 
     private func drawer(width: CGFloat) -> some View {

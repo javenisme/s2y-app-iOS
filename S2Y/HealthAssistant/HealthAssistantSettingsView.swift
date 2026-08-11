@@ -24,6 +24,7 @@ struct HealthAssistantSettingsView: View {
     @State private var hasStoredToken = false
     @AppStorage(StorageKeys.cloudflareGatewayURL) private var storedGatewayURL = ""
     @AppStorage(StorageKeys.cloudflareModelPath) private var storedModelPath = ""
+    @AppStorage(StorageKeys.omerIncludeHealthContext) private var omerIncludeHealthContext = true
     @AppStorage(StorageKeys.disableTimeSensitiveNotifications) private var disableTSN = false
     @AppStorage(StorageKeys.disableScheduler) private var disableScheduler = false
     @AppStorage(StorageKeys.disableBluetooth) private var disableBluetooth = false
@@ -68,6 +69,19 @@ struct HealthAssistantSettingsView: View {
                 Text("Cloud Service")
             } footer: {
                 Text("Custom gateway values override the bundled defaults only on this device.")
+            }
+
+            Section {
+                LabeledContent("Primary AI", value: "Apple On-Device")
+                LabeledContent(
+                    "Current Route",
+                    value: AppleFoundationModelService.shared.availability.isAvailable ? "On-Device" : "Omer Fallback"
+                )
+                Toggle("Attach Health Summary", isOn: $omerIncludeHealthContext)
+            } header: {
+                Text("AI & Privacy")
+            } footer: {
+                Text("The assistant uses Apple Intelligence on this device whenever available, then falls back to Omer automatically. Health summaries are attached only when this setting is enabled.")
             }
 
             Section {
