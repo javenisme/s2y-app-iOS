@@ -59,6 +59,10 @@ struct HealthAssistantView: View {
     @State private var isProcessing = false
     @State private var notice: AssistantNotice?
     @State private var showingSettings = false
+    @State private var showingHistory = false
+    @State private var chatHistory: [OmerChatSummary] = []
+    @State private var isLoadingHistory = false
+    @State private var historyError: String?
     @State private var streamTick = 0
     @State private var pendingToolApproval: OmerToolApprovalPayload?
     @AppStorage(StorageKeys.omerIncludeHealthContext) private var omerIncludeHealthContext = true
@@ -84,7 +88,14 @@ struct HealthAssistantView: View {
             .navigationTitle("Health Assistant")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button {
+                        showingHistory = true
+                    } label: {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .accessibilityLabel("Conversation History")
+                    }
+
                     Button {
                         showingSettings = true
                     } label: {
@@ -97,6 +108,12 @@ struct HealthAssistantView: View {
                 NavigationStack {
                     HealthAssistantSettingsView(showsDismissButton: true)
                 }
+            }
+            .sheet(isPresented: $showingHistory) {
+                conversationHistorySheet
+                    .task {
+                        await loadConversationHistory()
+                    }
             }
         }
         .task {
@@ -113,6 +130,108 @@ struct HealthAssistantView: View {
                     Task { await decideTool(approval, approved: false) }
                 }
             )
+        }
+    }
+
+    private var conversationHistorySheet: some View {
+        NavigationStack {
+            Group {
+                if isLoadingHistory && chatHistory.isEmpty {
+                    ProgressView("Loading conversations…")
+                } else if let historyError, chatHistory.isEmpty {
+                    ContentUnavailableView(
+                        "History Unavailable",
+                        systemImage: "exclamationmark.bubble",
+                        description: Text(historyError)
+                    )
+                } else if chatHistory.isEmpty {
+                    ContentUnavailableView(
+                        "No Conversations Yet",
+                        systemImage: "bubble.left.and.bubble.right",
+                        description: Text("Chats from S2Y Home and this iPhone will appear here.")
+                    )
+                } else {
+                    List(chatHistory) { chat in
+                        Button {
+                            Task { await openConversation(chat) }
+                        } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(chat.title)
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(2)
+                                Text("Synced with S2Y")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .refreshable {
+                        await loadConversationHistory()
+                    }
+                }
+            }
+            .navigationTitle("Conversations")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { showingHistory = false }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        Task { await beginNewConversation() }
+                    } label: {
+                        Label("New Chat", systemImage: "square.and.pencil")
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func loadConversationHistory() async {
+        isLoadingHistory = true
+        historyError = nil
+        defer { isLoadingHistory = false }
+        do {
+            chatHistory = try await omerChatService.fetchChats().chats
+        } catch {
+            historyError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func openConversation(_ chat: OmerChatSummary) async {
+        isLoadingHistory = true
+        historyError = nil
+        do {
+            let detail = try await omerChatService.fetchChat(id: chat.id)
+            try await omerChatService.selectChat(id: chat.id)
+            messages = detail.messages.compactMap { message in
+                guard !message.content.isEmpty else { return nil }
+                return ChatMessage(
+                    id: message.id,
+                    role: message.role == "user" ? .user : .assistant,
+                    content: message.content
+                )
+            }
+            showingHistory = false
+        } catch {
+            historyError = error.localizedDescription
+        }
+        isLoadingHistory = false
+    }
+
+    @MainActor
+    private func beginNewConversation() async {
+        do {
+            try await omerChatService.startNewChat()
+            messages = []
+            notice = nil
+            showingHistory = false
+        } catch {
+            historyError = error.localizedDescription
         }
     }
 
@@ -316,6 +435,23 @@ struct HealthAssistantView: View {
                 ) { snapshot in
                     updateAssistantMessage(id: assistantPlaceholder.id, content: snapshot)
                 }
+                if let assistantText = messages.first(where: { $0.id == assistantPlaceholder.id })?.content,
+                   !assistantText.isEmpty {
+                    do {
+                        _ = try await omerChatService.syncOnDeviceExchange(
+                            userMessageID: userMessage.id,
+                            userText: query,
+                            assistantMessageID: assistantPlaceholder.id,
+                            assistantText: assistantText
+                        )
+                    } catch {
+                        logger.error("On-device chat sync failed: \(error.localizedDescription)")
+                        notice = AssistantNotice(
+                            message: "The answer is available on this iPhone, but could not sync to your S2Y history yet.",
+                            tone: .warning
+                        )
+                    }
+                }
                 isProcessing = false
                 return
             } catch {
@@ -372,6 +508,11 @@ struct HealthAssistantView: View {
             pendingToolApproval = approval
         case .toolResult(let toolName):
             appendAssistantDelta(id: assistantMessageID, delta: "\n\n✓ \(toolName) completed.")
+        case .billing(let billing):
+            notice = AssistantNotice(
+                message: "\(billing.plan.capitalized) plan · \(billing.remainingTokens.formatted()) AI tokens remaining this month.",
+                tone: .info
+            )
         case .error(let message):
             updateAssistantMessage(id: assistantMessageID, content: message)
         }
