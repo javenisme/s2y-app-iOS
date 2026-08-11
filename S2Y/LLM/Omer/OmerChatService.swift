@@ -28,7 +28,7 @@ actor OmerChatService {
         onEvent: @escaping @Sendable (OmerChatStreamEvent) -> Void
     ) async throws {
         let serviceURL = try configuredServiceURL()
-        let sessionKey = "\(serviceURL.absoluteString)|firebase-v1"
+        let sessionKey = sessionKey(for: serviceURL)
         let conversationID = await existingOrNewConversationID(sessionKey: sessionKey)
         let requestID = UUID()
         let healthContext = await OmerHealthContextBuilder.buildSummary(
@@ -82,6 +82,9 @@ actor OmerChatService {
                 onEvent(.toolResult(toolEvent.toolName))
             }
         }
+        if let billing = response.billing {
+            onEvent(.billing(billing))
+        }
         await sessionStore.saveLastChatId(response.conversationId.uuidString, sessionKey: sessionKey)
         onEvent(.completed(.init(
             chatId: response.conversationId.uuidString,
@@ -117,6 +120,70 @@ actor OmerChatService {
         return try decoder.decode(OmerAgentsResponse.self, from: data).agents
     }
 
+    func fetchChats(limit: Int = 20, before: UUID? = nil) async throws -> OmerChatListResponse {
+        let serviceURL = try configuredServiceURL()
+        var components = URLComponents(
+            url: serviceURL.appendingPathComponent("api/mobile/v1/chats"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [
+            URLQueryItem(name: "limit", value: String(min(max(limit, 1), 50)))
+        ] + (before.map { [URLQueryItem(name: "before", value: $0.uuidString)] } ?? [])
+        guard let url = components?.url else {
+            throw OmerChatServiceError.invalidBaseURL
+        }
+        let data = try await authenticatedGET(url: url)
+        return try decoder.decode(OmerChatListResponse.self, from: data)
+    }
+
+    func fetchChat(id: UUID) async throws -> OmerChatDetailResponse {
+        let serviceURL = try configuredServiceURL()
+        let url = serviceURL
+            .appendingPathComponent("api/mobile/v1/chats")
+            .appendingPathComponent(id.uuidString)
+        let data = try await authenticatedGET(url: url)
+        return try decoder.decode(OmerChatDetailResponse.self, from: data)
+    }
+
+    func selectChat(id: UUID) async throws {
+        let serviceURL = try configuredServiceURL()
+        await sessionStore.saveLastChatId(id.uuidString, sessionKey: sessionKey(for: serviceURL))
+    }
+
+    func startNewChat() async throws {
+        let serviceURL = try configuredServiceURL()
+        await sessionStore.saveLastChatId(nil, sessionKey: sessionKey(for: serviceURL))
+    }
+
+    func syncOnDeviceExchange(
+        userMessageID: UUID,
+        userText: String,
+        assistantMessageID: UUID,
+        assistantText: String
+    ) async throws -> OmerLocalChatSyncResponse {
+        let serviceURL = try configuredServiceURL()
+        let key = sessionKey(for: serviceURL)
+        let conversationID = await existingOrNewConversationID(sessionKey: key)
+        let request = OmerLocalChatSyncRequest(
+            requestId: UUID(),
+            conversationId: conversationID,
+            source: "ios-on-device",
+            messages: [
+                .init(id: userMessageID, role: "user", content: userText),
+                .init(id: assistantMessageID, role: "assistant", content: assistantText)
+            ]
+        )
+        let url = serviceURL.appendingPathComponent("api/mobile/v1/chats/sync")
+        let response: OmerLocalChatSyncResponse
+        do {
+            response = try await performLocalSync(request, url: url, forceTokenRefresh: false)
+        } catch OmerChatServiceError.unauthorized {
+            response = try await performLocalSync(request, url: url, forceTokenRefresh: true)
+        }
+        await sessionStore.saveLastChatId(response.conversationId.uuidString, sessionKey: key)
+        return response
+    }
+
     private func configuredServiceURL() throws -> URL {
         let configuredBaseURL = Bundle.main.object(forInfoDictionaryKey: "OmerChat.BaseURL") as? String
         let normalizedBaseURL = (configuredBaseURL ?? Self.defaultBaseURL)
@@ -133,6 +200,45 @@ actor OmerChatService {
             return conversationID
         }
         return UUID()
+    }
+
+    private func sessionKey(for serviceURL: URL) -> String {
+        "\(serviceURL.absoluteString)|firebase-v1"
+    }
+
+    private func authenticatedGET(url: URL) async throws -> Data {
+        do {
+            return try await performAuthenticatedGET(url: url, forceTokenRefresh: false)
+        } catch OmerChatServiceError.unauthorized {
+            return try await performAuthenticatedGET(url: url, forceTokenRefresh: true)
+        }
+    }
+
+    private func performAuthenticatedGET(url: URL, forceTokenRefresh: Bool) async throws -> Data {
+        let token = try await firebaseIDToken(forceRefresh: forceTokenRefresh)
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data)
+        return data
+    }
+
+    private func performLocalSync(
+        _ body: OmerLocalChatSyncRequest,
+        url: URL,
+        forceTokenRefresh: Bool
+    ) async throws -> OmerLocalChatSyncResponse {
+        let token = try await firebaseIDToken(forceRefresh: forceTokenRefresh)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue(body.requestId.uuidString, forHTTPHeaderField: "Idempotency-Key")
+        request.httpBody = try encoder.encode(body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data)
+        return try decoder.decode(OmerLocalChatSyncResponse.self, from: data)
     }
 
     private func performChatRequest(

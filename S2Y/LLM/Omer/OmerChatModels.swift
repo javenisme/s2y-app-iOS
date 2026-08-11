@@ -39,7 +39,34 @@ struct OmerMobileChatResponse: Decodable {
     let conversationId: UUID
     let requestId: UUID
     let agentId: String
+    let billing: OmerBillingStatus?
     let toolEvents: [ToolEvent]
+}
+
+struct OmerBillingStatus: Decodable, Equatable, Sendable {
+    let plan: String
+    let usedTokens: Int
+    let monthlyTokenLimit: Int
+    let remainingTokens: Int
+}
+
+struct OmerLocalChatSyncRequest: Encodable {
+    struct Message: Encodable {
+        let id: UUID
+        let role: String
+        let content: String
+    }
+
+    let requestId: UUID
+    let conversationId: UUID
+    let source: String
+    let messages: [Message]
+}
+
+struct OmerLocalChatSyncResponse: Decodable {
+    let requestId: UUID
+    let conversationId: UUID
+    let synced: Bool
 }
 
 struct OmerToolDecisionRequest: Encodable {
@@ -67,6 +94,30 @@ struct OmerAgent: Decodable, Identifiable, Sendable {
 
 struct OmerAgentsResponse: Decodable {
     let agents: [OmerAgent]
+}
+
+struct OmerChatSummary: Decodable, Identifiable, Sendable {
+    let id: UUID
+    let createdAt: String
+    let title: String
+    let visibility: String
+}
+
+struct OmerChatListResponse: Decodable, Sendable {
+    let chats: [OmerChatSummary]
+    let hasMore: Bool
+}
+
+struct OmerChatHistoryMessage: Decodable, Identifiable, Sendable {
+    let id: UUID
+    let role: String
+    let content: String
+    let createdAt: String
+}
+
+struct OmerChatDetailResponse: Decodable, Sendable {
+    let chat: OmerChatSummary
+    let messages: [OmerChatHistoryMessage]
 }
 
 struct OmerAPIErrorResponse: Decodable {
@@ -102,6 +153,7 @@ enum OmerChatStreamEvent: Equatable, Sendable {
     case completed(OmerCompletedPayload)
     case toolApprovalRequired(OmerToolApprovalPayload)
     case toolResult(String)
+    case billing(OmerBillingStatus)
     case error(String)
 }
 
