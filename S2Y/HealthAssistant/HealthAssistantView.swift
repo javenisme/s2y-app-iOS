@@ -59,11 +59,13 @@ struct HealthAssistantView: View {
     @State private var isProcessing = false
     @State private var notice: AssistantNotice?
     @State private var showingSettings = false
-    @State private var showingModelDownload = false
-    @AppStorage("PreferLocalModel") private var preferLocalModel = false
+    @State private var streamTick = 0
+    @State private var pendingToolApproval: OmerToolApprovalPayload?
+    @AppStorage(StorageKeys.omerIncludeHealthContext) private var omerIncludeHealthContext = true
     
     private let healthService = HealthKitService.shared
-    private let enhancedProvider = EnhancedLLMProvider.shared
+    private let appleModelService = AppleFoundationModelService.shared
+    private let omerChatService = OmerChatService.shared
     private let logger = Logger(subsystem: "com.s2y.app", category: "HealthAssistantView")
     private let isRunningInSimulator = ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil
     
@@ -83,19 +85,11 @@ struct HealthAssistantView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 12) {
-                        Button {
-                            showingModelDownload = true
-                        } label: {
-                            Image(systemName: "arrow.down.circle")
-                                .accessibilityLabel("Download Local Model")
-                        }
-                        Button {
-                            showingSettings = true
-                        } label: {
-                            Image(systemName: "gearshape")
-                                .accessibilityLabel("Settings")
-                        }
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .accessibilityLabel("Settings")
                     }
                 }
             }
@@ -104,21 +98,30 @@ struct HealthAssistantView: View {
                     HealthAssistantSettingsView(showsDismissButton: true)
                 }
             }
-            .sheet(isPresented: $showingModelDownload) {
-                ModelDownloadView()
-            }
         }
         .task {
             await initializeHealthKit()
         }
+        .alert(item: $pendingToolApproval) { approval in
+            Alert(
+                title: Text("Allow Omer action?"),
+                message: Text("Omer wants to run \(approval.toolName). This can change your stored health data."),
+                primaryButton: .default(Text("Allow")) {
+                    Task { await decideTool(approval, approved: true) }
+                },
+                secondaryButton: .cancel(Text("Don't Allow")) {
+                    Task { await decideTool(approval, approved: false) }
+                }
+            )
+        }
     }
-    
+
     private var welcomeView: some View {
         ScrollView {
             welcomeContent
         }
     }
-    
+
     private var welcomeContent: some View {
         VStack(alignment: .leading, spacing: 16) {
             welcomeHero
@@ -179,6 +182,13 @@ struct HealthAssistantView: View {
                     }
                 }
             }
+            .onChange(of: streamTick) {
+                if let lastMessage = messages.last {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    }
+                }
+            }
         }
     }
     
@@ -186,22 +196,24 @@ struct HealthAssistantView: View {
         VStack(spacing: 0) {
             Divider()
             
-            if preferLocalModel {
-                HStack {
-                    Label("Local AI enabled", systemImage: "brain.head.profile")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                }
-                .padding(.horizontal)
-                .padding(.top, 6)
+            HStack {
+                Label(
+                    appleModelService.availability.isAvailable ? "On-device Apple AI" : "Omer fallback",
+                    systemImage: appleModelService.availability.isAvailable ? "apple.intelligence" : "icloud"
+                )
+                .font(.caption)
+                .foregroundColor(.secondary)
+                Spacer()
             }
+            .padding(.horizontal)
+            .padding(.top, 6)
             
             HStack(spacing: 12) {
                 TextField("Ask about your health data...", text: $inputText, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(1...4)
                     .disabled(isProcessing)
+                    .accessibilityIdentifier("health-assistant-input")
                 
                 Button {
                     Task { await sendMessage() }
@@ -214,6 +226,7 @@ struct HealthAssistantView: View {
                         .accessibilityLabel("Send Message")
                 }
                 .disabled(inputText.isEmpty || isProcessing)
+                .accessibilityIdentifier("health-assistant-send")
             }
             .padding()
         }
@@ -274,50 +287,135 @@ struct HealthAssistantView: View {
     }
     
     private func sendMessage() async {
-        let userMessage = ChatMessage(role: .user, content: inputText.trimmingCharacters(in: .whitespacesAndNewlines))
+        let trimmedInput = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedInput.isEmpty else {
+            return
+        }
+
+        let userMessage = ChatMessage(role: .user, content: trimmedInput)
         messages.append(userMessage)
         
-        let query = inputText
+        let query = trimmedInput
         inputText = ""
         isProcessing = true
         notice = nil
-        
-        do {
-            let response = try await processHealthQuery(query)
-            let assistantMessage = ChatMessage(role: .assistant, content: response)
-            messages.append(assistantMessage)
-        } catch {
-            let errorResponse = ChatMessage(
-                role: .assistant,
-                content: "Sorry, I ran into an error while processing your request: \(error.localizedDescription)"
-            )
-            messages.append(errorResponse)
-        }
-        
-        isProcessing = false
-    }
-    
-    private func processHealthQuery(_ query: String) async throws -> String {
-        // Always route to Cloudflare LLM (Omer)
-        return try await processWithLLM(query)
-    }
-    
-    private func processWithLLM(_ query: String) async throws -> String {
-        if preferLocalModel {
+
+        let assistantPlaceholder = ChatMessage(role: .assistant, content: "")
+        messages.append(assistantPlaceholder)
+
+        let healthContext = await OmerHealthContextBuilder.buildSummary(
+            for: query,
+            includeHealthContext: omerIncludeHealthContext
+        )
+
+        if appleModelService.availability.isAvailable {
             do {
-                try await LocalLLMService.shared.loadModel(.phi3_5Mini)
-                let mockText = try await LocalLLMService.shared.generateComplete(
-                    prompt: query,
-                    parameters: LocalGenerateParameters(maxTokens: 128)
-                )
-                return mockText
+                try await appleModelService.streamResponse(
+                    to: query,
+                    healthContext: healthContext
+                ) { snapshot in
+                    updateAssistantMessage(id: assistantPlaceholder.id, content: snapshot)
+                }
+                isProcessing = false
+                return
             } catch {
-                logger.error("LocalLLMService failed: \(error.localizedDescription). Falling back to EnhancedLLMProvider.")
-                return await enhancedProvider.sendMessageLocal(query)
+                logger.error("Apple on-device generation failed: \(error.localizedDescription)")
+                updateAssistantMessage(id: assistantPlaceholder.id, content: "")
+                notice = AssistantNotice(
+                    message: "On-device AI could not finish this response. Using Omer instead.",
+                    tone: .warning
+                )
             }
         } else {
-            return await enhancedProvider.sendMessageIntelligent(query)
+            notice = AssistantNotice(
+                message: appleModelService.availability.fallbackExplanation,
+                tone: .info
+            )
         }
+
+        await sendWithOmer(query, assistantMessageID: assistantPlaceholder.id)
+        isProcessing = false
+    }
+
+    private func sendWithOmer(_ query: String, assistantMessageID: UUID) async {
+        do {
+            try await omerChatService.sendMessage(
+                message: query,
+                includeHealthContext: omerIncludeHealthContext
+            ) { event in
+                Task { @MainActor in
+                    self.handleOmerEvent(event, assistantMessageID: assistantMessageID)
+                }
+            }
+        } catch {
+            let underlyingError = error as NSError
+            logger.error(
+                "Omer generation failed [\(underlyingError.domain, privacy: .public):\(underlyingError.code)]: \(error.localizedDescription, privacy: .public)"
+            )
+            updateAssistantMessage(
+                id: assistantMessageID,
+                content: "Sorry, neither on-device AI nor Omer is available right now: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    @MainActor
+    private func handleOmerEvent(_ event: OmerChatStreamEvent, assistantMessageID: UUID) {
+        switch event {
+        case .started:
+            break
+        case .delta(let delta):
+            appendAssistantDelta(id: assistantMessageID, delta: delta)
+        case .completed:
+            break
+        case .toolApprovalRequired(let approval):
+            pendingToolApproval = approval
+        case .toolResult(let toolName):
+            appendAssistantDelta(id: assistantMessageID, delta: "\n\n✓ \(toolName) completed.")
+        case .error(let message):
+            updateAssistantMessage(id: assistantMessageID, content: message)
+        }
+    }
+
+    private func decideTool(_ approval: OmerToolApprovalPayload, approved: Bool) async {
+        do {
+            let result = try await omerChatService.decideTool(
+                approvalId: approval.approvalId,
+                approved: approved
+            )
+            notice = AssistantNotice(
+                message: approved ? "\(result.toolName) completed." : "\(result.toolName) was not allowed.",
+                tone: .info
+            )
+        } catch {
+            notice = AssistantNotice(message: error.localizedDescription, tone: .warning)
+        }
+    }
+
+    @MainActor
+    private func appendAssistantDelta(id: UUID, delta: String) {
+        guard let index = messages.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+
+        let existingMessage = messages[index]
+        messages[index] = ChatMessage(
+            id: id,
+            role: existingMessage.role,
+            content: existingMessage.content + delta
+        )
+        streamTick += 1
+    }
+
+    @MainActor
+    private func updateAssistantMessage(id: UUID, content: String) {
+        guard let index = messages.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+
+        let existingMessage = messages[index]
+        messages[index] = ChatMessage(id: id, role: existingMessage.role, content: content)
+        streamTick += 1
     }
 
     private var welcomeHero: some View {
@@ -345,13 +443,11 @@ struct HealthAssistantView: View {
             }
 
             HStack(spacing: 10) {
-                modeChip(
-                    title: preferLocalModel ? "Local AI" : "Cloud AI",
-                    systemImage: preferLocalModel ? "brain.head.profile" : "icloud",
-                    tint: preferLocalModel ? .green : .blue
-                ) {
-                    preferLocalModel.toggle()
-                }
+                statusChip(
+                    title: appleModelService.availability.isAvailable ? "On-device AI" : "Omer fallback",
+                    systemImage: appleModelService.availability.isAvailable ? "apple.intelligence" : "icloud",
+                    tint: appleModelService.availability.isAvailable ? .green : .blue
+                )
 
                 statusChip(
                     title: isRunningInSimulator ? "Simulator Preview" : (HKHealthStore.isHealthDataAvailable() ? "HealthKit Ready" : "Unavailable"),
@@ -365,28 +461,6 @@ struct HealthAssistantView: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(Color(uiColor: .secondarySystemGroupedBackground))
         )
-    }
-
-    private func modeChip(
-        title: String,
-        systemImage: String,
-        tint: Color,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: systemImage)
-                Text(title)
-                    .fontWeight(.semibold)
-            }
-            .font(.subheadline)
-            .foregroundStyle(tint)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(tint.opacity(0.12))
-            .clipShape(Capsule())
-        }
-        .buttonStyle(.plain)
     }
 
     private func statusChip(title: String, systemImage: String, tint: Color) -> some View {
@@ -471,13 +545,19 @@ private struct AssistantNotice {
 }
 
 struct ChatMessage: Identifiable, Sendable {
-    let id = UUID()
+    let id: UUID
     let role: Role
     let content: String
     
     enum Role {
         case user
         case assistant
+    }
+
+    init(id: UUID = UUID(), role: Role, content: String) {
+        self.id = id
+        self.role = role
+        self.content = content
     }
 }
 
@@ -492,6 +572,11 @@ struct MessageBubble: View {
             
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
                 Text(message.content)
+                    .accessibilityIdentifier(
+                        message.role == .assistant
+                            ? "health-assistant-response"
+                            : "health-assistant-user-message"
+                    )
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                     .background(

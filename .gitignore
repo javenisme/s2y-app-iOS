@@ -29,6 +29,10 @@ xcuserdata/
 .DS_Store
 .env
 
+# Local model weights
+S2Y/Resources/LocalModels/*.safetensors
+S2Y/Resources/LocalModels/*.gguf
+
 # Tests
 report.junit
 report.html

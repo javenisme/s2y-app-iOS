@@ -13,7 +13,7 @@
     "parameters": "3.8B",
     "quantization": "Q4_K_M",
     "precision": "int4",
-    "model_size_mb": 2282,
+    "model_size_mb": 2050,
     "context_length": 4096,
     "max_tokens": 2048
   },
@@ -58,9 +58,9 @@
     ]
   },
   "deployment": {
-    "bundle_in_app": true,
-    "download_on_demand": false,
-    "download_url": "https://models.s2y.app/phi-3.5-mini/",
+    "bundle_in_app": false,
+    "download_on_demand": true,
+    "download_url": "https://huggingface.co/mlx-community/Phi-3.5-mini-instruct-4bit/resolve/main/",
     "fallback_models": ["llama-3.2-1b"],
     "auto_update": true,
     "update_check_interval": "7d"

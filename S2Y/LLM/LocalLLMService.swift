@@ -387,17 +387,12 @@ public final class LocalLLMService: ObservableObject, @unchecked Sendable {
     // MARK: - Private Methods
     
     private func loadModelContainer(config: LocalModelConfig) async throws -> any LLMModelContainer {
-#if DEBUG
-        // In DEBUG builds, always return a mock container to enable simulator smoke tests
-        return MockLLMContainer()
-#else
-    #if targetEnvironment(simulator)
+#if targetEnvironment(simulator)
         // On simulator in non-DEBUG, still provide mock to validate UI flows
         return MockLLMContainer()
-    #else
+#else
         // TODO: Replace with actual MLX/llama.cpp/CoreML backend
         throw LocalLLMError.modelLoadFailed("MLX integration not yet implemented. Use GGUF backend for now.")
-    #endif
 #endif
     }
     
@@ -425,4 +420,3 @@ extension LocalLLMService {
     }
 }
 #endif
-
