@@ -13,219 +13,221 @@ import SwiftUI
 struct HealthTrendChart: View {
     let trend: HealthKitService.Trend
     let metricKind: HealthKitService.MetricKind
-    
+
     private var title: String {
-        metricTitle(kind: metricKind)
+        metricKind.displayName
     }
-    
+
     private var unit: String {
-        metricUnit(kind: metricKind)
+        metricKind.unit
     }
-    
+
+    private var observedPoints: [HealthKitService.DailyMetric] {
+        trend.points.filter(\.isObserved)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(title) - \(trend.windowDays) Day Trend")
-                    .font(.headline)
-                
-                HStack {
-                    Text("Average: \(String(format: "%.1f", trend.average)) \(unit)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(title) · \(trend.windowDays) days")
+                        .font(.headline)
                     Spacer()
-                    
-                    HStack {
-                        Image(systemName: trend.changeRate >= 0 ? "arrow.up.right" : "arrow.down.right")
-                            .foregroundColor(trend.changeRate >= 0 ? .green : .red)
-                        Text("\(String(format: "%.1f", abs(trend.changeRate * 100)))%")
-                            .foregroundColor(trend.changeRate >= 0 ? .green : .red)
-                    }
+                    HealthDataQualityBadge(quality: trend.dataQuality)
+                }
+
+                Text("\(trend.observedDays) of \(trend.expectedDays) days include data")
                     .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                HStack(alignment: .firstTextBaseline) {
+                    Text(metricKind.formatValue(trend.average))
+                        .font(.title3.weight(.semibold))
+                    Text("average")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Label(
+                        "\(abs(trend.changeRate * 100).formatted(.number.precision(.fractionLength(1))))%",
+                        systemImage: trend.changeRate >= 0 ? "arrow.up.right" : "arrow.down.right"
+                    )
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(
+                        "First to last observed value changed \(trend.changeRate >= 0 ? "up" : "down") by \(abs(trend.changeRate * 100).formatted(.number.precision(.fractionLength(1)))) percent"
+                    )
                 }
             }
-            
-            Chart {
-                ForEach(trend.points, id: \.date) { point in
-                    LineMark(
-                        x: .value("Date", point.date),
-                        y: .value(title, point.value)
-                    )
-                    .foregroundStyle(.blue)
-                    .lineStyle(StrokeStyle(lineWidth: 2))
-                    
-                    PointMark(
-                        x: .value("Date", point.date),
-                        y: .value(title, point.value)
-                    )
-                    .foregroundStyle(.blue)
-                    .symbolSize(30)
-                }
-                
-                // Average line
-                RuleMark(y: .value("Average", trend.average))
-                    .foregroundStyle(.orange)
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
-                    .annotation(position: .trailing, alignment: .leading) {
-                        Text("Avg")
-                            .font(.caption2)
-                            .foregroundColor(.orange)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                            .background(Color.orange.opacity(0.1))
-                            .cornerRadius(4)
+
+            if observedPoints.isEmpty {
+                ContentUnavailableView(
+                    "No data in this period",
+                    systemImage: "chart.line.uptrend.xyaxis",
+                    description: Text("Connect or sync a health data source, then try again.")
+                )
+                .frame(maxWidth: .infinity, minHeight: 180)
+            } else {
+                Chart {
+                    ForEach(observedPoints, id: \.date) { point in
+                        LineMark(
+                            x: .value("Date", point.date),
+                            y: .value(title, point.value)
+                        )
+                        .foregroundStyle(.tint)
+                        .lineStyle(StrokeStyle(lineWidth: 2))
+
+                        PointMark(
+                            x: .value("Date", point.date),
+                            y: .value(title, point.value)
+                        )
+                        .foregroundStyle(.tint)
+                        .symbolSize(24)
                     }
-            }
-            .frame(height: 200)
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .day, count: max(1, trend.windowDays / 7))) { _ in
-                    AxisGridLine()
-                    AxisValueLabel(format: .dateTime.month().day())
+
+                    RuleMark(y: .value("Average", trend.average))
+                        .foregroundStyle(.secondary)
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                 }
-            }
-            .chartYAxis {
-                AxisMarks { _ in
-                    AxisGridLine()
-                    AxisValueLabel()
+                .frame(height: 200)
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: .day, count: max(1, trend.windowDays / 6))) { _ in
+                        AxisGridLine()
+                        AxisValueLabel(format: .dateTime.month().day())
+                    }
                 }
+                .chartYAxis {
+                    AxisMarks { _ in
+                        AxisGridLine()
+                        AxisValueLabel()
+                    }
+                }
+                .accessibilityLabel("\(title), \(trend.windowDays)-day trend chart")
+                .accessibilityValue(
+                    "Average \(trend.average.formatted(.number.precision(.fractionLength(1)))) \(unit), based on \(trend.observedDays) observed days"
+                )
+            }
+
+            if trend.dataQuality == .limited {
+                Label(
+                    "Treat this trend cautiously because fewer than half of the days contain data.",
+                    systemImage: "exclamationmark.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
         .padding()
-        .background(Color.gray.opacity(0.05))
-        .cornerRadius(12)
-    }
-    
-    private func metricUnit(kind: HealthKitService.MetricKind) -> String {
-        return HealthMetricsDictionary.unit(for: kind)
-    }
-    
-    private func metricTitle(kind: HealthKitService.MetricKind) -> String {
-        return HealthMetricsDictionary.displayName(for: kind)
+        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
 struct HealthComparisonChart: View {
     let comparison: HealthKitService.Comparison
     let metricKind: HealthKitService.MetricKind
-    
-    private var title: String {
-        metricTitle(kind: metricKind)
+
+    private struct PeriodAverage: Identifiable {
+        let id: String
+        let title: String
+        let value: Double
     }
-    
-    private var unit: String {
-        metricUnit(kind: metricKind)
+
+    private var periodAverages: [PeriodAverage] {
+        [
+            PeriodAverage(id: "previous", title: "Previous", value: comparison.previousAverage),
+            PeriodAverage(id: "current", title: "Current", value: comparison.currentAverage)
+        ]
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(title) - Comparison Analysis")
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(metricKind.displayName) comparison")
                     .font(.headline)
-                
-                Text("\(comparison.currentWindowDays) Day Window Comparison")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            HStack(spacing: 20) {
-                // Bar Chart
-                HStack(spacing: 12) {
-                    VStack {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(.blue.opacity(0.7))
-                            .frame(width: 40, height: max(20, CGFloat(comparison.previousAverage / max(comparison.currentAverage, comparison.previousAverage, 1) * 120)))
-                        Text("Previous")
-                            .font(.caption2)
-                    }
-                    
-                    VStack {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(.blue)
-                            .frame(width: 40, height: max(20, CGFloat(comparison.currentAverage / max(comparison.currentAverage, comparison.previousAverage, 1) * 120)))
-                        Text("Current")
-                            .font(.caption2)
-                    }
-                }
-                
                 Spacer()
-                
-                // Statistics
-                VStack(alignment: .trailing, spacing: 8) {
-                    HStack {
-                        Text("Current Avg:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text("\(String(format: "%.1f", comparison.currentAverage)) \(unit)")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                    }
-                    
-                    HStack {
-                        Text("Previous Avg:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text("\(String(format: "%.1f", comparison.previousAverage)) \(unit)")
-                            .font(.caption)
-                    }
-                    
-                    Divider()
-                        .frame(width: 80)
-                    
-                    HStack {
-                        Text("Change:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        HStack {
-                            Image(systemName: comparison.delta >= 0 ? "arrow.up" : "arrow.down")
-                                .font(.caption2)
-                            Text("\(String(format: "%.1f", abs(comparison.deltaRate * 100)))%")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundColor(comparison.delta >= 0 ? .green : .red)
-                    }
+                HealthDataQualityBadge(quality: comparison.dataQuality)
+            }
+
+            Text("Two adjacent \(comparison.currentWindowDays)-day periods")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Chart(periodAverages) { period in
+                BarMark(
+                    x: .value("Period", period.title),
+                    y: .value(metricKind.displayName, period.value)
+                )
+                .foregroundStyle(period.id == "current" ? Color.accentColor : Color.secondary.opacity(0.55))
+                .annotation(position: .top) {
+                    Text(metricKind.formatValue(period.value))
+                        .font(.caption2.weight(.medium))
                 }
             }
-            
-            // Interpretation
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Analysis")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
-                
+            .frame(height: 180)
+            .accessibilityLabel("\(metricKind.displayName), period comparison chart")
+            .accessibilityValue(
+                "Current average \(metricKind.formatValue(comparison.currentAverage)); previous average \(metricKind.formatValue(comparison.previousAverage))"
+            )
+
+            Label {
                 Text(interpretComparison())
-                    .font(.caption)
-                    .foregroundColor(.primary)
+            } icon: {
+                Image(systemName: comparison.delta >= 0 ? "arrow.up.right" : "arrow.down.right")
             }
-            .padding(.top, 8)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            Text(
+                "Current: \(comparison.currentObservedDays)/\(comparison.currentWindowDays) days · Previous: \(comparison.previousObservedDays)/\(comparison.previousWindowDays) days"
+            )
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+
+            if comparison.dataQuality == .limited {
+                Label(
+                    "This comparison has limited coverage in at least one period.",
+                    systemImage: "exclamationmark.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
         }
         .padding()
-        .background(Color.gray.opacity(0.05))
-        .cornerRadius(12)
+        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
-    
+
     private func interpretComparison() -> String {
         let change = abs(comparison.deltaRate * 100)
-        let direction = comparison.delta >= 0 ? "increase" : "decrease"
-        
+        let direction = comparison.delta >= 0 ? "higher" : "lower"
+
         if change < 5 {
-            return "Data remains relatively stable with minimal changes."
-        } else if change < 15 {
-            return "Shows a \(direction) of \(String(format: "%.1f", change))%, indicating minor changes."
-        } else if change < 30 {
-            return "Shows a \(direction) of \(String(format: "%.1f", change))%, indicating noticeable changes."
-        } else {
-            return "Shows a \(direction) of \(String(format: "%.1f", change))%, indicating significant changes that warrant attention."
+            return "The two period averages are similar."
+        }
+        return "The current average is \(change.formatted(.number.precision(.fractionLength(1))))% \(direction) than the previous period. This describes a change, not whether it is medically good or bad."
+    }
+}
+
+private struct HealthDataQualityBadge: View {
+    let quality: HealthKitService.DataQuality
+
+    private var title: String {
+        switch quality {
+        case .unavailable: "No data"
+        case .limited: "Limited"
+        case .sufficient: "Good coverage"
+        case .complete: "Complete"
         }
     }
-    
-    private func metricUnit(kind: HealthKitService.MetricKind) -> String {
-        return HealthMetricsDictionary.unit(for: kind)
-    }
-    
-    private func metricTitle(kind: HealthKitService.MetricKind) -> String {
-        return HealthMetricsDictionary.displayName(for: kind)
+
+    var body: some View {
+        Text(title)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.thinMaterial, in: Capsule())
+            .accessibilityLabel("Data coverage: \(title)")
     }
 }
 
