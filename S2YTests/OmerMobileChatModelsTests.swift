@@ -498,4 +498,41 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(dataset.values(for: .heartRateAverage).map(\.value), [70])
         XCTAssertEqual(dataset.coverage.first?.dataQuality, .complete)
     }
+
+    func testPersonalBaselineRequiresFourteenObservedDays() {
+        let baseline = PersonalHealthBaselineAnalyzer.baseline(
+            for: .restingHeartRate,
+            values: Array(repeating: 60, count: 13)
+        )
+
+        XCTAssertEqual(baseline.availability, .insufficientData)
+        XCTAssertNil(baseline.baselineMedian)
+    }
+
+    func testPersonalDeviationUsesRobustIndividualBaseline() {
+        let baselineValues = [58, 59, 60, 61, 62, 58, 59, 60, 61, 62, 59, 60, 61, 60]
+            .map(Double.init)
+
+        let deviation = PersonalHealthBaselineAnalyzer.deviation(
+            baselineValues: baselineValues,
+            currentValues: [72, 73, 74],
+            metricKind: .restingHeartRate
+        )
+
+        XCTAssertEqual(deviation.baselineMedian, 60)
+        XCTAssertEqual(deviation.currentMedian, 73)
+        XCTAssertEqual(deviation.direction, .higher)
+        XCTAssertEqual(deviation.baselineObservedDays, 14)
+    }
+
+    func testPersonalDeviationIsUndeterminedWithTooFewCurrentDays() {
+        let deviation = PersonalHealthBaselineAnalyzer.deviation(
+            baselineValues: Array(repeating: 7.5, count: 14),
+            currentValues: [5.5, 6],
+            metricKind: .sleepDurationHours
+        )
+
+        XCTAssertEqual(deviation.direction, .undetermined)
+        XCTAssertNil(deviation.robustDistance)
+    }
 }
