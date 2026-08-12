@@ -454,4 +454,48 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertTrue(context.contains("Coverage is limited"))
         XCTAssertTrue(context.contains("not a diagnosis or treatment recommendation"))
     }
+
+    func testLongitudinalDatasetAlignsObservedValuesWithoutZeroImputation() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let start = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-01T12:00:00Z"))
+        let dayTwo = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: start))
+        let dataset = LongitudinalHealthAligner.align(
+            series: [
+                .steps: [
+                    .init(date: start, value: 4_000),
+                    .init(date: dayTwo, value: 0, isObserved: false)
+                ],
+                .sleepDurationHours: [
+                    .init(date: dayTwo, value: 7.5)
+                ]
+            ],
+            expectedDays: 7,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(dataset.days.count, 2)
+        XCTAssertEqual(dataset.values(for: .steps).map(\.value), [4_000])
+        XCTAssertEqual(dataset.values(for: .sleepDurationHours).map(\.value), [7.5])
+        XCTAssertTrue(dataset.pairedValues(.steps, .sleepDurationHours).isEmpty)
+        XCTAssertEqual(dataset.coverage.first(where: { $0.metricKind == .steps })?.observedDays, 1)
+    }
+
+    func testLongitudinalDatasetAveragesDuplicateSamplesWithinDay() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let morning = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-01T08:00:00Z"))
+        let evening = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-01T20:00:00Z"))
+        let dataset = LongitudinalHealthAligner.align(
+            series: [
+                .heartRateAverage: [
+                    .init(date: morning, value: 60),
+                    .init(date: evening, value: 80)
+                ]
+            ],
+            expectedDays: 1,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(dataset.values(for: .heartRateAverage).map(\.value), [70])
+        XCTAssertEqual(dataset.coverage.first?.dataQuality, .complete)
+    }
 }
