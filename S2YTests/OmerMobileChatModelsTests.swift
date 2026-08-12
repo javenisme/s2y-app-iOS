@@ -172,4 +172,94 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(response.conversationId, conversationID)
         XCTAssertTrue(response.synced)
     }
+
+    func testLocalChatCacheRoundTripsConversationContent() throws {
+        let chatID = try XCTUnwrap(UUID(uuidString: "22222222-2222-4222-8222-222222222222"))
+        let messageID = try XCTUnwrap(UUID(uuidString: "33333333-3333-4333-8333-333333333333"))
+        let summary = OmerChatSummary(
+            id: chatID,
+            createdAt: "2026-08-12T12:00:00Z",
+            title: "Sleep quality",
+            visibility: "private"
+        )
+        let snapshot = OmerChatCacheSnapshot(
+            chats: [summary],
+            details: [
+                OmerChatDetailResponse(
+                    chat: summary,
+                    messages: [
+                        OmerChatHistoryMessage(
+                            id: messageID,
+                            role: "assistant",
+                            content: "**Average:** 7.5 hours",
+                            createdAt: "2026-08-12T12:00:01Z"
+                        )
+                    ]
+                )
+            ]
+        )
+
+        let decoded = try decoder.decode(OmerChatCacheSnapshot.self, from: encoder.encode(snapshot))
+        XCTAssertEqual(decoded.chats.first?.id, chatID)
+        XCTAssertEqual(decoded.details.first?.messages.first?.content, "**Average:** 7.5 hours")
+    }
+
+    func testAssistantMarkdownIsConvertedToDisplayText() throws {
+        let markdown = "**Average sleep:** 7.5 hours\n\nYour consistency is *improving*."
+        let rendered = try XCTUnwrap(ChatMarkdownRenderer.attributedString(from: markdown))
+        let displayText = String(rendered.characters)
+
+        XCTAssertTrue(displayText.contains("Average sleep:"))
+        XCTAssertTrue(displayText.contains("improving"))
+        XCTAssertFalse(displayText.contains("**"))
+        XCTAssertFalse(displayText.contains("*improving*"))
+    }
+
+    func testChatHistoryGroupsConversationsByRelativeDate() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let chats = [
+            OmerChatSummary(id: UUID(), createdAt: "2026-08-12T12:00:00.000Z", title: "Today", visibility: "private"),
+            OmerChatSummary(id: UUID(), createdAt: "2026-08-11T12:00:00.000Z", title: "Yesterday", visibility: "private"),
+            OmerChatSummary(id: UUID(), createdAt: "2026-08-08T12:00:00.000Z", title: "This week", visibility: "private"),
+            OmerChatSummary(id: UUID(), createdAt: "invalid", title: "Earlier", visibility: "private")
+        ]
+
+        let sections = OmerChatHistorySection.grouped(chats, relativeTo: now, calendar: calendar)
+
+        XCTAssertEqual(sections.map(\.title), ["Today", "Yesterday", "Previous 7 days", "Earlier"])
+        XCTAssertEqual(sections.flatMap(\.chats).map(\.title), ["Today", "Yesterday", "This week", "Earlier"])
+    }
+
+    func testHealthSuggestionsOnlyIncludeAvailableMetrics() {
+        let suggestions = HealthQuickQuerySuggestion.available(for: [.steps, .sleepDurationHours])
+
+        XCTAssertEqual(suggestions.map(\.id), ["steps", "sleep"])
+        XCTAssertFalse(suggestions.contains(where: { $0.metricKind == .heartRateAverage }))
+        XCTAssertFalse(suggestions.contains(where: { $0.metricKind == .activeEnergy }))
+    }
+
+    func testAssistantMarkdownCreatesUserFriendlyBlocks() {
+        let markdown = """
+        # Sleep summary
+
+        **Average:** 7.5 hours
+
+        - Keep a consistent bedtime
+        2. Review again next week
+
+        > This is a wellness insight, not a diagnosis.
+        """
+
+        let blocks = ChatMarkdownRenderer.blocks(from: markdown)
+
+        XCTAssertEqual(
+            blocks.map(\.kind),
+            [.heading(1), .paragraph, .unorderedListItem, .orderedListItem(2), .quote]
+        )
+        XCTAssertEqual(String(blocks[0].content.characters), "Sleep summary")
+        XCTAssertEqual(String(blocks[1].content.characters), "Average: 7.5 hours")
+        XCTAssertFalse(blocks.map { String($0.content.characters) }.joined().contains("**"))
+    }
 }

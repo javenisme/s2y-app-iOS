@@ -19,8 +19,18 @@ actor OmerChatService {
     private let sessionStore = OmerSessionStore.shared
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
+    private let cacheURL: URL
+    private var chatCache: OmerChatCacheSnapshot
 
-    private init() {}
+    private init() {
+        let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let cacheDirectory = applicationSupport.appendingPathComponent("OmerChatCache", isDirectory: true)
+        let historyURL = cacheDirectory.appendingPathComponent("history.json")
+        self.cacheURL = historyURL
+        self.chatCache = (try? Data(contentsOf: historyURL))
+            .flatMap { try? JSONDecoder().decode(OmerChatCacheSnapshot.self, from: $0) }
+            ?? OmerChatCacheSnapshot(chats: [], details: [])
+    }
 
     func sendMessage(
         message: String,
@@ -64,11 +74,19 @@ actor OmerChatService {
             )
         }
 
-        let assistantMessageID = UUID().uuidString
+        let assistantMessageID = UUID()
+        cacheExchange(
+            conversationID: response.conversationId,
+            userMessageID: body.message.id,
+            userText: message,
+            assistantMessageID: assistantMessageID,
+            assistantText: response.answer,
+            visibility: "private"
+        )
         onEvent(.started(.init(
             chatId: response.conversationId.uuidString,
             userMessageId: body.message.id.uuidString,
-            assistantMessageId: assistantMessageID
+            assistantMessageId: assistantMessageID.uuidString
         )))
         onEvent(.delta(response.answer))
         for toolEvent in response.toolEvents {
@@ -88,7 +106,7 @@ actor OmerChatService {
         await sessionStore.saveLastChatId(response.conversationId.uuidString, sessionKey: sessionKey)
         onEvent(.completed(.init(
             chatId: response.conversationId.uuidString,
-            assistantMessageId: assistantMessageID
+            assistantMessageId: assistantMessageID.uuidString
         )))
     }
 
@@ -133,7 +151,9 @@ actor OmerChatService {
             throw OmerChatServiceError.invalidBaseURL
         }
         let data = try await authenticatedGET(url: url)
-        return try decoder.decode(OmerChatListResponse.self, from: data)
+        let response = try decoder.decode(OmerChatListResponse.self, from: data)
+        mergeCachedSummaries(response.chats)
+        return response
     }
 
     func fetchChat(id: UUID) async throws -> OmerChatDetailResponse {
@@ -142,7 +162,17 @@ actor OmerChatService {
             .appendingPathComponent("api/mobile/v1/chats")
             .appendingPathComponent(id.uuidString)
         let data = try await authenticatedGET(url: url)
-        return try decoder.decode(OmerChatDetailResponse.self, from: data)
+        let detail = try decoder.decode(OmerChatDetailResponse.self, from: data)
+        cacheDetail(detail)
+        return detail
+    }
+
+    func cachedChats(limit: Int = 50) -> [OmerChatSummary] {
+        Array(chatCache.chats.prefix(max(1, limit)))
+    }
+
+    func cachedChat(id: UUID) -> OmerChatDetailResponse? {
+        chatCache.details.first { $0.chat.id == id }
     }
 
     func selectChat(id: UUID) async throws {
@@ -180,8 +210,92 @@ actor OmerChatService {
         } catch OmerChatServiceError.unauthorized {
             response = try await performLocalSync(request, url: url, forceTokenRefresh: true)
         }
+        cacheExchange(
+            conversationID: response.conversationId,
+            userMessageID: userMessageID,
+            userText: userText,
+            assistantMessageID: assistantMessageID,
+            assistantText: assistantText,
+            visibility: "private"
+        )
         await sessionStore.saveLastChatId(response.conversationId.uuidString, sessionKey: key)
         return response
+    }
+
+    private func cacheExchange(
+        conversationID: UUID,
+        userMessageID: UUID,
+        userText: String,
+        assistantMessageID: UUID,
+        assistantText: String,
+        visibility: String
+    ) {
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let existingSummary = chatCache.chats.first { $0.id == conversationID }
+        let title = existingSummary?.title ?? conversationTitle(from: userText)
+        let summary = OmerChatSummary(
+            id: conversationID,
+            createdAt: existingSummary?.createdAt ?? timestamp,
+            title: title,
+            visibility: existingSummary?.visibility ?? visibility
+        )
+        let newMessages = [
+            OmerChatHistoryMessage(id: userMessageID, role: "user", content: userText, createdAt: timestamp),
+            OmerChatHistoryMessage(id: assistantMessageID, role: "assistant", content: assistantText, createdAt: timestamp)
+        ]
+
+        if let detailIndex = chatCache.details.firstIndex(where: { $0.chat.id == conversationID }) {
+            let existing = chatCache.details[detailIndex]
+            let uniqueMessages = (existing.messages + newMessages).reduce(into: [OmerChatHistoryMessage]()) { result, message in
+                if !result.contains(where: { $0.id == message.id }) {
+                    result.append(message)
+                }
+            }
+            chatCache.details[detailIndex] = OmerChatDetailResponse(chat: summary, messages: Array(uniqueMessages.suffix(200)))
+        } else {
+            chatCache.details.insert(OmerChatDetailResponse(chat: summary, messages: newMessages), at: 0)
+        }
+        mergeCachedSummaries([summary])
+    }
+
+    private func cacheDetail(_ detail: OmerChatDetailResponse) {
+        if let index = chatCache.details.firstIndex(where: { $0.chat.id == detail.chat.id }) {
+            chatCache.details[index] = detail
+        } else {
+            chatCache.details.insert(detail, at: 0)
+        }
+        chatCache.details = Array(chatCache.details.prefix(50))
+        mergeCachedSummaries([detail.chat])
+    }
+
+    private func mergeCachedSummaries(_ summaries: [OmerChatSummary]) {
+        var merged = summaries
+        merged.append(contentsOf: chatCache.chats.filter { cached in
+            !summaries.contains(where: { $0.id == cached.id })
+        })
+        chatCache.chats = Array(merged.prefix(50))
+        persistCache()
+    }
+
+    private func conversationTitle(from text: String) -> String {
+        let firstLine = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? text
+        let trimmed = firstLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.count > 64 ? String(trimmed.prefix(61)) + "…" : trimmed
+    }
+
+    private func persistCache() {
+        do {
+            let directory = cacheURL.deletingLastPathComponent()
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            var resourceValues = URLResourceValues()
+            resourceValues.isExcludedFromBackup = true
+            var mutableDirectory = directory
+            try? mutableDirectory.setResourceValues(resourceValues)
+            let data = try encoder.encode(chatCache)
+            try data.write(to: cacheURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        } catch {
+            logger.error("Failed to persist protected Omer chat cache: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     private func configuredServiceURL() throws -> URL {

@@ -43,12 +43,48 @@ final class ContributionsTest: XCTestCase {
 
 final class HealthAssistantChatUITests: XCTestCase {
     @MainActor
-    func testOmerFallbackRespondsInSimulator() {
+    func testChatControlsAndDrawer() {
         let app = XCUIApplication()
         app.launchArguments = ["--setupTestAccount", "--skipOnboarding"]
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Omer fallback"].waitForExistence(timeout: 10))
+        let providerMenu = app.buttons["health-assistant-ai-mode"]
+        XCTAssertTrue(providerMenu.waitForExistence(timeout: 10))
+        providerMenu.tap()
+        XCTAssertTrue(app.buttons["Omer Online"].waitForExistence(timeout: 3))
+        app.buttons["Omer Online"].tap()
+        XCTAssertTrue(app.staticTexts["Omer Online"].waitForExistence(timeout: 3))
+
+        let input = app.textFields["health-assistant-input"]
+        XCTAssertTrue(input.waitForExistence(timeout: 5))
+        input.tap()
+        input.typeText("How has my sleep quality been recently?")
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        XCTAssertTrue(app.toolbars.buttons["Done"].waitForExistence(timeout: 3))
+        app.toolbars.buttons["Done"].tap()
+        XCTAssertFalse(app.keyboards.firstMatch.waitForExistence(timeout: 1))
+
+        app.openHomeDrawer()
+        XCTAssertTrue(app.buttons["drawer.new-chat"].waitForExistence(timeout: 5))
+        let expectedChatSectionLabels = ["Recent chats", "Today", "Yesterday", "Previous 7 days", "Earlier"]
+        XCTAssertTrue(expectedChatSectionLabels.contains { app.staticTexts[$0].exists })
+        app.swipeUp()
+        app.swipeUp()
+        XCTAssertTrue(app.buttons["drawer.account"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.buttons.matching(identifier: "drawer.account").count, 1)
+    }
+
+    @MainActor
+    func testOmerOnlineRespondsInSimulator() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--setupTestAccount", "--skipOnboarding"]
+        app.launch()
+
+        let providerMenu = app.buttons["health-assistant-ai-mode"]
+        XCTAssertTrue(providerMenu.waitForExistence(timeout: 10))
+        providerMenu.tap()
+        XCTAssertTrue(app.buttons["Omer Online"].waitForExistence(timeout: 3))
+        app.buttons["Omer Online"].tap()
 
         let input = app.textFields["health-assistant-input"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))

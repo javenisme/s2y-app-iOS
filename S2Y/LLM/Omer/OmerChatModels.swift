@@ -96,11 +96,87 @@ struct OmerAgentsResponse: Decodable {
     let agents: [OmerAgent]
 }
 
-struct OmerChatSummary: Decodable, Identifiable, Sendable {
+struct OmerChatSummary: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     let createdAt: String
     let title: String
     let visibility: String
+}
+
+struct OmerChatHistorySection: Identifiable, Equatable, Sendable {
+    let id: String
+    let title: String
+    let chats: [OmerChatSummary]
+
+    static func grouped(
+        _ chats: [OmerChatSummary],
+        relativeTo now: Date = .now,
+        calendar: Calendar = .current
+    ) -> [OmerChatHistorySection] {
+        let buckets = Dictionary(grouping: chats) { chat in
+            section(for: chat.createdAt, relativeTo: now, calendar: calendar)
+        }
+
+        return Section.allCases.compactMap { section in
+            guard let sectionChats = buckets[section], !sectionChats.isEmpty else {
+                return nil
+            }
+            return OmerChatHistorySection(
+                id: section.rawValue,
+                title: section.title,
+                chats: sectionChats
+            )
+        }
+    }
+
+    private static func section(
+        for timestamp: String,
+        relativeTo now: Date,
+        calendar: Calendar
+    ) -> Section {
+        guard let date = ISO8601DateFormatter.s2yDate(from: timestamp) else {
+            return .earlier
+        }
+
+        if calendar.isDate(date, inSameDayAs: now) {
+            return .today
+        }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
+           calendar.isDate(date, inSameDayAs: yesterday) {
+            return .yesterday
+        }
+        if let weekAgo = calendar.date(byAdding: .day, value: -7, to: now), date >= weekAgo {
+            return .previousSevenDays
+        }
+        return .earlier
+    }
+
+    private enum Section: String, CaseIterable {
+        case today
+        case yesterday
+        case previousSevenDays
+        case earlier
+
+        var title: String {
+            switch self {
+            case .today: "Today"
+            case .yesterday: "Yesterday"
+            case .previousSevenDays: "Previous 7 days"
+            case .earlier: "Earlier"
+            }
+        }
+    }
+}
+
+private extension ISO8601DateFormatter {
+    static func s2yDate(from timestamp: String) -> Date? {
+        let fractionalFormatter = ISO8601DateFormatter()
+        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractionalFormatter.date(from: timestamp) {
+            return date
+        }
+        return ISO8601DateFormatter().date(from: timestamp)
+    }
 }
 
 struct OmerChatListResponse: Decodable, Sendable {
@@ -108,16 +184,21 @@ struct OmerChatListResponse: Decodable, Sendable {
     let hasMore: Bool
 }
 
-struct OmerChatHistoryMessage: Decodable, Identifiable, Sendable {
+struct OmerChatHistoryMessage: Codable, Identifiable, Sendable {
     let id: UUID
     let role: String
     let content: String
     let createdAt: String
 }
 
-struct OmerChatDetailResponse: Decodable, Sendable {
+struct OmerChatDetailResponse: Codable, Sendable {
     let chat: OmerChatSummary
     let messages: [OmerChatHistoryMessage]
+}
+
+struct OmerChatCacheSnapshot: Codable, Sendable {
+    var chats: [OmerChatSummary]
+    var details: [OmerChatDetailResponse]
 }
 
 struct OmerAPIErrorResponse: Decodable {

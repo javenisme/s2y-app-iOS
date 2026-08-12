@@ -86,7 +86,7 @@ public final class HealthKitService {
         public let value: Double
     }
 
-    public enum MetricKind: Sendable, Codable, CaseIterable {
+    public enum MetricKind: Sendable, Codable, CaseIterable, Hashable {
         case steps
         case heartRateAverage
         case restingHeartRate
