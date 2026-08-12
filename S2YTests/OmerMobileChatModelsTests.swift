@@ -535,4 +535,52 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(deviation.direction, .undetermined)
         XCTAssertNil(deviation.robustDistance)
     }
+
+    func testDescriptiveRelationshipUsesOnlyPairedDaysAndRejectsCausality() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let start = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-01T12:00:00Z"))
+        var steps: [HealthKitService.DailyMetric] = []
+        var sleep: [HealthKitService.DailyMetric] = []
+        for offset in 0..<7 {
+            let date = try XCTUnwrap(calendar.date(byAdding: .day, value: offset, to: start))
+            steps.append(.init(date: date, value: Double(offset + 1) * 1_000))
+            sleep.append(.init(date: date, value: Double(offset + 1)))
+        }
+        let dataset = LongitudinalHealthAligner.align(
+            series: [.steps: steps, .sleepDurationHours: sleep],
+            expectedDays: 7,
+            calendar: calendar
+        )
+
+        let relationship = DescriptiveHealthRelationshipAnalyzer.analyze(
+            dataset: dataset,
+            first: .steps,
+            second: .sleepDurationHours
+        )
+
+        XCTAssertEqual(relationship.pairedDays, 7)
+        XCTAssertEqual(relationship.direction, .movesTogether)
+        XCTAssertEqual(relationship.strength, .strong)
+        XCTAssertTrue(relationship.explanation.contains("not evidence that one caused the other"))
+    }
+
+    func testDescriptiveRelationshipRequiresSevenPairedDays() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-01T12:00:00Z"))
+        let dataset = LongitudinalHealthAligner.align(
+            series: [
+                .steps: [.init(date: date, value: 5_000)],
+                .sleepDurationHours: [.init(date: date, value: 7)]
+            ],
+            expectedDays: 30
+        )
+
+        let relationship = DescriptiveHealthRelationshipAnalyzer.analyze(
+            dataset: dataset,
+            first: .steps,
+            second: .sleepDurationHours
+        )
+
+        XCTAssertEqual(relationship.availability, .insufficientData)
+        XCTAssertNil(relationship.coefficient)
+    }
 }
