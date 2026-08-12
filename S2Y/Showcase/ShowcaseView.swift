@@ -336,29 +336,23 @@ struct ShowcaseView: View {
 }
 
 private struct HealthAccessSettingsView: View {
-    @Environment(HealthKit.self) private var healthKit
-
-    @State private var isRequesting = false
+    @State private var requestingGroup: HealthPermissionGroup?
+    @State private var requestStates: [HealthPermissionGroup: HealthPermissionRequestState] = [:]
     @State private var errorMessage: String?
 
-    private var isAuthorized: Bool {
-        !ProcessInfo.processInfo.isPreviewSimulator && healthKit.isFullyAuthorized
-    }
+    private let healthService = HealthKitService.shared
 
     var body: some View {
         List {
             Section {
-                LabeledContent("Health Access", value: isAuthorized ? "Allowed" : "Not Allowed")
-
-                Button(isAuthorized ? "Review Health Access" : "Allow Health Access") {
-                    _Concurrency.Task { await requestAuthorization() }
+                ForEach(HealthPermissionGroup.allCases) { group in
+                    permissionRow(for: group)
                 }
-                .disabled(isRequesting)
             } footer: {
-                Text("iOS controls individual Health permissions. You can review the system prompt without restarting onboarding.")
+                Text("S2Y requests each category only when you choose it. Apple does not reveal whether read access was allowed or denied, so S2Y never labels a category as Allowed.")
             }
 
-            if isRequesting {
+            if requestingGroup != nil {
                 Section {
                     HStack(spacing: 12) {
                         ProgressView()
@@ -377,18 +371,66 @@ private struct HealthAccessSettingsView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Health Permissions")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await refreshRequestStates()
+        }
+    }
+
+    private func permissionRow(for group: HealthPermissionGroup) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: group.systemImage)
+                .foregroundStyle(.red)
+                .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(group.title)
+                    .font(.headline)
+                Text(group.purpose)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            Button(buttonTitle(for: group)) {
+                _Concurrency.Task { await requestAuthorization(for: group) }
+            }
+            .buttonStyle(.bordered)
+            .disabled(requestingGroup != nil || requestStates[group] == .unavailable)
+            .accessibilityIdentifier("health-permission-\(group.rawValue)")
+        }
+        .padding(.vertical, 6)
+    }
+
+    private func buttonTitle(for group: HealthPermissionGroup) -> String {
+        switch requestStates[group] {
+        case .requested:
+            "Requested"
+        case .unavailable:
+            "Unavailable"
+        case .review, .none:
+            "Review"
+        }
     }
 
     @MainActor
-    private func requestAuthorization() async {
-        isRequesting = true
+    private func requestAuthorization(for group: HealthPermissionGroup) async {
+        requestingGroup = group
         errorMessage = nil
-        defer { isRequesting = false }
+        defer { requestingGroup = nil }
 
         do {
-            try await healthKit.askForAuthorization()
+            try await healthService.requestAuthorization(for: [group])
+            requestStates[group] = await healthService.permissionRequestState(for: group)
         } catch {
             errorMessage = "Health access could not be updated: \(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func refreshRequestStates() async {
+        for group in HealthPermissionGroup.allCases {
+            requestStates[group] = await healthService.permissionRequestState(for: group)
         }
     }
 }

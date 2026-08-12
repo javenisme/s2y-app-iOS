@@ -262,4 +262,13 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(String(blocks[1].content.characters), "Average: 7.5 hours")
         XCTAssertFalse(blocks.map { String($0.content.characters) }.joined().contains("**"))
     }
+
+    func testHealthPermissionGroupsArePurposeBasedAndNonOverlapping() {
+        let groups = HealthPermissionGroup.allCases
+        let allMetrics = groups.flatMap(\.metricKinds)
+
+        XCTAssertEqual(Set(allMetrics), Set(HealthKitService.MetricKind.allCases))
+        XCTAssertEqual(allMetrics.count, Set(allMetrics).count)
+        XCTAssertTrue(groups.allSatisfy { !$0.title.isEmpty && !$0.purpose.isEmpty })
+    }
 }

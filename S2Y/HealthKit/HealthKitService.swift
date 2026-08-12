@@ -32,6 +32,85 @@ public enum HealthKitError: Error, LocalizedError {
     }
 }
 
+public enum HealthPermissionGroup: String, CaseIterable, Identifiable, Sendable {
+    case activity
+    case sleep
+    case heart
+    case vitals
+    case body
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .activity: "Activity"
+        case .sleep: "Sleep"
+        case .heart: "Heart & Fitness"
+        case .vitals: "Vitals"
+        case .body: "Body Measurements"
+        }
+    }
+
+    public var purpose: String {
+        switch self {
+        case .activity:
+            "Understand movement, exercise, and energy trends."
+        case .sleep:
+            "Summarize sleep duration and consistency."
+        case .heart:
+            "Explain heart-rate, recovery, and cardio-fitness trends."
+        case .vitals:
+            "Review blood pressure, temperature, breathing, and oxygen trends."
+        case .body:
+            "Track changes in body measurements over time."
+        }
+    }
+
+    public var systemImage: String {
+        switch self {
+        case .activity: "figure.walk"
+        case .sleep: "bed.double"
+        case .heart: "heart"
+        case .vitals: "waveform.path.ecg"
+        case .body: "scalemass"
+        }
+    }
+
+    public var metricKinds: [HealthKitService.MetricKind] {
+        switch self {
+        case .activity:
+            [.steps, .activeEnergy]
+        case .sleep:
+            [.sleepDurationHours]
+        case .heart:
+            [
+                .heartRateAverage,
+                .restingHeartRate,
+                .heartRateVariability,
+                .heartRateRecovery,
+                .vo2Max,
+                .walkingHeartRateAverage
+            ]
+        case .vitals:
+            [
+                .oxygenSaturation,
+                .bloodPressureSystolic,
+                .bloodPressureDiastolic,
+                .bodyTemperature,
+                .respiratoryRate
+            ]
+        case .body:
+            [.bodyMass]
+        }
+    }
+}
+
+public enum HealthPermissionRequestState: Sendable {
+    case review
+    case requested
+    case unavailable
+}
+
 @MainActor
 public final class HealthKitService {
     public static let shared = HealthKitService()
@@ -42,33 +121,19 @@ public final class HealthKitService {
     private init() {}
 
     public func requestAuthorization() async throws {
+        try await requestAuthorization(for: Set(HealthPermissionGroup.allCases))
+    }
+
+    public func requestAuthorization(for groups: Set<HealthPermissionGroup>) async throws {
         guard HKHealthStore.isHealthDataAvailable() else { 
             logger.error("HealthKit not available on this device")
             throw HealthKitError.notAvailable
         }
 
-        let readTypes: Set<HKObjectType> = [
-            // Basic metrics
-            HKObjectType.quantityType(forIdentifier: .stepCount)!,
-            HKObjectType.quantityType(forIdentifier: .heartRate)!,
-            HKObjectType.quantityType(forIdentifier: .restingHeartRate)!,
-            HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!,
-            HKObjectType.quantityType(forIdentifier: .bodyMass)!,
-            HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!,
-            
-            // Advanced cardiac metrics
-            HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN)!,
-            HKObjectType.quantityType(forIdentifier: .heartRateRecoveryOneMinute)!,
-            HKObjectType.quantityType(forIdentifier: .vo2Max)!,
-            HKObjectType.quantityType(forIdentifier: .walkingHeartRateAverage)!,
-            HKObjectType.quantityType(forIdentifier: .oxygenSaturation)!,
-            
-            // Blood pressure and vitals
-            HKObjectType.quantityType(forIdentifier: .bloodPressureSystolic)!,
-            HKObjectType.quantityType(forIdentifier: .bloodPressureDiastolic)!,
-            HKObjectType.quantityType(forIdentifier: .bodyTemperature)!,
-            HKObjectType.quantityType(forIdentifier: .respiratoryRate)!
-        ]
+        let readTypes = readTypes(for: groups)
+        guard !readTypes.isEmpty else {
+            return
+        }
 
         do {
             try await healthStore.requestAuthorization(toShare: [], read: readTypes)
@@ -76,6 +141,71 @@ public final class HealthKitService {
         } catch {
             logger.error("HealthKit authorization failed: \(error.localizedDescription)")
             throw HealthKitError.authorizationFailed
+        }
+    }
+
+    public func permissionRequestState(for group: HealthPermissionGroup) async -> HealthPermissionRequestState {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            return .unavailable
+        }
+
+        do {
+            let status = try await healthStore.statusForAuthorizationRequest(
+                toShare: [],
+                read: readTypes(for: [group])
+            )
+            switch status {
+            case .shouldRequest:
+                return .review
+            case .unnecessary:
+                return .requested
+            case .unknown:
+                return .review
+            @unknown default:
+                return .review
+            }
+        } catch {
+            logger.error("Could not determine Health authorization request state: \(error.localizedDescription)")
+            return .review
+        }
+    }
+
+    private func readTypes(for groups: Set<HealthPermissionGroup>) -> Set<HKObjectType> {
+        Set(groups.flatMap(\.metricKinds).compactMap(healthObjectType(for:)))
+    }
+
+    private func healthObjectType(for kind: MetricKind) -> HKObjectType? {
+        switch kind {
+        case .steps:
+            HKObjectType.quantityType(forIdentifier: .stepCount)
+        case .heartRateAverage:
+            HKObjectType.quantityType(forIdentifier: .heartRate)
+        case .restingHeartRate:
+            HKObjectType.quantityType(forIdentifier: .restingHeartRate)
+        case .activeEnergy:
+            HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)
+        case .bodyMass:
+            HKObjectType.quantityType(forIdentifier: .bodyMass)
+        case .sleepDurationHours:
+            HKObjectType.categoryType(forIdentifier: .sleepAnalysis)
+        case .heartRateVariability:
+            HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN)
+        case .heartRateRecovery:
+            HKObjectType.quantityType(forIdentifier: .heartRateRecoveryOneMinute)
+        case .vo2Max:
+            HKObjectType.quantityType(forIdentifier: .vo2Max)
+        case .walkingHeartRateAverage:
+            HKObjectType.quantityType(forIdentifier: .walkingHeartRateAverage)
+        case .oxygenSaturation:
+            HKObjectType.quantityType(forIdentifier: .oxygenSaturation)
+        case .bloodPressureSystolic:
+            HKObjectType.quantityType(forIdentifier: .bloodPressureSystolic)
+        case .bloodPressureDiastolic:
+            HKObjectType.quantityType(forIdentifier: .bloodPressureDiastolic)
+        case .bodyTemperature:
+            HKObjectType.quantityType(forIdentifier: .bodyTemperature)
+        case .respiratoryRate:
+            HKObjectType.quantityType(forIdentifier: .respiratoryRate)
         }
     }
 
