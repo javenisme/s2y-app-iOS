@@ -663,4 +663,47 @@ final class OmerMobileChatModelsTests: XCTestCase {
             XCTAssertEqual(error as? WellnessPlanTransitionError, .emptyPlan)
         }
     }
+
+    func testWellnessDraftUsesPersonalBaselineAndRequiresConfirmation() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let report = PersonalHealthInsightReport(
+            windowDays: 30,
+            generatedAt: date,
+            coverage: [],
+            deviations: [PersonalMetricDeviation(
+                metricKind: .sleepDurationHours,
+                currentMedian: 6.5,
+                baselineMedian: 7.5,
+                robustDistance: -3,
+                direction: .lower,
+                baselineObservedDays: 20,
+                currentObservedDays: 7
+            )],
+            relationships: []
+        )
+
+        let draft = WellnessPlanDraftBuilder.build(from: report, now: date)
+
+        XCTAssertEqual(draft.plan.status, .draft)
+        XCTAssertEqual(draft.plan.origin, .assistantDraft)
+        XCTAssertEqual(draft.plan.goals.first?.targetValue, 6.5)
+        XCTAssertTrue(draft.rationale.first?.contains("your own earlier baseline") == true)
+        XCTAssertTrue(draft.limitations.contains { $0.contains("until you confirm") })
+    }
+
+    func testWellnessDraftAvoidsMetricTargetsWhenBaselineIsInsufficient() {
+        let report = PersonalHealthInsightReport(
+            windowDays: 30,
+            generatedAt: .now,
+            coverage: [],
+            deviations: [],
+            relationships: []
+        )
+
+        let draft = WellnessPlanDraftBuilder.build(from: report)
+
+        XCTAssertTrue(draft.plan.goals.isEmpty)
+        XCTAssertEqual(draft.plan.actions.first?.category, .checkIn)
+        XCTAssertTrue(draft.plan.actions.first?.isOptional == true)
+    }
 }
