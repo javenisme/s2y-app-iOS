@@ -28,12 +28,16 @@ enum HealthChartRequest: Equatable, Sendable {
 enum HealthChartAttachment: Sendable {
     case trend(HealthKitService.Trend, HealthKitService.MetricKind)
     case comparison(HealthKitService.Comparison, HealthKitService.MetricKind)
+    case personalInsights(PersonalHealthInsightReport)
 }
 
 enum HealthChatVisualizationLoader {
     /// Loads only data that is already readable. It never triggers a permission prompt from chat.
     @MainActor
     static func load(for query: String) async -> HealthChartAttachment? {
+        if let report = await PersonalHealthInsightLoader.load(for: query) {
+            return .personalInsights(report)
+        }
         guard let request = HealthChartRequest.parse(query) else {
             return nil
         }

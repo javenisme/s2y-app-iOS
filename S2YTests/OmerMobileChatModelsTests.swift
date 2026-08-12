@@ -583,4 +583,35 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(relationship.availability, .insufficientData)
         XCTAssertNil(relationship.coefficient)
     }
+
+    func testPersonalInsightReportRetainsCoverageAndTraceability() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let start = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-07-01T12:00:00Z"))
+        var steps: [HealthKitService.DailyMetric] = []
+        var sleep: [HealthKitService.DailyMetric] = []
+        for offset in 0..<30 {
+            let date = try XCTUnwrap(calendar.date(byAdding: .day, value: offset, to: start))
+            steps.append(.init(date: date, value: offset < 23 ? 5_000 : 8_000))
+            sleep.append(.init(date: date, value: offset < 23 ? 7 : 8))
+        }
+        let dataset = LongitudinalHealthAligner.align(
+            series: [.steps: steps, .sleepDurationHours: sleep],
+            expectedDays: 30,
+            calendar: calendar
+        )
+
+        let report = PersonalHealthInsightBuilder.build(dataset: dataset, generatedAt: start)
+
+        XCTAssertEqual(report.coverage.count, 2)
+        XCTAssertEqual(report.coverage.first(where: { $0.metricKind == .steps })?.observedDays, 30)
+        XCTAssertEqual(report.deviations.first(where: { $0.metricKind == .steps })?.direction, .higher)
+        XCTAssertEqual(report.relationships.first?.pairedDays, 30)
+        XCTAssertTrue(report.hasUsableInsight)
+    }
+
+    func testPersonalInsightIntentIsExplicit() {
+        XCTAssertTrue(PersonalHealthInsightLoader.matches("Show patterns in my health data"))
+        XCTAssertTrue(PersonalHealthInsightLoader.matches("我的健康数据有什么关联"))
+        XCTAssertFalse(PersonalHealthInsightLoader.matches("How many steps today?"))
+    }
 }
