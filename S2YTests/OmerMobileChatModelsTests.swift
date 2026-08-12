@@ -437,4 +437,21 @@ final class OmerMobileChatModelsTests: XCTestCase {
         )
         XCTAssertNil(HealthChartRequest.parse("What can I do to relax today?"))
     }
+
+    func testHealthInterpretationStatesCoverageAndWellnessBoundary() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-01T00:00:00Z"))
+        let trend = HealthKitService.Trend.summarize(
+            windowDays: 7,
+            points: [
+                .init(date: date, value: 6, isObserved: true),
+                .init(date: date.addingTimeInterval(86_400), value: 7, isObserved: true)
+            ]
+        )
+
+        let context = HealthInterpretationPolicy.trendContext(trend, kind: .sleepDurationHours)
+
+        XCTAssertTrue(context.contains("Coverage: 2/7 days"))
+        XCTAssertTrue(context.contains("Coverage is limited"))
+        XCTAssertTrue(context.contains("not a diagnosis or treatment recommendation"))
+    }
 }

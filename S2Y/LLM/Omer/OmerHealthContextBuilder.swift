@@ -30,12 +30,13 @@ enum OmerHealthContextBuilder {
                     return (key, String(normalized.prefix(200)))
                 }
         )
+        context["interpretationBoundary"] = HealthInterpretationPolicy.wellnessBoundary
 
         do {
             let result = try await HealthQueryProcessor.processQuery(query)
             let queryResult = format(result).trimmingCharacters(in: .whitespacesAndNewlines)
             if !queryResult.isEmpty {
-                context["queryResult"] = String(queryResult.prefix(200))
+                context["queryResult"] = String(queryResult.prefix(500))
             }
         } catch {
             // Health data can be unavailable or partially authorized. Existing context,
@@ -50,11 +51,9 @@ enum OmerHealthContextBuilder {
         case .textResponse(let text):
             return text
         case .trend(let trend, let kind):
-            let change = trend.changeRate * 100
-            return "\(kind.displayName), \(trend.windowDays)-day average: \(kind.formatValue(trend.average)); first-to-last change: \(change.formatted(.number.precision(.fractionLength(1))))%."
+            return HealthInterpretationPolicy.trendContext(trend, kind: kind)
         case .comparison(let comparison, let kind):
-            let change = comparison.deltaRate * 100
-            return "\(kind.displayName), current \(comparison.currentWindowDays)-day average: \(kind.formatValue(comparison.currentAverage)); previous average: \(kind.formatValue(comparison.previousAverage)); change: \(change.formatted(.number.precision(.fractionLength(1))))%."
+            return HealthInterpretationPolicy.comparisonContext(comparison, kind: kind)
         case .insights(let insights):
             return insights.map { insight in
                 var parts = [insight.title, insight.insight]

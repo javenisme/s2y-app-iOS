@@ -902,8 +902,13 @@ struct MessageBubble: View {
                     .foregroundColor(message.role == .user ? .white : .primary)
 
                 if let chartAttachment = message.chartAttachment {
-                    chart(attachment: chartAttachment)
-                        .accessibilityIdentifier("health-assistant-chart")
+                    VStack(alignment: .leading, spacing: 6) {
+                        chart(attachment: chartAttachment)
+                            .accessibilityIdentifier("health-assistant-chart")
+                        Label(HealthInterpretationPolicy.wellnessBoundary, systemImage: "info.circle")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             
