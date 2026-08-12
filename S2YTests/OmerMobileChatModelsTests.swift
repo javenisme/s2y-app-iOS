@@ -911,6 +911,69 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(validated.request.origin, .assistantDraft)
     }
 
+    func testWellnessSessionCannotStartWithoutMatchingUserConfirmation() throws {
+        let validated = try validatedWellnessSession()
+        var controller = WellnessSessionController()
+        let confirmation = controller.prepare(validated, now: validated.validatedAt)
+
+        XCTAssertThrowsError(
+            try controller.confirm(confirmationID: UUID(), now: validated.validatedAt)
+        ) { error in
+            XCTAssertEqual(error as? WellnessSessionControlFailure, .confirmationMismatch)
+        }
+        XCTAssertEqual(controller.state, .awaitingConfirmation(confirmation))
+    }
+
+    func testWellnessSessionConfirmationExpires() throws {
+        let validated = try validatedWellnessSession()
+        var controller = WellnessSessionController()
+        let confirmation = controller.prepare(validated, now: validated.validatedAt)
+
+        XCTAssertThrowsError(
+            try controller.confirm(
+                confirmationID: confirmation.id,
+                now: validated.expiresAt.addingTimeInterval(1)
+            )
+        ) { error in
+            XCTAssertEqual(error as? WellnessSessionControlFailure, .confirmationExpired)
+        }
+    }
+
+    func testActiveWellnessSessionCanAlwaysStopLocally() throws {
+        let validated = try validatedWellnessSession()
+        var controller = WellnessSessionController()
+        let confirmation = controller.prepare(validated, now: validated.validatedAt)
+        _ = try controller.confirm(
+            confirmationID: confirmation.id,
+            now: validated.validatedAt.addingTimeInterval(1)
+        )
+        let stopTime = validated.validatedAt.addingTimeInterval(30)
+
+        let stopped = try controller.stopImmediately(reason: .safetyStop, now: stopTime)
+
+        XCTAssertEqual(stopped.reason, .safetyStop)
+        XCTAssertEqual(stopped.stoppedAt, stopTime)
+        XCTAssertEqual(controller.state, .stopped(stopped))
+    }
+
+    private func validatedWellnessSession() throws -> ValidatedWellnessSession {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
+        let deviceID = UUID()
+        let request = WellnessSessionRequest(
+            deviceID: deviceID,
+            purpose: .relaxation,
+            durationMinutes: 10,
+            comfortLevel: 1,
+            origin: .assistantDraft
+        )
+        return try WellnessSessionSafetyPolicy().validate(
+            request,
+            for: verifiedWellnessDevice(id: deviceID),
+            lastSessionEndedAt: nil,
+            now: now
+        )
+    }
+
     private func verifiedWellnessDevice(id: UUID) -> VerifiedWellnessDevice {
         let identity = WellnessDeviceIdentity(
             deviceID: id,

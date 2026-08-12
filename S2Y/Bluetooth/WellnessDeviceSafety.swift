@@ -201,3 +201,122 @@ public struct WellnessSessionSafetyPolicy: Sendable {
         )
     }
 }
+
+public struct WellnessSessionConfirmationRequest: Sendable, Equatable {
+    public let id: UUID
+    public let session: ValidatedWellnessSession
+    public let presentedAt: Date
+}
+
+public struct ActiveWellnessSession: Sendable, Equatable {
+    public let session: ValidatedWellnessSession
+    public let confirmedAt: Date
+    public let scheduledEndAt: Date
+}
+
+public enum WellnessSessionStopReason: String, Sendable, Equatable {
+    case userStopped
+    case safetyStop
+    case completed
+    case confirmationCancelled
+}
+
+public struct StoppedWellnessSession: Sendable, Equatable {
+    public let request: WellnessSessionRequest
+    public let stoppedAt: Date
+    public let reason: WellnessSessionStopReason
+}
+
+public enum WellnessSessionState: Sendable, Equatable {
+    case idle
+    case awaitingConfirmation(WellnessSessionConfirmationRequest)
+    case active(ActiveWellnessSession)
+    case stopped(StoppedWellnessSession)
+}
+
+public enum WellnessSessionControlFailure: Error, Sendable, Equatable {
+    case confirmationNotPending
+    case confirmationMismatch
+    case confirmationExpired
+    case sessionNotActive
+}
+
+/// A local state machine that requires a fresh, explicit user confirmation.
+///
+/// It produces no Bluetooth payload. A future hardware adapter must accept only
+/// `ActiveWellnessSession` values from this controller and must always expose stop.
+public struct WellnessSessionController: Sendable {
+    public private(set) var state: WellnessSessionState = .idle
+
+    public init() {}
+
+    @discardableResult
+    public mutating func prepare(
+        _ session: ValidatedWellnessSession,
+        now: Date = .now
+    ) -> WellnessSessionConfirmationRequest {
+        let confirmation = WellnessSessionConfirmationRequest(
+            id: UUID(),
+            session: session,
+            presentedAt: now
+        )
+        state = .awaitingConfirmation(confirmation)
+        return confirmation
+    }
+
+    @discardableResult
+    public mutating func confirm(
+        confirmationID: UUID,
+        now: Date = .now
+    ) throws -> ActiveWellnessSession {
+        guard case let .awaitingConfirmation(pending) = state else {
+            throw WellnessSessionControlFailure.confirmationNotPending
+        }
+        guard pending.id == confirmationID else {
+            throw WellnessSessionControlFailure.confirmationMismatch
+        }
+        guard now <= pending.session.expiresAt else {
+            throw WellnessSessionControlFailure.confirmationExpired
+        }
+        let active = ActiveWellnessSession(
+            session: pending.session,
+            confirmedAt: now,
+            scheduledEndAt: now.addingTimeInterval(
+                TimeInterval(pending.session.request.durationMinutes * 60)
+            )
+        )
+        state = .active(active)
+        return active
+    }
+
+    public mutating func cancelConfirmation(now: Date = .now) throws {
+        guard case let .awaitingConfirmation(pending) = state else {
+            throw WellnessSessionControlFailure.confirmationNotPending
+        }
+        state = .stopped(
+            StoppedWellnessSession(
+                request: pending.session.request,
+                stoppedAt: now,
+                reason: .confirmationCancelled
+            )
+        )
+    }
+
+    /// Stops an active session without requiring a confirmation or network call.
+    @discardableResult
+    public mutating func stopImmediately(
+        reason: WellnessSessionStopReason = .userStopped,
+        now: Date = .now
+    ) throws -> StoppedWellnessSession {
+        guard case let .active(active) = state else {
+            throw WellnessSessionControlFailure.sessionNotActive
+        }
+        let stopped = StoppedWellnessSession(
+            request: active.session.request,
+            stoppedAt: now,
+            reason: reason
+        )
+        state = .stopped(stopped)
+        return stopped
+    }
+}
