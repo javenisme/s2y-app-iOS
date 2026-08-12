@@ -785,4 +785,61 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(review.unrecordedCount, 6)
         XCTAssertEqual(review.adjustment, .considerSimplifying)
     }
+
+    func testWellnessDeviceTrustPolicyFailsClosedForUnknownIdentity() throws {
+        let identity = WellnessDeviceIdentity(
+            deviceID: UUID(),
+            productIdentifier: "unknown-device",
+            firmwareVersion: "1.0.0",
+            protocolVersion: 1,
+            reportedCapabilities: [.relaxationSession, .immediateStop],
+            manufacturerSignatureValidated: true
+        )
+        let policy = WellnessDeviceTrustPolicy(
+            supportedProductIdentifiers: ["s2y-wellness-reference"],
+            supportedProtocolVersions: 1 ... 1
+        )
+
+        XCTAssertThrowsError(try policy.verify(identity)) { error in
+            XCTAssertEqual(error as? WellnessDeviceTrustFailure, .unsupportedProduct)
+        }
+    }
+
+    func testWellnessDeviceTrustPolicyRequiresImmediateStopCapability() throws {
+        let identity = WellnessDeviceIdentity(
+            deviceID: UUID(),
+            productIdentifier: "s2y-wellness-reference",
+            firmwareVersion: "1.0.0",
+            protocolVersion: 1,
+            reportedCapabilities: [.relaxationSession],
+            manufacturerSignatureValidated: true
+        )
+        let policy = WellnessDeviceTrustPolicy(
+            supportedProductIdentifiers: ["s2y-wellness-reference"],
+            supportedProtocolVersions: 1 ... 1
+        )
+
+        XCTAssertThrowsError(try policy.verify(identity)) { error in
+            XCTAssertEqual(error as? WellnessDeviceTrustFailure, .missingImmediateStop)
+        }
+    }
+
+    func testWellnessDeviceTrustPolicyNarrowsReportedCapabilities() throws {
+        let identity = WellnessDeviceIdentity(
+            deviceID: UUID(),
+            productIdentifier: "s2y-wellness-reference",
+            firmwareVersion: "1.0.0",
+            protocolVersion: 1,
+            reportedCapabilities: [.relaxationSession, .levelAdjustment, .immediateStop],
+            manufacturerSignatureValidated: true
+        )
+        let policy = WellnessDeviceTrustPolicy(
+            supportedProductIdentifiers: ["s2y-wellness-reference"],
+            supportedProtocolVersions: 1 ... 1,
+            allowedCapabilities: [.relaxationSession, .immediateStop]
+        )
+
+        let verified = try policy.verify(identity)
+        XCTAssertEqual(verified.allowedCapabilities, [.relaxationSession, .immediateStop])
+    }
 }
