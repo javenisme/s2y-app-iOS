@@ -75,6 +75,10 @@ struct HomeView: View {
 
     @State private var presentingAccount = false
     @State private var isDrawerOpen = false
+    @State private var drawerChatHistory: [OmerChatSummary] = []
+    @State private var requestedConversationID: UUID?
+    @State private var newChatRequestID = UUID()
+    @State private var isRefreshingChatHistory = false
 
 
     var body: some View {
@@ -97,13 +101,26 @@ struct HomeView: View {
         .accountRequired(!FeatureFlags.disableFirebase && !FeatureFlags.skipOnboarding) {
             AccountSheet()
         }
+        .task {
+            await loadDrawerChatHistory()
+        }
+        .onChange(of: isDrawerOpen) {
+            guard isDrawerOpen else { return }
+            Task { await loadDrawerChatHistory() }
+        }
     }
 
     @ViewBuilder
     private var selectedContent: some View {
         switch selectedTab {
         case .healthAssistant:
-            HealthAssistantView()
+            HealthAssistantView(
+                requestedConversationID: $requestedConversationID,
+                newChatRequestID: newChatRequestID,
+                onHistoryChanged: {
+                    Task { await loadDrawerChatHistory() }
+                }
+            )
         case .schedule:
             ScheduleView(presentingAccount: $presentingAccount)
         case .contact:
@@ -143,23 +160,46 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 0) {
             drawerHeader
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Navigate")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 6)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    newChatButton
 
-                ForEach(Tabs.allCases, id: \.self) { tab in
-                    drawerRow(for: tab)
+                    Text("Recent chats")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 12)
+
+                    if drawerChatHistory.isEmpty {
+                        Text(isRefreshingChatHistory ? "Loading conversations…" : "Your Omer and on-device chats will appear here.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 8)
+                    } else {
+                        ForEach(drawerChatHistory.prefix(20)) { chat in
+                            drawerChatRow(chat)
+                        }
+                    }
+
+                    Divider()
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 8)
+
+                    Text("Navigate")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                        .padding(.horizontal, 24)
+
+                    ForEach(Tabs.allCases, id: \.self) { tab in
+                        drawerRow(for: tab)
+                    }
                 }
+                .padding(.top, 10)
+                .padding(.bottom, 18)
             }
-            .padding(.top, 10)
-
-            Spacer(minLength: 20)
-
-            drawerFooter
         }
         .frame(width: width, alignment: .leading)
         .padding(.top, 20)
@@ -204,47 +244,51 @@ struct HomeView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-
-            Button {
-                selectedTab = .contact
-                closeDrawer()
-            } label: {
-                HStack(spacing: 12) {
-                    Circle()
-                        .fill(Color.teal.opacity(0.14))
-                        .frame(width: 42, height: 42)
-                        .overlay {
-                            Image(systemName: "person.crop.circle.fill")
-                                .foregroundStyle(.teal)
-                        }
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Open account")
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                        Text("Manage sign-in and profile details")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                }
-                .padding(16)
-                .background(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(.regularMaterial)
-                )
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Open account")
-            .accessibilityIdentifier("drawer.account")
         }
         .padding(.horizontal, 20)
         .padding(.top, 28)
+    }
+
+    private var newChatButton: some View {
+        Button {
+            selectedTab = .healthAssistant
+            requestedConversationID = nil
+            newChatRequestID = UUID()
+            closeDrawer()
+        } label: {
+            Label("New chat", systemImage: "square.and.pencil")
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .background(Color.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 14)
+        .accessibilityIdentifier("drawer.new-chat")
+    }
+
+    private func drawerChatRow(_ chat: OmerChatSummary) -> some View {
+        Button {
+            selectedTab = .healthAssistant
+            requestedConversationID = chat.id
+            closeDrawer()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "bubble.left")
+                    .foregroundStyle(.secondary)
+                Text(chat.title)
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                Spacer(minLength: 8)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("drawer.chat.\(chat.id.uuidString)")
     }
 
     private func drawerRow(for tab: Tabs) -> some View {
@@ -288,23 +332,8 @@ struct HomeView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(tab.title)
-        .accessibilityIdentifier("drawer.\(tab.rawValue)")
+        .accessibilityIdentifier(tab == .contact ? "drawer.account" : "drawer.\(tab.rawValue)")
         .padding(.horizontal, 14)
-    }
-
-    private var drawerFooter: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Quick Note")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-
-            Text("Use the drawer for major destinations, and keep feature settings deeper inside each area. This gives the app a cleaner hierarchy than the old bottom tab bar.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(20)
     }
 
     private var drawerToggleButton: some View {
@@ -326,6 +355,16 @@ struct HomeView: View {
 
     private func closeDrawer() {
         isDrawerOpen = false
+    }
+
+    @MainActor
+    private func loadDrawerChatHistory() async {
+        drawerChatHistory = await OmerChatService.shared.cachedChats()
+        isRefreshingChatHistory = true
+        defer { isRefreshingChatHistory = false }
+        if let remoteChats = try? await OmerChatService.shared.fetchChats(limit: 50).chats {
+            drawerChatHistory = remoteChats
+        }
     }
 }
 

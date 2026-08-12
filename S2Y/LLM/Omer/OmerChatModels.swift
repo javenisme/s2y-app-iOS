@@ -96,7 +96,7 @@ struct OmerAgentsResponse: Decodable {
     let agents: [OmerAgent]
 }
 
-struct OmerChatSummary: Decodable, Identifiable, Sendable {
+struct OmerChatSummary: Codable, Identifiable, Sendable {
     let id: UUID
     let createdAt: String
     let title: String
@@ -108,16 +108,21 @@ struct OmerChatListResponse: Decodable, Sendable {
     let hasMore: Bool
 }
 
-struct OmerChatHistoryMessage: Decodable, Identifiable, Sendable {
+struct OmerChatHistoryMessage: Codable, Identifiable, Sendable {
     let id: UUID
     let role: String
     let content: String
     let createdAt: String
 }
 
-struct OmerChatDetailResponse: Decodable, Sendable {
+struct OmerChatDetailResponse: Codable, Sendable {
     let chat: OmerChatSummary
     let messages: [OmerChatHistoryMessage]
+}
+
+struct OmerChatCacheSnapshot: Codable, Sendable {
+    var chats: [OmerChatSummary]
+    var details: [OmerChatDetailResponse]
 }
 
 struct OmerAPIErrorResponse: Decodable {
