@@ -735,4 +735,54 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertTrue(WellnessDailySchedule.actions(for: draft, on: date).isEmpty)
         XCTAssertEqual(WellnessDailySchedule.actions(for: active, on: date), [action])
     }
+
+    func testWeeklyReviewKeepsMissingRecordsSeparateFromSkipped() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let end = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-08T12:00:00Z"))
+        let action = WellnessAction(
+            title: "Daily check-in",
+            detail: "Brief reflection",
+            category: .checkIn,
+            daysPerWeek: 7,
+            estimatedMinutes: 2
+        )
+        let goal = WellnessGoal(
+            metricKind: .sleepDurationHours,
+            direction: .consistency,
+            targetValue: nil,
+            targetUnit: "hours",
+            reviewDate: end
+        )
+        let draft = WellnessPlan(
+            title: "Plan",
+            summary: "Summary",
+            origin: .userCreated,
+            goals: [goal],
+            actions: [action]
+        )
+        let plan = try WellnessPlanLifecycle.transition(draft, to: .active, at: end)
+        let records = [
+            WellnessActionRecord(
+                id: UUID(),
+                planID: plan.id,
+                actionID: action.id,
+                day: end,
+                outcome: .skipped,
+                recordedAt: end
+            )
+        ]
+
+        let review = WellnessWeeklyReviewBuilder.build(
+            plan: plan,
+            records: records,
+            endingAt: end,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(review.scheduledCount, 7)
+        XCTAssertEqual(review.skippedCount, 1)
+        XCTAssertEqual(review.unrecordedCount, 6)
+        XCTAssertEqual(review.adjustment, .considerSimplifying)
+    }
 }

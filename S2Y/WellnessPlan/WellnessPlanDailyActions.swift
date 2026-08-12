@@ -115,6 +115,13 @@ struct WellnessPlanSettingsView: View {
                 if plan.status == .active {
                     todaySection(plan)
                 }
+                Section {
+                    NavigationLink {
+                        WellnessWeeklyReviewView()
+                    } label: {
+                        Label("Weekly Review", systemImage: "calendar.badge.clock")
+                    }
+                }
             } else {
                 ContentUnavailableView(
                     "No wellbeing plan",
