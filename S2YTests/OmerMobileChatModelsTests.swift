@@ -231,4 +231,12 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(sections.map(\.title), ["Today", "Yesterday", "Previous 7 days", "Earlier"])
         XCTAssertEqual(sections.flatMap(\.chats).map(\.title), ["Today", "Yesterday", "This week", "Earlier"])
     }
+
+    func testHealthSuggestionsOnlyIncludeAvailableMetrics() {
+        let suggestions = HealthQuickQuerySuggestion.available(for: [.steps, .sleepDurationHours])
+
+        XCTAssertEqual(suggestions.map(\.id), ["steps", "sleep"])
+        XCTAssertFalse(suggestions.contains(where: { $0.metricKind == .heartRateAverage }))
+        XCTAssertFalse(suggestions.contains(where: { $0.metricKind == .activeEnergy }))
+    }
 }

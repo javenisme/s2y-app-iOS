@@ -84,6 +84,8 @@ struct HealthAssistantView: View {
     @State private var showingSettings = false
     @State private var streamTick = 0
     @State private var pendingToolApproval: OmerToolApprovalPayload?
+    @State private var availableSuggestionMetrics: Set<HealthKitService.MetricKind> = []
+    @State private var didLoadSuggestionAvailability = false
     @FocusState private var isInputFocused: Bool
     @AppStorage(StorageKeys.omerIncludeHealthContext) private var omerIncludeHealthContext = true
     @AppStorage(StorageKeys.healthAssistantAIMode) private var aiModeRawValue = AssistantAIMode.onDevice.rawValue
@@ -240,6 +242,19 @@ struct HealthAssistantView: View {
                         }
                     }
                 }
+
+                if didLoadSuggestionAvailability, quickQuerySuggestions.isEmpty {
+                    ContentUnavailableView(
+                        "No recent Health data",
+                        systemImage: "heart.text.clipboard",
+                        description: Text("Connect Health data to see questions tailored to the information available on this iPhone.")
+                    )
+                    .frame(maxWidth: .infinity)
+                } else if !didLoadSuggestionAvailability {
+                    ProgressView("Checking available Health data…")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+                }
             }
 
             Spacer(minLength: 24)
@@ -381,6 +396,7 @@ struct HealthAssistantView: View {
     
     private func initializeHealthKit() async {
         if isRunningInSimulator {
+            didLoadSuggestionAvailability = true
             return
         }
 
@@ -394,12 +410,34 @@ struct HealthAssistantView: View {
 
         do {
             try await healthService.requestAuthorization()
+            await loadQuickQueryAvailability()
         } catch {
+            didLoadSuggestionAvailability = true
             notice = AssistantNotice(
                 message: "HealthKit authorization failed: \(error.localizedDescription)",
                 tone: .warning
             )
         }
+    }
+
+    private func loadQuickQueryAvailability() async {
+        let end = Date()
+        let start = Calendar.current.date(byAdding: .day, value: -30, to: end) ?? end
+        var available: Set<HealthKitService.MetricKind> = []
+
+        for suggestion in HealthQuickQuerySuggestion.catalog {
+            guard !available.contains(suggestion.metricKind) else { continue }
+            if let metrics = try? await healthService.fetchDailyMetrics(
+                kind: suggestion.metricKind,
+                start: start,
+                end: end
+            ), metrics.contains(where: { $0.value > 0 }) {
+                available.insert(suggestion.metricKind)
+            }
+        }
+
+        availableSuggestionMetrics = available
+        didLoadSuggestionAvailability = true
     }
     
     private func sendMessage() async {
@@ -584,43 +622,67 @@ struct HealthAssistantView: View {
         .padding(.vertical, 6)
     }
 
-    private var quickQuerySuggestions: [QuickQuerySuggestion] {
-        [
-            QuickQuerySuggestion(
+    private var quickQuerySuggestions: [HealthQuickQuerySuggestion] {
+        HealthQuickQuerySuggestion.catalog.filter { availableSuggestionMetrics.contains($0.metricKind) }
+    }
+}
+
+struct HealthQuickQuerySuggestion: Identifiable, Equatable, Sendable {
+    let id: String
+    let metricKind: HealthKitService.MetricKind
+    let icon: String
+    let title: String
+    let query: String
+
+    static let catalog: [HealthQuickQuerySuggestion] = [
+            HealthQuickQuerySuggestion(
+                id: "steps",
+                metricKind: .steps,
                 icon: "figure.walk",
                 title: "Step Trends",
                 query: "How have my step counts trended over the past 7 days?"
             ),
-            QuickQuerySuggestion(
+            HealthQuickQuerySuggestion(
+                id: "heart-rate",
+                metricKind: .heartRateAverage,
                 icon: "heart.fill",
                 title: "Heart Rate",
                 query: "Compare my average heart rate this week versus last week."
             ),
-            QuickQuerySuggestion(
+            HealthQuickQuerySuggestion(
+                id: "sleep",
+                metricKind: .sleepDurationHours,
                 icon: "bed.double.fill",
                 title: "Sleep Quality",
                 query: "How has my sleep quality been recently?"
             ),
-            QuickQuerySuggestion(
+            HealthQuickQuerySuggestion(
+                id: "active-energy",
+                metricKind: .activeEnergy,
                 icon: "flame.fill",
                 title: "Active Energy",
                 query: "How has my active energy changed over the past 30 days?"
             )
         ]
-    }
 
-    private var suggestionColumns: [GridItem] {
+    static func available(for metrics: Set<HealthKitService.MetricKind>) -> [HealthQuickQuerySuggestion] {
+        catalog.filter { metrics.contains($0.metricKind) }
+    }
+}
+
+private extension HealthAssistantView {
+    var suggestionColumns: [GridItem] {
         if dynamicTypeSize.isAccessibilitySize {
             return [GridItem(.flexible())]
         }
         return [GridItem(.flexible()), GridItem(.flexible())]
     }
 
-    private var selectedAIMode: AssistantAIMode {
+    var selectedAIMode: AssistantAIMode {
         AssistantAIMode(rawValue: aiModeRawValue) ?? .onDevice
     }
 
-    private var aiModeBinding: Binding<AssistantAIMode> {
+    var aiModeBinding: Binding<AssistantAIMode> {
         Binding(
             get: { selectedAIMode },
             set: { aiModeRawValue = $0.rawValue }
@@ -737,15 +799,8 @@ struct MessageBubble: View {
     }
 }
 
-private struct QuickQuerySuggestion: Identifiable {
-    let id = UUID()
-    let icon: String
-    let title: String
-    let query: String
-}
-
 private struct QuickQueryRow: View {
-    let suggestion: QuickQuerySuggestion
+    let suggestion: HealthQuickQuerySuggestion
     let action: () -> Void
     
     var body: some View {
