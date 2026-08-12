@@ -842,4 +842,87 @@ final class OmerMobileChatModelsTests: XCTestCase {
         let verified = try policy.verify(identity)
         XCTAssertEqual(verified.allowedCapabilities, [.relaxationSession, .immediateStop])
     }
+
+    func testWellnessSessionPolicyRejectsAssistantDraftOutsideLocalLimits() throws {
+        let deviceID = UUID()
+        let device = verifiedWellnessDevice(id: deviceID)
+        let request = WellnessSessionRequest(
+            deviceID: deviceID,
+            purpose: .relaxation,
+            durationMinutes: 45,
+            comfortLevel: 2,
+            origin: .assistantDraft
+        )
+
+        XCTAssertThrowsError(
+            try WellnessSessionSafetyPolicy().validate(request, for: device, lastSessionEndedAt: nil)
+        ) { error in
+            XCTAssertEqual(error as? WellnessSessionValidationFailure, .durationOutOfRange)
+        }
+    }
+
+    func testWellnessSessionPolicyEnforcesCooldown() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
+        let deviceID = UUID()
+        let device = verifiedWellnessDevice(id: deviceID)
+        let request = WellnessSessionRequest(
+            deviceID: deviceID,
+            purpose: .windDown,
+            durationMinutes: 10,
+            comfortLevel: 1,
+            origin: .userCreated
+        )
+        let lastEnd = now.addingTimeInterval(-30 * 60)
+
+        XCTAssertThrowsError(
+            try WellnessSessionSafetyPolicy().validate(
+                request,
+                for: device,
+                lastSessionEndedAt: lastEnd,
+                now: now
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? WellnessSessionValidationFailure,
+                .cooldownActive(until: lastEnd.addingTimeInterval(60 * 60))
+            )
+        }
+    }
+
+    func testWellnessSessionPolicyProducesShortLivedValidation() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
+        let deviceID = UUID()
+        let device = verifiedWellnessDevice(id: deviceID)
+        let request = WellnessSessionRequest(
+            deviceID: deviceID,
+            purpose: .mindfulBreak,
+            durationMinutes: 10,
+            comfortLevel: 2,
+            origin: .assistantDraft
+        )
+
+        let validated = try WellnessSessionSafetyPolicy().validate(
+            request,
+            for: device,
+            lastSessionEndedAt: now.addingTimeInterval(-2 * 60 * 60),
+            now: now
+        )
+        XCTAssertEqual(validated.expiresAt, now.addingTimeInterval(5 * 60))
+        XCTAssertEqual(validated.request.origin, .assistantDraft)
+    }
+
+    private func verifiedWellnessDevice(id: UUID) -> VerifiedWellnessDevice {
+        let identity = WellnessDeviceIdentity(
+            deviceID: id,
+            productIdentifier: "s2y-wellness-reference",
+            firmwareVersion: "1.0.0",
+            protocolVersion: 1,
+            reportedCapabilities: [.relaxationSession, .sessionTimer, .immediateStop],
+            manufacturerSignatureValidated: true
+        )
+        return VerifiedWellnessDevice(
+            identity: identity,
+            allowedCapabilities: identity.reportedCapabilities
+        )
+    }
 }

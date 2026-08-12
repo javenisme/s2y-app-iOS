@@ -95,3 +95,109 @@ public struct WellnessDeviceTrustPolicy: Sendable {
         return VerifiedWellnessDevice(identity: identity, allowedCapabilities: capabilities)
     }
 }
+
+public enum WellnessSessionPurpose: String, Codable, Sendable, CaseIterable {
+    case relaxation
+    case mindfulBreak
+    case windDown
+}
+
+public enum WellnessSessionOrigin: String, Codable, Sendable {
+    case userCreated
+    case assistantDraft
+}
+
+/// A user-readable request that intentionally excludes hardware stimulation parameters.
+public struct WellnessSessionRequest: Codable, Sendable, Equatable {
+    public let id: UUID
+    public let deviceID: UUID
+    public let purpose: WellnessSessionPurpose
+    public let durationMinutes: Int
+    public let comfortLevel: Int
+    public let origin: WellnessSessionOrigin
+
+    public init(
+        id: UUID = UUID(),
+        deviceID: UUID,
+        purpose: WellnessSessionPurpose,
+        durationMinutes: Int,
+        comfortLevel: Int,
+        origin: WellnessSessionOrigin
+    ) {
+        self.id = id
+        self.deviceID = deviceID
+        self.purpose = purpose
+        self.durationMinutes = durationMinutes
+        self.comfortLevel = comfortLevel
+        self.origin = origin
+    }
+}
+
+public struct ValidatedWellnessSession: Sendable, Equatable {
+    public let request: WellnessSessionRequest
+    public let validatedAt: Date
+    public let expiresAt: Date
+}
+
+public enum WellnessSessionValidationFailure: Error, Sendable, Equatable {
+    case deviceMismatch
+    case missingCapability(WellnessDeviceCapability)
+    case durationOutOfRange
+    case comfortLevelOutOfRange
+    case cooldownActive(until: Date)
+}
+
+/// Fixed local safety envelope. Server or AI suggestions cannot widen these bounds.
+public struct WellnessSessionSafetyPolicy: Sendable {
+    public let durationRange: ClosedRange<Int>
+    public let comfortLevelRange: ClosedRange<Int>
+    public let minimumCooldown: TimeInterval
+    public let validationLifetime: TimeInterval
+
+    public init(
+        durationRange: ClosedRange<Int> = 1 ... 20,
+        comfortLevelRange: ClosedRange<Int> = 1 ... 3,
+        minimumCooldown: TimeInterval = 60 * 60,
+        validationLifetime: TimeInterval = 5 * 60
+    ) {
+        self.durationRange = durationRange
+        self.comfortLevelRange = comfortLevelRange
+        self.minimumCooldown = minimumCooldown
+        self.validationLifetime = validationLifetime
+    }
+
+    public func validate(
+        _ request: WellnessSessionRequest,
+        for device: VerifiedWellnessDevice,
+        lastSessionEndedAt: Date?,
+        now: Date = .now
+    ) throws -> ValidatedWellnessSession {
+        guard request.deviceID == device.identity.deviceID else {
+            throw WellnessSessionValidationFailure.deviceMismatch
+        }
+        for capability in [
+            WellnessDeviceCapability.relaxationSession,
+            .sessionTimer,
+            .immediateStop
+        ] where !device.allowedCapabilities.contains(capability) {
+            throw WellnessSessionValidationFailure.missingCapability(capability)
+        }
+        guard durationRange.contains(request.durationMinutes) else {
+            throw WellnessSessionValidationFailure.durationOutOfRange
+        }
+        guard comfortLevelRange.contains(request.comfortLevel) else {
+            throw WellnessSessionValidationFailure.comfortLevelOutOfRange
+        }
+        if let lastSessionEndedAt {
+            let allowedAt = lastSessionEndedAt.addingTimeInterval(minimumCooldown)
+            guard now >= allowedAt else {
+                throw WellnessSessionValidationFailure.cooldownActive(until: allowedAt)
+            }
+        }
+        return ValidatedWellnessSession(
+            request: request,
+            validatedAt: now,
+            expiresAt: now.addingTimeInterval(validationLifetime)
+        )
+    }
+}
