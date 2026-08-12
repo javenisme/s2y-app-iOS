@@ -280,6 +280,13 @@ public final class HealthKitService {
     public struct DailyMetric: Sendable, Codable {
         public let date: Date
         public let value: Double
+        public let isObserved: Bool
+
+        public init(date: Date, value: Double, isObserved: Bool = true) {
+            self.date = date
+            self.value = value
+            self.isObserved = isObserved
+        }
     }
 
     public enum MetricKind: Sendable, Codable, CaseIterable, Hashable {
@@ -391,7 +398,7 @@ public final class HealthKitService {
                                 quantity = nil
                             }
                             let value = quantity?.doubleValue(for: quantityDescriptor.unit) ?? 0
-                            output.append(.init(date: date, value: value))
+                            output.append(.init(date: date, value: value, isObserved: quantity != nil))
                         }
                         cont.resume(returning: output)
                     }
@@ -513,11 +520,61 @@ public final class HealthKitService {
 
     // MARK: - Aggregations
 
+    public enum DataQuality: String, Sendable, Codable {
+        case unavailable
+        case limited
+        case sufficient
+        case complete
+
+        public static func classify(observedDays: Int, expectedDays: Int) -> DataQuality {
+            guard observedDays > 0, expectedDays > 0 else {
+                return .unavailable
+            }
+            let coverage = Double(observedDays) / Double(expectedDays)
+            if coverage >= 0.9 {
+                return .complete
+            }
+            if coverage >= 0.5 {
+                return .sufficient
+            }
+            return .limited
+        }
+    }
+
     public struct Trend: Sendable, Codable {
         public let windowDays: Int
         public let points: [DailyMetric]
         public let average: Double
         public let changeRate: Double // last vs first
+        public let observedDays: Int
+        public let expectedDays: Int
+        public let dataQuality: DataQuality
+
+        public var coverageRate: Double {
+            guard expectedDays > 0 else { return 0 }
+            return Double(observedDays) / Double(expectedDays)
+        }
+
+        static func summarize(windowDays: Int, points: [DailyMetric]) -> Trend {
+            let observed = points.filter(\.isObserved)
+            let values = observed.map(\.value)
+            let average = values.average()
+            let changeRate: Double
+            if let first = values.first, let last = values.last, abs(first) > 1e-9 {
+                changeRate = (last - first) / abs(first)
+            } else {
+                changeRate = 0
+            }
+            return Trend(
+                windowDays: windowDays,
+                points: points,
+                average: average,
+                changeRate: changeRate,
+                observedDays: observed.count,
+                expectedDays: windowDays,
+                dataQuality: .classify(observedDays: observed.count, expectedDays: windowDays)
+            )
+        }
     }
 
     public func trend(kind: MetricKind, days: Int, endingAt end: Date = Date(), useCache: Bool = true) async throws -> Trend {
@@ -533,12 +590,7 @@ public final class HealthKitService {
         let calendar = Calendar.current
         let start = calendar.date(byAdding: .day, value: -days + 1, to: calendar.startOfDay(for: end)) ?? end
         let series = try await fetchDailyMetrics(kind: kind, start: start, end: end, useCache: useCache)
-        let values = series.map { $0.value }
-        let avg = values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
-        let change = (values.last ?? 0) - (values.first ?? 0)
-        let base = max(1e-9, abs(values.first ?? 0))
-        let changeRate = change / base
-        let result = Trend(windowDays: days, points: series, average: avg, changeRate: changeRate)
+        let result = Trend.summarize(windowDays: days, points: series)
         
         // Cache the result
         if useCache {
@@ -556,6 +608,34 @@ public final class HealthKitService {
         public let previousAverage: Double
         public let delta: Double
         public let deltaRate: Double
+        public let currentObservedDays: Int
+        public let previousObservedDays: Int
+        public let dataQuality: DataQuality
+
+        static func summarize(
+            windowDays: Int,
+            current: [DailyMetric],
+            previous: [DailyMetric]
+        ) -> Comparison {
+            let currentValues = current.filter(\.isObserved).map(\.value)
+            let previousValues = previous.filter(\.isObserved).map(\.value)
+            let currentAverage = currentValues.average()
+            let previousAverage = previousValues.average()
+            let delta = currentAverage - previousAverage
+            let deltaRate = abs(previousAverage) > 1e-9 ? delta / abs(previousAverage) : 0
+            let observedDays = min(currentValues.count, previousValues.count)
+            return Comparison(
+                currentWindowDays: windowDays,
+                previousWindowDays: windowDays,
+                currentAverage: currentAverage,
+                previousAverage: previousAverage,
+                delta: delta,
+                deltaRate: deltaRate,
+                currentObservedDays: currentValues.count,
+                previousObservedDays: previousValues.count,
+                dataQuality: .classify(observedDays: observedDays, expectedDays: windowDays)
+            )
+        }
     }
 
     public func compare(kind: MetricKind, windowDays: Int, endingAt end: Date = Date(), useCache: Bool = true) async throws -> Comparison {
@@ -578,18 +658,10 @@ public final class HealthKitService {
         async let previous = fetchDailyMetrics(kind: kind, start: startPrev, end: endPrev, useCache: useCache)
 
         let (curSeries, prevSeries) = try await (current, previous)
-        let curAvg = curSeries.map { $0.value }.average()
-        let prevAvg = prevSeries.map { $0.value }.average()
-        let delta = curAvg - prevAvg
-        let base = max(1e-9, abs(prevAvg))
-        let deltaRate = delta / base
-        let result = Comparison(
-            currentWindowDays: windowDays,
-            previousWindowDays: windowDays,
-            currentAverage: curAvg,
-            previousAverage: prevAvg,
-            delta: delta,
-            deltaRate: deltaRate
+        let result = Comparison.summarize(
+            windowDays: windowDays,
+            current: curSeries,
+            previous: prevSeries
         )
         
         // Cache the result
@@ -620,6 +692,7 @@ public final class HealthKitService {
 
         let calendar = Calendar.current
         var dayBuckets: [Date: TimeInterval] = [:]
+        var observedDays: Set<Date> = []
         var cur = calendar.startOfDay(for: start)
         let endDay = calendar.startOfDay(for: end)
         while cur <= endDay {
@@ -650,12 +723,17 @@ public final class HealthKitService {
                 let intervalEnd = min(dayEnd, segEnd)
                 let overlap = intervalEnd.timeIntervalSince(segStart)
                 dayBuckets[dayStart, default: 0] += max(0, overlap)
+                observedDays.insert(dayStart)
                 segStart = intervalEnd
             }
         }
 
         return dayBuckets.keys.sorted().map { day in
-            .init(date: day, value: dayBuckets[day, default: 0] / 3600.0)
+            .init(
+                date: day,
+                value: dayBuckets[day, default: 0] / 3600.0,
+                isObserved: observedDays.contains(day)
+            )
         }
     }
 }

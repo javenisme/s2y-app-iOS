@@ -377,4 +377,52 @@ final class OmerMobileChatModelsTests: XCTestCase {
 
         XCTAssertTrue(WearableMeasurementNormalizer.normalize([vendorScore]).isEmpty)
     }
+
+    func testTrendSummaryExcludesMissingDaysFromAverage() throws {
+        let start = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-01T00:00:00Z"))
+        var points: [HealthKitService.DailyMetric] = []
+        for offset in 0..<7 {
+            points.append(HealthKitService.DailyMetric(
+                date: start.addingTimeInterval(Double(offset) * 86_400),
+                value: offset < 2 ? Double((offset + 1) * 1_000) : 0,
+                isObserved: offset < 2
+            ))
+        }
+
+        let trend = HealthKitService.Trend.summarize(windowDays: 7, points: points)
+
+        XCTAssertEqual(trend.average, 1_500)
+        XCTAssertEqual(trend.changeRate, 1)
+        XCTAssertEqual(trend.observedDays, 2)
+        XCTAssertEqual(trend.dataQuality, .limited)
+    }
+
+    func testComparisonRequiresCoverageInBothWindows() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-01T00:00:00Z"))
+        var current: [HealthKitService.DailyMetric] = []
+        var previous: [HealthKitService.DailyMetric] = []
+        for offset in 0..<7 {
+            current.append(HealthKitService.DailyMetric(
+                date: date.addingTimeInterval(Double(offset) * 86_400),
+                value: 8_000,
+                isObserved: true
+            ))
+            previous.append(HealthKitService.DailyMetric(
+                date: date.addingTimeInterval(Double(offset - 7) * 86_400),
+                value: offset < 2 ? 4_000 : 0,
+                isObserved: offset < 2
+            ))
+        }
+
+        let comparison = HealthKitService.Comparison.summarize(
+            windowDays: 7,
+            current: current,
+            previous: previous
+        )
+
+        XCTAssertEqual(comparison.currentAverage, 8_000)
+        XCTAssertEqual(comparison.previousAverage, 4_000)
+        XCTAssertEqual(comparison.deltaRate, 1)
+        XCTAssertEqual(comparison.dataQuality, .limited)
+    }
 }
