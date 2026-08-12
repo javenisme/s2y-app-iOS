@@ -336,29 +336,35 @@ struct ShowcaseView: View {
 }
 
 private struct HealthAccessSettingsView: View {
-    @Environment(HealthKit.self) private var healthKit
-
-    @State private var isRequesting = false
+    @State private var requestingGroup: HealthPermissionGroup?
+    @State private var requestStates: [HealthPermissionGroup: HealthPermissionRequestState] = [:]
     @State private var errorMessage: String?
 
-    private var isAuthorized: Bool {
-        !ProcessInfo.processInfo.isPreviewSimulator && healthKit.isFullyAuthorized
-    }
+    private let healthService = HealthKitService.shared
 
     var body: some View {
         List {
             Section {
-                LabeledContent("Health Access", value: isAuthorized ? "Allowed" : "Not Allowed")
-
-                Button(isAuthorized ? "Review Health Access" : "Allow Health Access") {
-                    _Concurrency.Task { await requestAuthorization() }
+                ForEach(HealthPermissionGroup.allCases) { group in
+                    permissionRow(for: group)
                 }
-                .disabled(isRequesting)
+
+                NavigationLink {
+                    HealthDataSourcesView()
+                } label: {
+                    Label("Data Sources & Freshness", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                }
+
+                NavigationLink {
+                    ClinicalRecordsSettingsView()
+                } label: {
+                    Label("Clinical Records", systemImage: "cross.case")
+                }
             } footer: {
-                Text("iOS controls individual Health permissions. You can review the system prompt without restarting onboarding.")
+                Text("S2Y requests each category only when you choose it. Apple does not reveal whether read access was allowed or denied, so S2Y never labels a category as Allowed.")
             }
 
-            if isRequesting {
+            if requestingGroup != nil {
                 Section {
                     HStack(spacing: 12) {
                         ProgressView()
@@ -377,18 +383,241 @@ private struct HealthAccessSettingsView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Health Permissions")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await refreshRequestStates()
+        }
+    }
+
+    private func permissionRow(for group: HealthPermissionGroup) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: group.systemImage)
+                .foregroundStyle(.red)
+                .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(group.title)
+                    .font(.headline)
+                Text(group.purpose)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            Button(buttonTitle(for: group)) {
+                _Concurrency.Task { await requestAuthorization(for: group) }
+            }
+            .buttonStyle(.bordered)
+            .disabled(requestingGroup != nil || requestStates[group] == .unavailable)
+            .accessibilityIdentifier("health-permission-\(group.rawValue)")
+        }
+        .padding(.vertical, 6)
+    }
+
+    private func buttonTitle(for group: HealthPermissionGroup) -> String {
+        switch requestStates[group] {
+        case .requested:
+            "Requested"
+        case .unavailable:
+            "Unavailable"
+        case .review, .none:
+            "Review"
+        }
     }
 
     @MainActor
-    private func requestAuthorization() async {
-        isRequesting = true
+    private func requestAuthorization(for group: HealthPermissionGroup) async {
+        requestingGroup = group
         errorMessage = nil
-        defer { isRequesting = false }
+        defer { requestingGroup = nil }
 
         do {
-            try await healthKit.askForAuthorization()
+            try await healthService.requestAuthorization(for: [group])
+            requestStates[group] = await healthService.permissionRequestState(for: group)
         } catch {
             errorMessage = "Health access could not be updated: \(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func refreshRequestStates() async {
+        for group in HealthPermissionGroup.allCases {
+            requestStates[group] = await healthService.permissionRequestState(for: group)
+        }
+    }
+}
+
+private struct ClinicalRecordsSettingsView: View {
+    @State private var selectedCategories: Set<ClinicalRecordCategory> = []
+    @State private var records: [ClinicalRecordSummary] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    private let healthService = HealthKitService.shared
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(ClinicalRecordCategory.allCases) { category in
+                    Toggle(category.title, isOn: selectionBinding(for: category))
+                }
+
+                Button("Review Selected Access") {
+                    _Concurrency.Task { await requestAndLoadRecords() }
+                }
+                .disabled(selectedCategories.isEmpty || isLoading)
+            } footer: {
+                Text("Clinical records are read-only. Select only the record types you want S2Y to display, then review Apple's permission sheet.")
+            }
+
+            if isLoading {
+                Section {
+                    ProgressView("Reading selected records…")
+                }
+            } else if records.isEmpty, errorMessage == nil {
+                Section {
+                    Text("No selected clinical records are currently readable.")
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Section("Records") {
+                    ForEach(records) { record in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(record.displayName)
+                            Text("\(record.category.title) · \(record.sourceName)")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            Text(record.recordedAt, format: .dateTime.year().month().day())
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .accessibilityHint("Linked to the original Health clinical record")
+                    }
+                }
+            }
+
+            if let errorMessage {
+                Section {
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+        .navigationTitle("Clinical Records")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func selectionBinding(for category: ClinicalRecordCategory) -> Binding<Bool> {
+        Binding(
+            get: { selectedCategories.contains(category) },
+            set: { selected in
+                if selected {
+                    selectedCategories.insert(category)
+                } else {
+                    selectedCategories.remove(category)
+                }
+            }
+        )
+    }
+
+    @MainActor
+    private func requestAndLoadRecords() async {
+        isLoading = true
+        records = []
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            try await healthService.requestClinicalRecordAuthorization(for: selectedCategories)
+            for category in ClinicalRecordCategory.allCases where selectedCategories.contains(category) {
+                records.append(contentsOf: try await healthService.fetchClinicalRecordSummaries(for: category))
+            }
+            records.sort { $0.recordedAt > $1.recordedAt }
+        } catch {
+            errorMessage = "Clinical records could not be read: \(error.localizedDescription)"
+        }
+    }
+}
+
+private struct HealthDataSourcesView: View {
+    @State private var provenance: [HealthKitService.MetricKind: HealthMetricProvenance] = [:]
+    @State private var isLoading = true
+
+    private let healthService = HealthKitService.shared
+
+    var body: some View {
+        List {
+            ForEach(HealthPermissionGroup.allCases) { group in
+                Section(group.title) {
+                    ForEach(group.metricKinds, id: \.self) { kind in
+                        provenanceRow(for: kind)
+                    }
+                }
+            }
+        }
+        .overlay {
+            if isLoading {
+                ProgressView("Checking Health data…")
+                    .padding()
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
+        .navigationTitle("Health Data Sources")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await loadProvenance()
+        }
+    }
+
+    @ViewBuilder
+    private func provenanceRow(for kind: HealthKitService.MetricKind) -> some View {
+        if let item = provenance[kind] {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Text(kind.displayName)
+                    Spacer()
+                    Text(item.freshness.rawValue)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(freshnessColor(item.freshness))
+                }
+                Text(sourceDescription(item))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Text(item.updatedAt, format: .relative(presentation: .named))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 4)
+        } else if !isLoading {
+            LabeledContent(kind.displayName, value: "No recent readable data")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func sourceDescription(_ item: HealthMetricProvenance) -> String {
+        guard let deviceName = item.deviceName, deviceName != item.sourceName else {
+            return item.sourceName
+        }
+        return "\(item.sourceName) · \(deviceName)"
+    }
+
+    private func freshnessColor(_ freshness: HealthMetricProvenance.Freshness) -> Color {
+        switch freshness {
+        case .current: .green
+        case .aging: .orange
+        case .stale: .secondary
+        }
+    }
+
+    @MainActor
+    private func loadProvenance() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        for kind in HealthKitService.MetricKind.allCases {
+            if let item = try? await healthService.latestProvenance(for: kind) {
+                provenance[kind] = item
+            }
         }
     }
 }

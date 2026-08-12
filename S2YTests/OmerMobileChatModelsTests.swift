@@ -262,4 +262,119 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(String(blocks[1].content.characters), "Average: 7.5 hours")
         XCTAssertFalse(blocks.map { String($0.content.characters) }.joined().contains("**"))
     }
+
+    func testHealthPermissionGroupsArePurposeBasedAndNonOverlapping() {
+        let groups = HealthPermissionGroup.allCases
+        let allMetrics = groups.flatMap(\.metricKinds)
+
+        XCTAssertEqual(Set(allMetrics), Set(HealthKitService.MetricKind.allCases))
+        XCTAssertEqual(allMetrics.count, Set(allMetrics).count)
+        XCTAssertTrue(groups.allSatisfy { !$0.title.isEmpty && !$0.purpose.isEmpty })
+    }
+
+    func testHealthMetricFreshnessUsesClearAgeBands() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+
+        XCTAssertEqual(
+            HealthMetricProvenance.freshness(for: now.addingTimeInterval(-24 * 60 * 60), relativeTo: now),
+            .current
+        )
+        XCTAssertEqual(
+            HealthMetricProvenance.freshness(for: now.addingTimeInterval(-4 * 24 * 60 * 60), relativeTo: now),
+            .aging
+        )
+        XCTAssertEqual(
+            HealthMetricProvenance.freshness(for: now.addingTimeInterval(-8 * 24 * 60 * 60), relativeTo: now),
+            .stale
+        )
+    }
+
+    func testClinicalRecordSummaryRoundTripsWithoutRawFHIRPayload() throws {
+        let id = try XCTUnwrap(UUID(uuidString: "22222222-2222-4222-8222-222222222222"))
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let summary = ClinicalRecordSummary(
+            id: id,
+            category: .labResults,
+            displayName: "Example laboratory result",
+            recordedAt: date,
+            sourceName: "Example Health Provider",
+            fhirResourceIdentifier: "Observation/example"
+        )
+
+        let data = try encoder.encode(summary)
+        let decoded = try decoder.decode(ClinicalRecordSummary.self, from: data)
+
+        XCTAssertEqual(decoded, summary)
+        XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("resourceType"))
+    }
+
+    func testWearableMeasurementsNormalizeUnitsAndPreserveOrigin() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let input = WearableMeasurementInput(
+            id: "energy-1",
+            metricIdentifier: "HKQuantityTypeIdentifierActiveEnergyBurned",
+            value: 418.4,
+            unit: "kJ",
+            startDate: date,
+            endDate: date.addingTimeInterval(60),
+            timeZoneIdentifier: "America/New_York",
+            sourceIdentifier: "com.example.watch",
+            sourceName: "Example Watch",
+            deviceName: "Watch"
+        )
+
+        let result = try XCTUnwrap(WearableMeasurementNormalizer.normalize([input]).first)
+
+        XCTAssertEqual(result.value, 100, accuracy: 0.001)
+        XCTAssertEqual(result.unit, "kcal")
+        XCTAssertEqual(result.originalValue, 418.4)
+        XCTAssertEqual(result.originalUnit, "kJ")
+        XCTAssertEqual(result.sourceIdentifier, "com.example.watch")
+        XCTAssertEqual(result.timeZoneIdentifier, "America/New_York")
+    }
+
+    func testWearableDeduplicationIsScopedToSourceAndSyncIdentifier() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        func sample(id: String, source: String, version: Int, value: Double) -> WearableMeasurementInput {
+            WearableMeasurementInput(
+                id: id,
+                metricIdentifier: "HKQuantityTypeIdentifierStepCount",
+                value: value,
+                unit: "count",
+                startDate: date,
+                endDate: date,
+                timeZoneIdentifier: "UTC",
+                sourceIdentifier: source,
+                sourceName: source,
+                syncIdentifier: "shared-sync-id",
+                syncVersion: version
+            )
+        }
+
+        let normalized = WearableMeasurementNormalizer.normalize([
+            sample(id: "old", source: "watch-a", version: 1, value: 10),
+            sample(id: "new", source: "watch-a", version: 2, value: 20),
+            sample(id: "other-source", source: "watch-b", version: 1, value: 30)
+        ])
+
+        XCTAssertEqual(normalized.count, 2)
+        XCTAssertEqual(Set(normalized.map(\.id)), ["new", "other-source"])
+    }
+
+    func testWearableNormalizerRejectsVendorOnlyScores() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let vendorScore = WearableMeasurementInput(
+            id: "score-1",
+            metricIdentifier: "com.vendor.readiness-score",
+            value: 92,
+            unit: "score",
+            startDate: date,
+            endDate: date,
+            timeZoneIdentifier: "UTC",
+            sourceIdentifier: "com.vendor.app",
+            sourceName: "Vendor"
+        )
+
+        XCTAssertTrue(WearableMeasurementNormalizer.normalize([vendorScore]).isEmpty)
+    }
 }

@@ -408,16 +408,7 @@ struct HealthAssistantView: View {
             return
         }
 
-        do {
-            try await healthService.requestAuthorization()
-            await loadQuickQueryAvailability()
-        } catch {
-            didLoadSuggestionAvailability = true
-            notice = AssistantNotice(
-                message: "HealthKit authorization failed: \(error.localizedDescription)",
-                tone: .warning
-            )
-        }
+        await loadQuickQueryAvailability()
     }
 
     private func loadQuickQueryAvailability() async {
