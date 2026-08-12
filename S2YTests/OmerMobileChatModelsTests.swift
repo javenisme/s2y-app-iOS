@@ -271,4 +271,21 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(allMetrics.count, Set(allMetrics).count)
         XCTAssertTrue(groups.allSatisfy { !$0.title.isEmpty && !$0.purpose.isEmpty })
     }
+
+    func testHealthMetricFreshnessUsesClearAgeBands() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+
+        XCTAssertEqual(
+            HealthMetricProvenance.freshness(for: now.addingTimeInterval(-24 * 60 * 60), relativeTo: now),
+            .current
+        )
+        XCTAssertEqual(
+            HealthMetricProvenance.freshness(for: now.addingTimeInterval(-4 * 24 * 60 * 60), relativeTo: now),
+            .aging
+        )
+        XCTAssertEqual(
+            HealthMetricProvenance.freshness(for: now.addingTimeInterval(-8 * 24 * 60 * 60), relativeTo: now),
+            .stale
+        )
+    }
 }

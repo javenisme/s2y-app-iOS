@@ -111,6 +111,36 @@ public enum HealthPermissionRequestState: Sendable {
     case unavailable
 }
 
+public struct HealthMetricProvenance: Identifiable, Sendable {
+    public enum Freshness: String, Sendable {
+        case current = "Current"
+        case aging = "Getting old"
+        case stale = "Out of date"
+    }
+
+    public let metricKind: HealthKitService.MetricKind
+    public let sourceName: String
+    public let deviceName: String?
+    public let updatedAt: Date
+    public let freshness: Freshness
+
+    public var id: HealthKitService.MetricKind { metricKind }
+
+    public static func freshness(
+        for updatedAt: Date,
+        relativeTo now: Date = .now
+    ) -> Freshness {
+        let age = max(0, now.timeIntervalSince(updatedAt))
+        if age <= 48 * 60 * 60 {
+            return .current
+        }
+        if age <= 7 * 24 * 60 * 60 {
+            return .aging
+        }
+        return .stale
+    }
+}
+
 @MainActor
 public final class HealthKitService {
     public static let shared = HealthKitService()
@@ -168,6 +198,40 @@ public final class HealthKitService {
             logger.error("Could not determine Health authorization request state: \(error.localizedDescription)")
             return .review
         }
+    }
+
+    public func latestProvenance(for kind: MetricKind) async throws -> HealthMetricProvenance? {
+        guard let sampleType = healthObjectType(for: kind) as? HKSampleType else {
+            return nil
+        }
+
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        let samples: [HKSample] = try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: sampleType,
+                predicate: nil,
+                limit: 1,
+                sortDescriptors: [sort]
+            ) { _, samples, error in
+                if let error {
+                    continuation.resume(throwing: HealthKitError.queryFailed(error))
+                    return
+                }
+                continuation.resume(returning: samples ?? [])
+            }
+            healthStore.execute(query)
+        }
+
+        guard let sample = samples.first else {
+            return nil
+        }
+        return HealthMetricProvenance(
+            metricKind: kind,
+            sourceName: sample.sourceRevision.source.name,
+            deviceName: sample.device?.name ?? sample.device?.model,
+            updatedAt: sample.endDate,
+            freshness: HealthMetricProvenance.freshness(for: sample.endDate)
+        )
     }
 
     private func readTypes(for groups: Set<HealthPermissionGroup>) -> Set<HKObjectType> {

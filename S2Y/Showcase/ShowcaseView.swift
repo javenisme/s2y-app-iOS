@@ -348,6 +348,12 @@ private struct HealthAccessSettingsView: View {
                 ForEach(HealthPermissionGroup.allCases) { group in
                     permissionRow(for: group)
                 }
+
+                NavigationLink {
+                    HealthDataSourcesView()
+                } label: {
+                    Label("Data Sources & Freshness", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                }
             } footer: {
                 Text("S2Y requests each category only when you choose it. Apple does not reveal whether read access was allowed or denied, so S2Y never labels a category as Allowed.")
             }
@@ -431,6 +437,89 @@ private struct HealthAccessSettingsView: View {
     private func refreshRequestStates() async {
         for group in HealthPermissionGroup.allCases {
             requestStates[group] = await healthService.permissionRequestState(for: group)
+        }
+    }
+}
+
+private struct HealthDataSourcesView: View {
+    @State private var provenance: [HealthKitService.MetricKind: HealthMetricProvenance] = [:]
+    @State private var isLoading = true
+
+    private let healthService = HealthKitService.shared
+
+    var body: some View {
+        List {
+            ForEach(HealthPermissionGroup.allCases) { group in
+                Section(group.title) {
+                    ForEach(group.metricKinds, id: \.self) { kind in
+                        provenanceRow(for: kind)
+                    }
+                }
+            }
+        }
+        .overlay {
+            if isLoading {
+                ProgressView("Checking Health data…")
+                    .padding()
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
+        .navigationTitle("Health Data Sources")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await loadProvenance()
+        }
+    }
+
+    @ViewBuilder
+    private func provenanceRow(for kind: HealthKitService.MetricKind) -> some View {
+        if let item = provenance[kind] {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Text(kind.displayName)
+                    Spacer()
+                    Text(item.freshness.rawValue)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(freshnessColor(item.freshness))
+                }
+                Text(sourceDescription(item))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Text(item.updatedAt, format: .relative(presentation: .named))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 4)
+        } else if !isLoading {
+            LabeledContent(kind.displayName, value: "No recent readable data")
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func sourceDescription(_ item: HealthMetricProvenance) -> String {
+        guard let deviceName = item.deviceName, deviceName != item.sourceName else {
+            return item.sourceName
+        }
+        return "\(item.sourceName) · \(deviceName)"
+    }
+
+    private func freshnessColor(_ freshness: HealthMetricProvenance.Freshness) -> Color {
+        switch freshness {
+        case .current: .green
+        case .aging: .orange
+        case .stale: .secondary
+        }
+    }
+
+    @MainActor
+    private func loadProvenance() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        for kind in HealthKitService.MetricKind.allCases {
+            if let item = try? await healthService.latestProvenance(for: kind) {
+                provenance[kind] = item
+            }
         }
     }
 }
