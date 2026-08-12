@@ -51,8 +51,30 @@ enum HealthAssistantError: Error, LocalizedError {
     }
 }
 
+private enum AssistantAIMode: String, CaseIterable, Identifiable {
+    case onDevice
+    case omer
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .onDevice: "On-device"
+        case .omer: "Omer Online"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .onDevice: "apple.intelligence"
+        case .omer: "icloud"
+        }
+    }
+}
+
 struct HealthAssistantView: View {
     @Environment(\.homeDrawerProgress) private var homeDrawerProgress
+    @Binding private var requestedConversationID: UUID?
 
     @State private var inputText: String = ""
     @State private var messages: [ChatMessage] = []
@@ -65,13 +87,28 @@ struct HealthAssistantView: View {
     @State private var historyError: String?
     @State private var streamTick = 0
     @State private var pendingToolApproval: OmerToolApprovalPayload?
+    @FocusState private var isInputFocused: Bool
     @AppStorage(StorageKeys.omerIncludeHealthContext) private var omerIncludeHealthContext = true
+    @AppStorage(StorageKeys.healthAssistantAIMode) private var aiModeRawValue = AssistantAIMode.onDevice.rawValue
+
+    private let newChatRequestID: UUID
+    private let onHistoryChanged: () -> Void
     
     private let healthService = HealthKitService.shared
     private let appleModelService = AppleFoundationModelService.shared
     private let omerChatService = OmerChatService.shared
     private let logger = Logger(subsystem: "com.s2y.app", category: "HealthAssistantView")
     private let isRunningInSimulator = ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil
+
+    init(
+        requestedConversationID: Binding<UUID?> = .constant(nil),
+        newChatRequestID: UUID = UUID(),
+        onHistoryChanged: @escaping () -> Void = {}
+    ) {
+        self._requestedConversationID = requestedConversationID
+        self.newChatRequestID = newChatRequestID
+        self.onHistoryChanged = onHistoryChanged
+    }
     
     var body: some View {
         NavigationStack {
@@ -103,6 +140,12 @@ struct HealthAssistantView: View {
                             .accessibilityLabel("Settings")
                     }
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        isInputFocused = false
+                    }
+                }
             }
             .sheet(isPresented: $showingSettings) {
                 NavigationStack {
@@ -118,6 +161,14 @@ struct HealthAssistantView: View {
         }
         .task {
             await initializeHealthKit()
+        }
+        .task(id: requestedConversationID) {
+            guard let requestedConversationID else { return }
+            await openConversation(id: requestedConversationID)
+            self.requestedConversationID = nil
+        }
+        .onChange(of: newChatRequestID) {
+            Task { await beginNewConversation() }
         }
         .alert(item: $pendingToolApproval) { approval in
             Alert(
@@ -194,33 +245,53 @@ struct HealthAssistantView: View {
         isLoadingHistory = true
         historyError = nil
         defer { isLoadingHistory = false }
+        chatHistory = await omerChatService.cachedChats()
         do {
             chatHistory = try await omerChatService.fetchChats().chats
         } catch {
-            historyError = error.localizedDescription
+            if chatHistory.isEmpty {
+                historyError = error.localizedDescription
+            }
         }
     }
 
     @MainActor
     private func openConversation(_ chat: OmerChatSummary) async {
+        await openConversation(id: chat.id)
+    }
+
+    @MainActor
+    private func openConversation(id: UUID) async {
         isLoadingHistory = true
         historyError = nil
         do {
-            let detail = try await omerChatService.fetchChat(id: chat.id)
-            try await omerChatService.selectChat(id: chat.id)
-            messages = detail.messages.compactMap { message in
-                guard !message.content.isEmpty else { return nil }
-                return ChatMessage(
-                    id: message.id,
-                    role: message.role == "user" ? .user : .assistant,
-                    content: message.content
-                )
-            }
+            let detail = try await omerChatService.fetchChat(id: id)
+            try await omerChatService.selectChat(id: id)
+            displayConversation(detail)
             showingHistory = false
         } catch {
-            historyError = error.localizedDescription
+            if let cached = await omerChatService.cachedChat(id: id) {
+                try? await omerChatService.selectChat(id: id)
+                displayConversation(cached)
+                showingHistory = false
+                notice = AssistantNotice(message: "Showing the locally saved copy of this chat.", tone: .info)
+            } else {
+                historyError = error.localizedDescription
+            }
         }
         isLoadingHistory = false
+    }
+
+    @MainActor
+    private func displayConversation(_ detail: OmerChatDetailResponse) {
+        messages = detail.messages.compactMap { message in
+            guard !message.content.isEmpty else { return nil }
+            return ChatMessage(
+                id: message.id,
+                role: message.role == "user" ? .user : .assistant,
+                content: message.content
+            )
+        }
     }
 
     @MainActor
@@ -230,6 +301,7 @@ struct HealthAssistantView: View {
             messages = []
             notice = nil
             showingHistory = false
+            onHistoryChanged()
         } catch {
             historyError = error.localizedDescription
         }
@@ -238,6 +310,10 @@ struct HealthAssistantView: View {
     private var welcomeView: some View {
         ScrollView {
             welcomeContent
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .onTapGesture {
+            isInputFocused = false
         }
     }
 
@@ -294,6 +370,10 @@ struct HealthAssistantView: View {
                 }
                 .padding()
             }
+            .scrollDismissesKeyboard(.interactively)
+            .onTapGesture {
+                isInputFocused = false
+            }
             .onChange(of: messages.count) {
                 if let lastMessage = messages.last {
                     withAnimation(.easeInOut(duration: 0.3)) {
@@ -316,13 +396,23 @@ struct HealthAssistantView: View {
             Divider()
             
             HStack {
-                Label(
-                    appleModelService.availability.isAvailable ? "On-device Apple AI" : "Omer fallback",
-                    systemImage: appleModelService.availability.isAvailable ? "apple.intelligence" : "icloud"
-                )
-                .font(.caption)
-                .foregroundColor(.secondary)
+                Menu {
+                    Picker("AI provider", selection: aiModeBinding) {
+                        ForEach(AssistantAIMode.allCases) { mode in
+                            Label(mode.title, systemImage: mode.systemImage)
+                                .tag(mode)
+                        }
+                    }
+                } label: {
+                    Label(selectedAIMode.title, systemImage: selectedAIMode.systemImage)
+                        .font(.caption.weight(.semibold))
+                }
+                .accessibilityLabel("AI provider")
+                .accessibilityIdentifier("health-assistant-ai-mode")
                 Spacer()
+                Text(selectedAIMode == .onDevice ? "Runs on this iPhone" : "Uses Omer online")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal)
             .padding(.top, 6)
@@ -332,6 +422,12 @@ struct HealthAssistantView: View {
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(1...4)
                     .disabled(isProcessing)
+                    .focused($isInputFocused)
+                    .submitLabel(.send)
+                    .onSubmit {
+                        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isProcessing else { return }
+                        Task { await sendMessage() }
+                    }
                     .accessibilityIdentifier("health-assistant-input")
                 
                 Button {
@@ -416,6 +512,7 @@ struct HealthAssistantView: View {
         
         let query = trimmedInput
         inputText = ""
+        isInputFocused = false
         isProcessing = true
         notice = nil
 
@@ -427,7 +524,7 @@ struct HealthAssistantView: View {
             includeHealthContext: omerIncludeHealthContext
         )
 
-        if appleModelService.availability.isAvailable {
+        if selectedAIMode == .onDevice, appleModelService.availability.isAvailable {
             do {
                 try await appleModelService.streamResponse(
                     to: query,
@@ -452,24 +549,33 @@ struct HealthAssistantView: View {
                         )
                     }
                 }
+                onHistoryChanged()
                 isProcessing = false
                 return
             } catch {
                 logger.error("Apple on-device generation failed: \(error.localizedDescription)")
-                updateAssistantMessage(id: assistantPlaceholder.id, content: "")
-                notice = AssistantNotice(
-                    message: "On-device AI could not finish this response. Using Omer instead.",
-                    tone: .warning
+                updateAssistantMessage(
+                    id: assistantPlaceholder.id,
+                    content: "On-device Apple AI could not finish this response: \(error.localizedDescription)"
                 )
+                isProcessing = false
+                return
             }
-        } else {
+        } else if selectedAIMode == .onDevice {
             notice = AssistantNotice(
-                message: appleModelService.availability.fallbackExplanation,
-                tone: .info
+                message: appleModelService.availability.fallbackExplanation.replacingOccurrences(of: "Using Omer instead.", with: "Choose Omer Online to continue."),
+                tone: .warning
             )
+            updateAssistantMessage(
+                id: assistantPlaceholder.id,
+                content: "On-device Apple AI is not available. Choose Omer Online from the provider menu to send this request online."
+            )
+            isProcessing = false
+            return
         }
 
         await sendWithOmer(query, assistantMessageID: assistantPlaceholder.id)
+        onHistoryChanged()
         isProcessing = false
     }
 
@@ -585,9 +691,9 @@ struct HealthAssistantView: View {
 
             HStack(spacing: 10) {
                 statusChip(
-                    title: appleModelService.availability.isAvailable ? "On-device AI" : "Omer fallback",
-                    systemImage: appleModelService.availability.isAvailable ? "apple.intelligence" : "icloud",
-                    tint: appleModelService.availability.isAvailable ? .green : .blue
+                    title: selectedAIMode.title,
+                    systemImage: selectedAIMode.systemImage,
+                    tint: selectedAIMode == .onDevice ? .green : .blue
                 )
 
                 statusChip(
@@ -646,6 +752,17 @@ struct HealthAssistantView: View {
             )
         ]
     }
+
+    private var selectedAIMode: AssistantAIMode {
+        AssistantAIMode(rawValue: aiModeRawValue) ?? .onDevice
+    }
+
+    private var aiModeBinding: Binding<AssistantAIMode> {
+        Binding(
+            get: { selectedAIMode },
+            set: { aiModeRawValue = $0.rawValue }
+        )
+    }
 }
 
 private struct AssistantNotice {
@@ -702,6 +819,18 @@ struct ChatMessage: Identifiable, Sendable {
     }
 }
 
+enum ChatMarkdownRenderer {
+    static func attributedString(from source: String) -> AttributedString? {
+        try? AttributedString(
+            markdown: source,
+            options: .init(
+                interpretedSyntax: .full,
+                failurePolicy: .returnPartiallyParsedIfPossible
+            )
+        )
+    }
+}
+
 struct MessageBubble: View {
     let message: ChatMessage
     
@@ -712,7 +841,7 @@ struct MessageBubble: View {
             }
             
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
-                Text(message.content)
+                messageContent
                     .accessibilityIdentifier(
                         message.role == .assistant
                             ? "health-assistant-response"
@@ -730,6 +859,17 @@ struct MessageBubble: View {
             if message.role == .assistant {
                 Spacer(minLength: 60)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var messageContent: some View {
+        if message.role == .assistant,
+           let attributed = ChatMarkdownRenderer.attributedString(from: message.content) {
+            Text(attributed)
+                .textSelection(.enabled)
+        } else {
+            Text(message.content)
         }
     }
 }

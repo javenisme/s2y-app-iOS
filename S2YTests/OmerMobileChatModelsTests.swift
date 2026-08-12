@@ -172,4 +172,46 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(response.conversationId, conversationID)
         XCTAssertTrue(response.synced)
     }
+
+    func testLocalChatCacheRoundTripsConversationContent() throws {
+        let chatID = try XCTUnwrap(UUID(uuidString: "22222222-2222-4222-8222-222222222222"))
+        let messageID = try XCTUnwrap(UUID(uuidString: "33333333-3333-4333-8333-333333333333"))
+        let summary = OmerChatSummary(
+            id: chatID,
+            createdAt: "2026-08-12T12:00:00Z",
+            title: "Sleep quality",
+            visibility: "private"
+        )
+        let snapshot = OmerChatCacheSnapshot(
+            chats: [summary],
+            details: [
+                OmerChatDetailResponse(
+                    chat: summary,
+                    messages: [
+                        OmerChatHistoryMessage(
+                            id: messageID,
+                            role: "assistant",
+                            content: "**Average:** 7.5 hours",
+                            createdAt: "2026-08-12T12:00:01Z"
+                        )
+                    ]
+                )
+            ]
+        )
+
+        let decoded = try decoder.decode(OmerChatCacheSnapshot.self, from: encoder.encode(snapshot))
+        XCTAssertEqual(decoded.chats.first?.id, chatID)
+        XCTAssertEqual(decoded.details.first?.messages.first?.content, "**Average:** 7.5 hours")
+    }
+
+    func testAssistantMarkdownIsConvertedToDisplayText() throws {
+        let markdown = "**Average sleep:** 7.5 hours\n\nYour consistency is *improving*."
+        let rendered = try XCTUnwrap(ChatMarkdownRenderer.attributedString(from: markdown))
+        let displayText = String(rendered.characters)
+
+        XCTAssertTrue(displayText.contains("Average sleep:"))
+        XCTAssertTrue(displayText.contains("improving"))
+        XCTAssertFalse(displayText.contains("**"))
+        XCTAssertFalse(displayText.contains("*improving*"))
+    }
 }

@@ -72,16 +72,13 @@ struct HealthAssistantSettingsView: View {
             }
 
             Section {
-                LabeledContent("Primary AI", value: "Apple On-Device")
-                LabeledContent(
-                    "Current Route",
-                    value: AppleFoundationModelService.shared.availability.isAvailable ? "On-Device" : "Omer Fallback"
-                )
+                LabeledContent("AI Selection", value: "Choose in Chat")
+                LabeledContent("On-Device Status", value: AppleFoundationModelService.shared.availability.isAvailable ? "Available" : "Unavailable")
                 Toggle("Attach Health Summary", isOn: $omerIncludeHealthContext)
             } header: {
                 Text("AI & Privacy")
             } footer: {
-                Text("The assistant uses Apple Intelligence on this device whenever available, then falls back to Omer automatically. Health summaries are attached only when this setting is enabled.")
+                Text("Choose On-device or Omer Online directly in the chat composer. The app does not switch providers automatically. Health summaries are attached to Omer only when this setting is enabled.")
             }
 
             Section {
