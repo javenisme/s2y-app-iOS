@@ -74,6 +74,7 @@ private enum AssistantAIMode: String, CaseIterable, Identifiable {
 
 struct HealthAssistantView: View {
     @Environment(\.homeDrawerProgress) private var homeDrawerProgress
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding private var requestedConversationID: UUID?
 
     @State private var inputText: String = ""
@@ -81,10 +82,6 @@ struct HealthAssistantView: View {
     @State private var isProcessing = false
     @State private var notice: AssistantNotice?
     @State private var showingSettings = false
-    @State private var showingHistory = false
-    @State private var chatHistory: [OmerChatSummary] = []
-    @State private var isLoadingHistory = false
-    @State private var historyError: String?
     @State private var streamTick = 0
     @State private var pendingToolApproval: OmerToolApprovalPayload?
     @FocusState private var isInputFocused: Bool
@@ -125,14 +122,7 @@ struct HealthAssistantView: View {
             .navigationTitle("Health Assistant")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Button {
-                        showingHistory = true
-                    } label: {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .accessibilityLabel("Conversation History")
-                    }
-
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         showingSettings = true
                     } label: {
@@ -151,12 +141,6 @@ struct HealthAssistantView: View {
                 NavigationStack {
                     HealthAssistantSettingsView(showsDismissButton: true)
                 }
-            }
-            .sheet(isPresented: $showingHistory) {
-                conversationHistorySheet
-                    .task {
-                        await loadConversationHistory()
-                    }
             }
         }
         .task {
@@ -184,102 +168,21 @@ struct HealthAssistantView: View {
         }
     }
 
-    private var conversationHistorySheet: some View {
-        NavigationStack {
-            Group {
-                if isLoadingHistory && chatHistory.isEmpty {
-                    ProgressView("Loading conversations…")
-                } else if let historyError, chatHistory.isEmpty {
-                    ContentUnavailableView(
-                        "History Unavailable",
-                        systemImage: "exclamationmark.bubble",
-                        description: Text(historyError)
-                    )
-                } else if chatHistory.isEmpty {
-                    ContentUnavailableView(
-                        "No Conversations Yet",
-                        systemImage: "bubble.left.and.bubble.right",
-                        description: Text("Chats from S2Y Home and this iPhone will appear here.")
-                    )
-                } else {
-                    List(chatHistory) { chat in
-                        Button {
-                            Task { await openConversation(chat) }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(chat.title)
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(2)
-                                Text("Synced with S2Y")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                    .refreshable {
-                        await loadConversationHistory()
-                    }
-                }
-            }
-            .navigationTitle("Conversations")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { showingHistory = false }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        Task { await beginNewConversation() }
-                    } label: {
-                        Label("New Chat", systemImage: "square.and.pencil")
-                    }
-                }
-            }
-        }
-    }
-
-    @MainActor
-    private func loadConversationHistory() async {
-        isLoadingHistory = true
-        historyError = nil
-        defer { isLoadingHistory = false }
-        chatHistory = await omerChatService.cachedChats()
-        do {
-            chatHistory = try await omerChatService.fetchChats().chats
-        } catch {
-            if chatHistory.isEmpty {
-                historyError = error.localizedDescription
-            }
-        }
-    }
-
-    @MainActor
-    private func openConversation(_ chat: OmerChatSummary) async {
-        await openConversation(id: chat.id)
-    }
-
     @MainActor
     private func openConversation(id: UUID) async {
-        isLoadingHistory = true
-        historyError = nil
         do {
             let detail = try await omerChatService.fetchChat(id: id)
             try await omerChatService.selectChat(id: id)
             displayConversation(detail)
-            showingHistory = false
         } catch {
             if let cached = await omerChatService.cachedChat(id: id) {
                 try? await omerChatService.selectChat(id: id)
                 displayConversation(cached)
-                showingHistory = false
                 notice = AssistantNotice(message: "Showing the locally saved copy of this chat.", tone: .info)
             } else {
-                historyError = error.localizedDescription
+                notice = AssistantNotice(message: "This conversation could not be opened. Try again when you're online.", tone: .warning)
             }
         }
-        isLoadingHistory = false
     }
 
     @MainActor
@@ -300,10 +203,9 @@ struct HealthAssistantView: View {
             try await omerChatService.startNewChat()
             messages = []
             notice = nil
-            showingHistory = false
             onHistoryChanged()
         } catch {
-            historyError = error.localizedDescription
+            notice = AssistantNotice(message: "A new conversation could not be started. Please try again.", tone: .warning)
         }
     }
 
@@ -326,13 +228,16 @@ struct HealthAssistantView: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("Suggested Questions")
+                Text("Try asking")
                     .font(.headline)
                     .padding(.horizontal, 4)
 
-                ForEach(quickQuerySuggestions) { suggestion in
-                    QuickQueryRow(suggestion: suggestion) {
-                        inputText = suggestion.query
+                LazyVGrid(columns: suggestionColumns, spacing: 10) {
+                    ForEach(quickQuerySuggestions) { suggestion in
+                        QuickQueryRow(suggestion: suggestion) {
+                            inputText = suggestion.query
+                            isInputFocused = true
+                        }
                     }
                 }
             }
@@ -476,10 +381,6 @@ struct HealthAssistantView: View {
     
     private func initializeHealthKit() async {
         if isRunningInSimulator {
-            notice = AssistantNotice(
-                message: "Simulator preview: use a physical iPhone for live Health data.",
-                tone: .info
-            )
             return
         }
 
@@ -614,11 +515,8 @@ struct HealthAssistantView: View {
             pendingToolApproval = approval
         case .toolResult(let toolName):
             appendAssistantDelta(id: assistantMessageID, delta: "\n\n✓ \(toolName) completed.")
-        case .billing(let billing):
-            notice = AssistantNotice(
-                message: "\(billing.plan.capitalized) plan · \(billing.remainingTokens.formatted()) AI tokens remaining this month.",
-                tone: .info
-            )
+        case .billing:
+            break
         case .error(let message):
             updateAssistantMessage(id: assistantMessageID, content: message)
         }
@@ -666,62 +564,24 @@ struct HealthAssistantView: View {
     }
 
     private var welcomeHero: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.red.opacity(0.12))
-                        .frame(width: 54, height: 54)
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "heart.text.square.fill")
+                .font(.title2)
+                .foregroundStyle(.red)
+                .frame(width: 44, height: 44)
+                .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .accessibilityLabel("Health Assistant Icon")
 
-                    Image(systemName: "heart.text.square.fill")
-                        .font(.title3)
-                        .foregroundColor(.red)
-                        .accessibilityLabel("Health Assistant Icon")
-                }
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Ask about your health")
+                    .font(.title3.weight(.semibold))
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Ask about your health in plain language")
-                        .font(.title3.weight(.semibold))
-
-                    Text("Explore steps, heart rate, sleep, and activity trends without digging through charts first.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            HStack(spacing: 10) {
-                statusChip(
-                    title: selectedAIMode.title,
-                    systemImage: selectedAIMode.systemImage,
-                    tint: selectedAIMode == .onDevice ? .green : .blue
-                )
-
-                statusChip(
-                    title: isRunningInSimulator ? "Simulator Preview" : (HKHealthStore.isHealthDataAvailable() ? "HealthKit Ready" : "Unavailable"),
-                    systemImage: isRunningInSimulator ? "iphone" : (HKHealthStore.isHealthDataAvailable() ? "heart.circle" : "exclamationmark.circle"),
-                    tint: isRunningInSimulator ? .orange : (HKHealthStore.isHealthDataAvailable() ? .pink : .orange)
-                )
+                Text("Get a clear summary of your sleep, activity, heart rate, and other Health data.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
         }
-        .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color(uiColor: .secondarySystemGroupedBackground))
-        )
-    }
-
-    private func statusChip(title: String, systemImage: String, tint: Color) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: systemImage)
-            Text(title)
-                .fontWeight(.semibold)
-        }
-        .font(.subheadline)
-        .foregroundStyle(tint)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(tint.opacity(0.12))
-        .clipShape(Capsule())
+        .padding(.vertical, 6)
     }
 
     private var quickQuerySuggestions: [QuickQuerySuggestion] {
@@ -729,28 +589,31 @@ struct HealthAssistantView: View {
             QuickQuerySuggestion(
                 icon: "figure.walk",
                 title: "Step Trends",
-                subtitle: "7-day movement snapshot",
                 query: "How have my step counts trended over the past 7 days?"
             ),
             QuickQuerySuggestion(
                 icon: "heart.fill",
-                title: "Heart Rate Comparison",
-                subtitle: "This week versus last week",
+                title: "Heart Rate",
                 query: "Compare my average heart rate this week versus last week."
             ),
             QuickQuerySuggestion(
                 icon: "bed.double.fill",
-                title: "Sleep Analysis",
-                subtitle: "Recent rest and recovery",
+                title: "Sleep Quality",
                 query: "How has my sleep quality been recently?"
             ),
             QuickQuerySuggestion(
                 icon: "flame.fill",
                 title: "Active Energy",
-                subtitle: "30-day activity change",
                 query: "How has my active energy changed over the past 30 days?"
             )
         ]
+    }
+
+    private var suggestionColumns: [GridItem] {
+        if dynamicTypeSize.isAccessibilitySize {
+            return [GridItem(.flexible())]
+        }
+        return [GridItem(.flexible()), GridItem(.flexible())]
     }
 
     private var selectedAIMode: AssistantAIMode {
@@ -878,7 +741,6 @@ private struct QuickQuerySuggestion: Identifiable {
     let id = UUID()
     let icon: String
     let title: String
-    let subtitle: String
     let query: String
 }
 
@@ -888,43 +750,22 @@ private struct QuickQueryRow: View {
     
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.blue.opacity(0.12))
-                        .frame(width: 48, height: 48)
-
-                    Image(systemName: suggestion.icon)
-                        .font(.title3)
-                        .foregroundColor(.blue)
-                        .accessibilityLabel(suggestion.title)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(suggestion.title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-
-                    Text(suggestion.subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    Text(suggestion.query)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(2)
-                }
-
-                Spacer(minLength: 12)
-
-                Image(systemName: "arrow.up.left.circle.fill")
+            VStack(alignment: .leading, spacing: 12) {
+                Image(systemName: suggestion.icon)
                     .font(.title3)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.blue)
+                    .accessibilityHidden(true)
+
+                Text(suggestion.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
+            .padding(14)
             .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color(uiColor: .secondarySystemGroupedBackground))
             )
         }
