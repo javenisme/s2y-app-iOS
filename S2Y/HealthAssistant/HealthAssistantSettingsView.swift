@@ -42,6 +42,14 @@ struct HealthAssistantSettingsView: View {
                 Text("When Omer Online is selected, this allows a short summary of relevant Health data to be included with your question. On-device analysis stays on your iPhone, while chat history may still sync to your S2Y account.")
             }
 
+            Section("Plan") {
+                NavigationLink {
+                    WellnessPlanSettingsView()
+                } label: {
+                    Label("Wellbeing Plan", systemImage: "list.bullet.clipboard")
+                }
+            }
+
             Section {
                 Button("Clear Health data cache", role: .destructive) {
                     HealthKitCache.shared.clearAll()

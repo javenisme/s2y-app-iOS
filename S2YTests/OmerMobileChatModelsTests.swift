@@ -706,4 +706,33 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(draft.plan.actions.first?.category, .checkIn)
         XCTAssertTrue(draft.plan.actions.first?.isOptional == true)
     }
+
+    func testOnlyActiveWellnessPlansProduceDailyActions() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let goal = WellnessGoal(
+            metricKind: .steps,
+            direction: .maintain,
+            targetValue: 6_000,
+            targetUnit: "steps",
+            reviewDate: date
+        )
+        let action = WellnessAction(
+            title: "Movement break",
+            detail: "A comfortable activity",
+            category: .movement,
+            daysPerWeek: 7,
+            estimatedMinutes: 10
+        )
+        let draft = WellnessPlan(
+            title: "Plan",
+            summary: "Draft",
+            origin: .userCreated,
+            goals: [goal],
+            actions: [action]
+        )
+        let active = try WellnessPlanLifecycle.transition(draft, to: .active, at: date)
+
+        XCTAssertTrue(WellnessDailySchedule.actions(for: draft, on: date).isEmpty)
+        XCTAssertEqual(WellnessDailySchedule.actions(for: active, on: date), [action])
+    }
 }
