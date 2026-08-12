@@ -425,4 +425,16 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(comparison.deltaRate, 1)
         XCTAssertEqual(comparison.dataQuality, .limited)
     }
+
+    func testHealthChartRequestRecognizesTrendAndComparisonWindows() {
+        XCTAssertEqual(
+            HealthChartRequest.parse("How have my steps trended over the past 30 days?"),
+            .trend(kind: .steps, days: 30)
+        )
+        XCTAssertEqual(
+            HealthChartRequest.parse("Compare my heart rate this week vs last week"),
+            .comparison(kind: .heartRateAverage, days: 7)
+        )
+        XCTAssertNil(HealthChartRequest.parse("What can I do to relax today?"))
+    }
 }

@@ -453,6 +453,8 @@ struct HealthAssistantView: View {
             for: query,
             includeHealthContext: omerIncludeHealthContext
         )
+        let chartAttachment = await HealthChatVisualizationLoader.load(for: query)
+        updateAssistantAttachment(id: assistantPlaceholder.id, attachment: chartAttachment)
 
         if selectedAIMode == .onDevice, appleModelService.availability.isAvailable {
             do {
@@ -576,7 +578,8 @@ struct HealthAssistantView: View {
         messages[index] = ChatMessage(
             id: id,
             role: existingMessage.role,
-            content: existingMessage.content + delta
+            content: existingMessage.content + delta,
+            chartAttachment: existingMessage.chartAttachment
         )
         streamTick += 1
     }
@@ -588,7 +591,28 @@ struct HealthAssistantView: View {
         }
 
         let existingMessage = messages[index]
-        messages[index] = ChatMessage(id: id, role: existingMessage.role, content: content)
+        messages[index] = ChatMessage(
+            id: id,
+            role: existingMessage.role,
+            content: content,
+            chartAttachment: existingMessage.chartAttachment
+        )
+        streamTick += 1
+    }
+
+    @MainActor
+    private func updateAssistantAttachment(id: UUID, attachment: HealthChartAttachment?) {
+        guard let attachment,
+              let index = messages.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        let existingMessage = messages[index]
+        messages[index] = ChatMessage(
+            id: id,
+            role: existingMessage.role,
+            content: existingMessage.content,
+            chartAttachment: attachment
+        )
         streamTick += 1
     }
 
@@ -722,16 +746,23 @@ struct ChatMessage: Identifiable, Sendable {
     let id: UUID
     let role: Role
     let content: String
+    let chartAttachment: HealthChartAttachment?
     
     enum Role {
         case user
         case assistant
     }
 
-    init(id: UUID = UUID(), role: Role, content: String) {
+    init(
+        id: UUID = UUID(),
+        role: Role,
+        content: String,
+        chartAttachment: HealthChartAttachment? = nil
+    ) {
         self.id = id
         self.role = role
         self.content = content
+        self.chartAttachment = chartAttachment
     }
 }
 
@@ -869,11 +900,26 @@ struct MessageBubble: View {
                             .fill(message.role == .user ? Color.blue : Color.gray.opacity(0.2))
                     )
                     .foregroundColor(message.role == .user ? .white : .primary)
+
+                if let chartAttachment = message.chartAttachment {
+                    chart(attachment: chartAttachment)
+                        .accessibilityIdentifier("health-assistant-chart")
+                }
             }
             
             if message.role == .assistant {
                 Spacer(minLength: 60)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func chart(attachment: HealthChartAttachment) -> some View {
+        switch attachment {
+        case .trend(let trend, let kind):
+            HealthTrendChart(trend: trend, metricKind: kind)
+        case .comparison(let comparison, let kind):
+            HealthComparisonChart(comparison: comparison, metricKind: kind)
         }
     }
 
