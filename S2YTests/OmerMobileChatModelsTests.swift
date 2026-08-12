@@ -288,4 +288,23 @@ final class OmerMobileChatModelsTests: XCTestCase {
             .stale
         )
     }
+
+    func testClinicalRecordSummaryRoundTripsWithoutRawFHIRPayload() throws {
+        let id = try XCTUnwrap(UUID(uuidString: "22222222-2222-4222-8222-222222222222"))
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let summary = ClinicalRecordSummary(
+            id: id,
+            category: .labResults,
+            displayName: "Example laboratory result",
+            recordedAt: date,
+            sourceName: "Example Health Provider",
+            fhirResourceIdentifier: "Observation/example"
+        )
+
+        let data = try encoder.encode(summary)
+        let decoded = try decoder.decode(ClinicalRecordSummary.self, from: data)
+
+        XCTAssertEqual(decoded, summary)
+        XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("resourceType"))
+    }
 }

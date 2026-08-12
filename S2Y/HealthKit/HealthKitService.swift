@@ -145,7 +145,9 @@ public struct HealthMetricProvenance: Identifiable, Sendable {
 public final class HealthKitService {
     public static let shared = HealthKitService()
 
-    private let healthStore = HKHealthStore()
+    // Internal so focused HealthKit extensions (for example, clinical records)
+    // can share the same store without exposing it outside the app module.
+    let healthStore = HKHealthStore()
     private let logger = Logger(subsystem: "com.s2y.app", category: "HealthKit")
 
     private init() {}
