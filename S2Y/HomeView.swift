@@ -164,22 +164,31 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     newChatButton
 
-                    Text("Recent chats")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .textCase(.uppercase)
-                        .padding(.horizontal, 24)
-                        .padding(.top, 12)
-
                     if drawerChatHistory.isEmpty {
+                        Text("Recent chats")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                            .padding(.horizontal, 24)
+                            .padding(.top, 12)
+
                         Text(isRefreshingChatHistory ? "Loading conversations…" : "Your Omer and on-device chats will appear here.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 24)
                             .padding(.vertical, 8)
                     } else {
-                        ForEach(drawerChatHistory.prefix(20)) { chat in
-                            drawerChatRow(chat)
+                        ForEach(chatHistorySections) { section in
+                            Text(section.title)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .textCase(.uppercase)
+                                .padding(.horizontal, 24)
+                                .padding(.top, 12)
+
+                            ForEach(section.chats) { chat in
+                                drawerChatRow(chat)
+                            }
                         }
                     }
 
@@ -355,6 +364,10 @@ struct HomeView: View {
 
     private func closeDrawer() {
         isDrawerOpen = false
+    }
+
+    private var chatHistorySections: [OmerChatHistorySection] {
+        OmerChatHistorySection.grouped(Array(drawerChatHistory.prefix(20)))
     }
 
     @MainActor

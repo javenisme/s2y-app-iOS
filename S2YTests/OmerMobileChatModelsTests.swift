@@ -214,4 +214,21 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertFalse(displayText.contains("**"))
         XCTAssertFalse(displayText.contains("*improving*"))
     }
+
+    func testChatHistoryGroupsConversationsByRelativeDate() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let chats = [
+            OmerChatSummary(id: UUID(), createdAt: "2026-08-12T12:00:00.000Z", title: "Today", visibility: "private"),
+            OmerChatSummary(id: UUID(), createdAt: "2026-08-11T12:00:00.000Z", title: "Yesterday", visibility: "private"),
+            OmerChatSummary(id: UUID(), createdAt: "2026-08-08T12:00:00.000Z", title: "This week", visibility: "private"),
+            OmerChatSummary(id: UUID(), createdAt: "invalid", title: "Earlier", visibility: "private")
+        ]
+
+        let sections = OmerChatHistorySection.grouped(chats, relativeTo: now, calendar: calendar)
+
+        XCTAssertEqual(sections.map(\.title), ["Today", "Yesterday", "Previous 7 days", "Earlier"])
+        XCTAssertEqual(sections.flatMap(\.chats).map(\.title), ["Today", "Yesterday", "This week", "Earlier"])
+    }
 }

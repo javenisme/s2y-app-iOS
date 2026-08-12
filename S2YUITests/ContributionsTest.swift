@@ -66,9 +66,8 @@ final class HealthAssistantChatUITests: XCTestCase {
 
         app.openHomeDrawer()
         XCTAssertTrue(app.buttons["drawer.new-chat"].waitForExistence(timeout: 5))
-        XCTAssertTrue(
-            app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Recent chats")).firstMatch.exists
-        )
+        let expectedChatSectionLabels = ["Recent chats", "Today", "Yesterday", "Previous 7 days", "Earlier"]
+        XCTAssertTrue(expectedChatSectionLabels.contains { app.staticTexts[$0].exists })
         app.swipeUp()
         app.swipeUp()
         XCTAssertTrue(app.buttons["drawer.account"].waitForExistence(timeout: 3))
