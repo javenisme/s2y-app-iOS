@@ -614,4 +614,53 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertTrue(PersonalHealthInsightLoader.matches("我的健康数据有什么关联"))
         XCTAssertFalse(PersonalHealthInsightLoader.matches("How many steps today?"))
     }
+
+    func testWellnessPlanRequiresExplicitValidActivation() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let goal = WellnessGoal(
+            metricKind: .sleepDurationHours,
+            direction: .consistency,
+            targetValue: nil,
+            targetUnit: "hours",
+            reviewDate: date.addingTimeInterval(14 * 86_400)
+        )
+        let action = WellnessAction(
+            title: "Keep a regular wind-down time",
+            detail: "Choose a realistic 20-minute wind-down window.",
+            category: .sleepRoutine,
+            daysPerWeek: 5,
+            estimatedMinutes: 20
+        )
+        let draft = WellnessPlan(
+            title: "Sleep consistency",
+            summary: "A user-controlled wellness plan.",
+            origin: .assistantDraft,
+            goals: [goal],
+            actions: [action],
+            createdAt: date,
+            updatedAt: date
+        )
+
+        let active = try WellnessPlanLifecycle.transition(draft, to: .active, at: date)
+        let paused = try WellnessPlanLifecycle.transition(active, to: .paused, at: date)
+
+        XCTAssertEqual(active.status, .active)
+        XCTAssertEqual(active.activatedAt, date)
+        XCTAssertEqual(paused.status, .paused)
+        XCTAssertThrowsError(try WellnessPlanLifecycle.transition(paused, to: .completed))
+    }
+
+    func testEmptyWellnessPlanCannotActivate() {
+        let plan = WellnessPlan(
+            title: "Empty",
+            summary: "No actions yet",
+            origin: .userCreated,
+            goals: [],
+            actions: []
+        )
+
+        XCTAssertThrowsError(try WellnessPlanLifecycle.transition(plan, to: .active)) { error in
+            XCTAssertEqual(error as? WellnessPlanTransitionError, .emptyPlan)
+        }
+    }
 }
