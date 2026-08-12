@@ -754,6 +754,105 @@ enum ChatMarkdownRenderer {
             )
         )
     }
+
+    static func blocks(from source: String) -> [ChatMarkdownBlock] {
+        var blocks: [ChatMarkdownBlock] = []
+        var paragraphLines: [String] = []
+        var codeLines: [String] = []
+        var isInsideCodeBlock = false
+
+        func appendParagraph() {
+            guard !paragraphLines.isEmpty else { return }
+            let paragraph = paragraphLines.joined(separator: "\n")
+            blocks.append(ChatMarkdownBlock(kind: .paragraph, content: inline(paragraph)))
+            paragraphLines.removeAll()
+        }
+
+        for line in source.components(separatedBy: .newlines) {
+            if line.hasPrefix("```") {
+                if isInsideCodeBlock {
+                    blocks.append(ChatMarkdownBlock(kind: .code, content: AttributedString(codeLines.joined(separator: "\n"))))
+                    codeLines.removeAll()
+                } else {
+                    appendParagraph()
+                }
+                isInsideCodeBlock.toggle()
+                continue
+            }
+
+            if isInsideCodeBlock {
+                codeLines.append(line)
+                continue
+            }
+
+            if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                appendParagraph()
+                continue
+            }
+
+            if let heading = heading(from: line) {
+                appendParagraph()
+                blocks.append(ChatMarkdownBlock(kind: .heading(heading.level), content: inline(heading.text)))
+            } else if let item = unorderedListItem(from: line) {
+                appendParagraph()
+                blocks.append(ChatMarkdownBlock(kind: .unorderedListItem, content: inline(item)))
+            } else if let item = orderedListItem(from: line) {
+                appendParagraph()
+                blocks.append(ChatMarkdownBlock(kind: .orderedListItem(item.number), content: inline(item.text)))
+            } else if line.hasPrefix("> ") {
+                appendParagraph()
+                blocks.append(ChatMarkdownBlock(kind: .quote, content: inline(String(line.dropFirst(2)))))
+            } else {
+                paragraphLines.append(line)
+            }
+        }
+
+        appendParagraph()
+        if !codeLines.isEmpty {
+            blocks.append(ChatMarkdownBlock(kind: .code, content: AttributedString(codeLines.joined(separator: "\n"))))
+        }
+        return blocks
+    }
+
+    private static func inline(_ source: String) -> AttributedString {
+        attributedString(from: source) ?? AttributedString(source)
+    }
+
+    private static func heading(from line: String) -> (level: Int, text: String)? {
+        let level = line.prefix(while: { $0 == "#" }).count
+        guard (1...6).contains(level), line.dropFirst(level).hasPrefix(" ") else { return nil }
+        return (level, String(line.dropFirst(level + 1)))
+    }
+
+    private static func unorderedListItem(from line: String) -> String? {
+        guard line.count > 2 else { return nil }
+        let marker = line.prefix(2)
+        guard marker == "- " || marker == "* " || marker == "+ " else { return nil }
+        return String(line.dropFirst(2))
+    }
+
+    private static func orderedListItem(from line: String) -> (number: Int, text: String)? {
+        guard let separator = line.firstIndex(of: "."), separator < line.endIndex else { return nil }
+        let numberText = line[..<separator]
+        let contentStart = line.index(after: separator)
+        guard let number = Int(numberText), contentStart < line.endIndex, line[contentStart] == " " else { return nil }
+        return (number, String(line[line.index(after: contentStart)...]))
+    }
+}
+
+struct ChatMarkdownBlock: Identifiable, Sendable {
+    enum Kind: Equatable, Sendable {
+        case heading(Int)
+        case unorderedListItem
+        case orderedListItem(Int)
+        case quote
+        case code
+        case paragraph
+    }
+
+    let id = UUID()
+    let kind: Kind
+    let content: AttributedString
 }
 
 struct MessageBubble: View {
@@ -789,12 +888,55 @@ struct MessageBubble: View {
 
     @ViewBuilder
     private var messageContent: some View {
-        if message.role == .assistant,
-           let attributed = ChatMarkdownRenderer.attributedString(from: message.content) {
-            Text(attributed)
-                .textSelection(.enabled)
+        if message.role == .assistant {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(ChatMarkdownRenderer.blocks(from: message.content)) { block in
+                    markdownBlock(block)
+                }
+            }
+            .textSelection(.enabled)
         } else {
             Text(message.content)
+        }
+    }
+
+    @ViewBuilder
+    private func markdownBlock(_ block: ChatMarkdownBlock) -> some View {
+        switch block.kind {
+        case .heading(let level):
+            Text(block.content)
+                .font(level <= 2 ? .headline : .subheadline.weight(.semibold))
+                .accessibilityAddTraits(.isHeader)
+        case .unorderedListItem:
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("•")
+                    .accessibilityHidden(true)
+                Text(block.content)
+            }
+        case .orderedListItem(let number):
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("\(number).")
+                    .accessibilityHidden(true)
+                Text(block.content)
+            }
+        case .quote:
+            HStack(alignment: .top, spacing: 10) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.secondary.opacity(0.5))
+                    .frame(width: 3)
+                    .accessibilityHidden(true)
+                Text(block.content)
+                    .foregroundStyle(.secondary)
+            }
+        case .code:
+            ScrollView(.horizontal) {
+                Text(block.content)
+                    .font(.system(.footnote, design: .monospaced))
+                    .padding(8)
+            }
+            .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+        case .paragraph:
+            Text(block.content)
         }
     }
 }

@@ -239,4 +239,27 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertFalse(suggestions.contains(where: { $0.metricKind == .heartRateAverage }))
         XCTAssertFalse(suggestions.contains(where: { $0.metricKind == .activeEnergy }))
     }
+
+    func testAssistantMarkdownCreatesUserFriendlyBlocks() {
+        let markdown = """
+        # Sleep summary
+
+        **Average:** 7.5 hours
+
+        - Keep a consistent bedtime
+        2. Review again next week
+
+        > This is a wellness insight, not a diagnosis.
+        """
+
+        let blocks = ChatMarkdownRenderer.blocks(from: markdown)
+
+        XCTAssertEqual(
+            blocks.map(\.kind),
+            [.heading(1), .paragraph, .unorderedListItem, .orderedListItem(2), .quote]
+        )
+        XCTAssertEqual(String(blocks[0].content.characters), "Sleep summary")
+        XCTAssertEqual(String(blocks[1].content.characters), "Average: 7.5 hours")
+        XCTAssertFalse(blocks.map { String($0.content.characters) }.joined().contains("**"))
+    }
 }
