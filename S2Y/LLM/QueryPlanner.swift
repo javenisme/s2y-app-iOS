@@ -73,8 +73,6 @@ enum QueryPlanner {
     }
 
     static func run(intent: Intent) async throws -> String {
-        try await HealthKitService.shared.requestAuthorization()
-
         switch intent {
         case let .compare(kind, windowDays):
             let comparison = try await HealthKitService.shared.compare(
@@ -129,5 +127,4 @@ enum QueryPlanner {
         return "\(title)\n窗口平均：\(String(format: "%.2f", avg)) \(unit)\n首末变化：\(arrow) \(String(format: "%.1f", abs(rate)))%\n建议：保持良好习惯，必要时逐步调整计划。"
     }
 }
-
 

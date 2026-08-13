@@ -52,8 +52,6 @@ enum HealthQueryProcessor {
     }
     
     private static func processStructuredQuery(_ intent: QueryPlanner.Intent) async throws -> QueryResult {
-        try await HealthKitService.shared.requestAuthorization()
-        
         switch intent {
         case let .trend(kind, days):
             let trend = try await HealthKitService.shared.trend(kind: kind, days: days, useCache: true)
@@ -72,8 +70,6 @@ enum HealthQueryProcessor {
     }
     
     private static func generateHealthInsights(_ query: String) async throws -> QueryResult {
-        try await HealthKitService.shared.requestAuthorization()
-        
         var insights: [HealthInsight] = []
         
         // Generate insights for different metrics

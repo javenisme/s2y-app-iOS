@@ -89,8 +89,6 @@ enum EnhancedQueryPlanner {
     }
     
     static func run(intent: Intent) async throws -> HealthQueryProcessor.QueryResult {
-        try await HealthKitService.shared.requestAuthorization()
-        
         switch intent {
         case let .compare(kind, windowDays):
             let comparison = try await HealthKitService.shared.compare(
