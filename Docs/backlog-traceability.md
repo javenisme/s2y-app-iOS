@@ -28,7 +28,7 @@ TestFlight 或真实 S2Y 设备已经通过验收。
 
 | Issue | 当前归属 | 未完成证据 |
 |---:|---|---|
-| #3 Firebase 生产连通性 | US-201 | 尚缺 iOS 实际登录、逐范围授权、Omer 撤回/删除闭环 |
+| #3 Firebase 生产连通性 | US-201 | iOS 登录与最小 Omer 聊天范围 grant/revoke 已由 H54 验证；尚缺撤回后健康正文停止新增、云端删除及旧客户端收紧闭环 |
 | #7 TestFlight 外测 | US-204 | Archive/签名、TestFlight 安装、回滚和审核仍未完成 |
 
 ## 可关闭的旧 PR

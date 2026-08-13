@@ -44,121 +44,11 @@ struct HealthAssistantSettingsView: View {
                 )
             }
 
-            Section {
-                Toggle(
-                    "Send questions to Omer Online",
-                    isOn: consentBinding(for: .omerChatText)
-                )
+            privacySection
 
-                Toggle(
-                    "Share relevant Health summary",
-                    isOn: consentBinding(for: .relevantHealthSummary)
-                )
+            planSection
 
-                Toggle(
-                    "Share selected clinical record summaries",
-                    isOn: consentBinding(for: .clinicalRecordSummary)
-                )
-
-                Toggle(
-                    "Share relevant imported document excerpts with Omer",
-                    isOn: consentBinding(for: .importedClinicalDocumentExcerpts)
-                )
-
-                Toggle(
-                    "Back up completed check-ins to S2Y account",
-                    isOn: consentBinding(for: .wellbeingCheckInCloudBackup)
-                )
-
-                Toggle(
-                    "Share recent check-in summaries with Omer",
-                    isOn: consentBinding(for: .wellbeingCheckInSummary)
-                )
-
-                LabeledContent("Omer confirmation") {
-                    Label(cloudConfirmation.title, systemImage: cloudConfirmation.systemImage)
-                        .foregroundStyle(cloudConfirmation.color)
-                }
-                .accessibilityIdentifier("health-sharing-cloud-status")
-
-                Button("Refresh Omer confirmation", systemImage: "arrow.clockwise") {
-                    startConsentSynchronization()
-                }
-                .disabled(isCheckingOmerAuthorization)
-                .accessibilityIdentifier("health-sharing-cloud-refresh")
-
-                NavigationLink {
-                    HealthSafetyActivityView()
-                } label: {
-                    Label("Safety Activity", systemImage: "shield.checkered")
-                }
-
-                NavigationLink {
-                    CrossDeviceSyncSettingsView()
-                } label: {
-                    Label("Cross-Device Sync", systemImage: "arrow.triangle.2.circlepath.icloud")
-                }
-            } header: {
-                Text("Privacy")
-            } footer: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(
-                        "Each sharing choice is independent and can be withdrawn immediately. "
-                        + "Clinical record summaries are never included under the general Health summary choice. "
-                        + "Imported document excerpts have their own sharing choice. "
-                        + "Check-in account backup and Omer analysis are separate choices. "
-                        + "On-device analysis stays on this iPhone unless conversation sync is enabled."
-                    )
-                    if let consentSyncMessage {
-                        Text(consentSyncMessage)
-                            .foregroundStyle(.orange)
-                    }
-                }
-            }
-
-            Section("Plan") {
-                NavigationLink {
-                    WellnessPlanSettingsView()
-                } label: {
-                    Label("Wellbeing Plan", systemImage: "list.bullet.clipboard")
-                }
-            }
-
-            Section {
-                NavigationLink {
-                    HealthSummaryExportView()
-                } label: {
-                    Label("Health Summary PDF", systemImage: "doc.richtext")
-                }
-
-                NavigationLink {
-                    LocalHealthDataControlsView()
-                } label: {
-                    Label("Data Controls", systemImage: "externaldrive.badge.checkmark")
-                }
-
-                NavigationLink {
-                    WellbeingCheckInHistoryView()
-                } label: {
-                    Label("Daily Check-in History", systemImage: "checkmark.circle")
-                }
-
-                NavigationLink {
-                    ClinicalRecordsSettingsView()
-                } label: {
-                    Label("Clinical Record Summaries", systemImage: "cross.case")
-                }
-
-                NavigationLink {
-                    ClinicalDocumentLibraryView()
-                } label: {
-                    Label("Imported Clinical Documents", systemImage: "doc.text.magnifyingglass")
-                }
-            } header: {
-                Text("Data")
-            } footer: {
-                Text("Review, export, or delete S2Y's local copies. Apple Health and cloud data remain separate.")
-            }
+            dataSection
         }
         .navigationTitle("Health Assistant")
         .navigationBarTitleDisplayMode(.inline)
@@ -173,6 +63,132 @@ struct HealthAssistantSettingsView: View {
         }
         .task {
             startConsentSynchronization()
+        }
+    }
+
+    private var privacySection: some View {
+        Section {
+            Toggle(
+                "Send questions to Omer Online",
+                isOn: consentBinding(for: .omerChatText)
+            )
+
+            Toggle(
+                "Share relevant Health summary",
+                isOn: consentBinding(for: .relevantHealthSummary)
+            )
+
+            Toggle(
+                "Share selected clinical record summaries",
+                isOn: consentBinding(for: .clinicalRecordSummary)
+            )
+
+            Toggle(
+                "Share relevant imported document excerpts with Omer",
+                isOn: consentBinding(for: .importedClinicalDocumentExcerpts)
+            )
+
+            Toggle(
+                "Back up completed check-ins to S2Y account",
+                isOn: consentBinding(for: .wellbeingCheckInCloudBackup)
+            )
+
+            Toggle(
+                "Share recent check-in summaries with Omer",
+                isOn: consentBinding(for: .wellbeingCheckInSummary)
+            )
+
+            cloudConfirmationControls
+
+            NavigationLink {
+                HealthSafetyActivityView()
+            } label: {
+                Label("Safety Activity", systemImage: "shield.checkered")
+            }
+
+            NavigationLink {
+                CrossDeviceSyncSettingsView()
+            } label: {
+                Label("Cross-Device Sync", systemImage: "arrow.triangle.2.circlepath.icloud")
+            }
+        } header: {
+            Text("Privacy")
+        } footer: {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(
+                    "Each sharing choice is independent and can be withdrawn immediately. "
+                    + "Clinical record summaries are never included under the general Health summary choice. "
+                    + "Imported document excerpts have their own sharing choice. "
+                    + "Check-in account backup and Omer analysis are separate choices. "
+                    + "On-device analysis stays on this iPhone unless conversation sync is enabled."
+                )
+                if let consentSyncMessage {
+                    Text(consentSyncMessage)
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var cloudConfirmationControls: some View {
+        LabeledContent("Omer confirmation") {
+            Label(cloudConfirmation.title, systemImage: cloudConfirmation.systemImage)
+                .foregroundStyle(cloudConfirmation.color)
+        }
+        .accessibilityIdentifier("health-sharing-cloud-status")
+
+        Button("Refresh Omer confirmation", systemImage: "arrow.clockwise") {
+            startConsentSynchronization()
+        }
+        .disabled(isCheckingOmerAuthorization)
+        .accessibilityIdentifier("health-sharing-cloud-refresh")
+    }
+
+    private var planSection: some View {
+        Section("Plan") {
+            NavigationLink {
+                WellnessPlanSettingsView()
+            } label: {
+                Label("Wellbeing Plan", systemImage: "list.bullet.clipboard")
+            }
+        }
+    }
+
+    private var dataSection: some View {
+        Section {
+            NavigationLink {
+                HealthSummaryExportView()
+            } label: {
+                Label("Health Summary PDF", systemImage: "doc.richtext")
+            }
+
+            NavigationLink {
+                LocalHealthDataControlsView()
+            } label: {
+                Label("Data Controls", systemImage: "externaldrive.badge.checkmark")
+            }
+
+            NavigationLink {
+                WellbeingCheckInHistoryView()
+            } label: {
+                Label("Daily Check-in History", systemImage: "checkmark.circle")
+            }
+
+            NavigationLink {
+                ClinicalRecordsSettingsView()
+            } label: {
+                Label("Clinical Record Summaries", systemImage: "cross.case")
+            }
+
+            NavigationLink {
+                ClinicalDocumentLibraryView()
+            } label: {
+                Label("Imported Clinical Documents", systemImage: "doc.text.magnifyingglass")
+            }
+        } header: {
+            Text("Data")
+        } footer: {
+            Text("Review, export, or delete S2Y's local copies. Apple Health and cloud data remain separate.")
         }
     }
 
@@ -208,11 +224,15 @@ struct HealthAssistantSettingsView: View {
             do {
                 try await OmerChatService.shared.syncHealthSharingConsentReceipts()
                 let authorization = try await OmerChatService.shared.fetchHealthSharingAuthorization()
-                guard consentSyncRequestID == requestID else { return }
+                guard consentSyncRequestID == requestID else {
+                    return
+                }
                 omerAuthorization = authorization
                 isCheckingOmerAuthorization = false
             } catch {
-                guard consentSyncRequestID == requestID else { return }
+                guard consentSyncRequestID == requestID else {
+                    return
+                }
                 isCheckingOmerAuthorization = false
                 consentSyncMessage = "This choice is applied on this iPhone. Cloud confirmation is pending until Omer is reachable."
             }
@@ -220,8 +240,8 @@ struct HealthAssistantSettingsView: View {
     }
 }
 
-private extension HealthSharingCloudConfirmation {
-    var title: String {
+extension HealthSharingCloudConfirmation {
+    fileprivate var title: String {
         switch self {
         case .checking: "Checking"
         case .confirmed: "Confirmed"
@@ -229,7 +249,7 @@ private extension HealthSharingCloudConfirmation {
         }
     }
 
-    var systemImage: String {
+    fileprivate var systemImage: String {
         switch self {
         case .checking: "arrow.triangle.2.circlepath"
         case .confirmed: "checkmark.seal.fill"
@@ -237,7 +257,7 @@ private extension HealthSharingCloudConfirmation {
         }
     }
 
-    var color: Color {
+    fileprivate var color: Color {
         switch self {
         case .checking: .secondary
         case .confirmed: .green

@@ -522,21 +522,6 @@ actor OmerChatService {
         try await syncHealthSharingConsentReceipts(serviceURL: configuredServiceURL())
     }
 
-    func fetchHealthSharingAuthorization() async throws -> HealthSharingAuthorization {
-        let serviceURL = try configuredServiceURL()
-        do {
-            return try await performHealthSharingAuthorizationRequest(
-                serviceURL: serviceURL,
-                forceTokenRefresh: false
-            )
-        } catch OmerChatServiceError.unauthorized {
-            return try await performHealthSharingAuthorizationRequest(
-                serviceURL: serviceURL,
-                forceTokenRefresh: true
-            )
-        }
-    }
-
     private func syncHealthSharingConsentReceipts(serviceURL: URL) async throws {
         let receipts = await MainActor.run {
             Array(HealthSharingConsentStore.shared.ledger.receipts.reversed())
@@ -573,21 +558,6 @@ actor OmerChatService {
         request.httpBody = try encoder.encode(body)
         let (data, response) = try await URLSession.shared.data(for: request)
         try validate(response: response, data: data)
-    }
-
-    private func performHealthSharingAuthorizationRequest(
-        serviceURL: URL,
-        forceTokenRefresh: Bool
-    ) async throws -> HealthSharingAuthorization {
-        let token = try await firebaseIDToken(forceRefresh: forceTokenRefresh)
-        var request = URLRequest(url: serviceURL.appendingPathComponent("api/mobile/v1/consents"))
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try validate(response: response, data: data)
-        let authorization = try decoder.decode(OmerHealthSharingAuthorizationResponse.self, from: data)
-        return HealthSharingAuthorization(grantedScopes: authorization.recognizedGrantedScopes)
     }
 
     private func performChatRequest(
@@ -640,5 +610,37 @@ actor OmerChatService {
                 }
             }
         }
+    }
+}
+
+extension OmerChatService {
+    func fetchHealthSharingAuthorization() async throws -> HealthSharingAuthorization {
+        let serviceURL = try configuredServiceURL()
+        do {
+            return try await performHealthSharingAuthorizationRequest(
+                serviceURL: serviceURL,
+                forceTokenRefresh: false
+            )
+        } catch OmerChatServiceError.unauthorized {
+            return try await performHealthSharingAuthorizationRequest(
+                serviceURL: serviceURL,
+                forceTokenRefresh: true
+            )
+        }
+    }
+
+    private func performHealthSharingAuthorizationRequest(
+        serviceURL: URL,
+        forceTokenRefresh: Bool
+    ) async throws -> HealthSharingAuthorization {
+        let token = try await firebaseIDToken(forceRefresh: forceTokenRefresh)
+        var request = URLRequest(url: serviceURL.appendingPathComponent("api/mobile/v1/consents"))
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data)
+        let authorization = try decoder.decode(OmerHealthSharingAuthorizationResponse.self, from: data)
+        return HealthSharingAuthorization(grantedScopes: authorization.recognizedGrantedScopes)
     }
 }
