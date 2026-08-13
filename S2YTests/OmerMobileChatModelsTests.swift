@@ -614,4 +614,175 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertTrue(PersonalHealthInsightLoader.matches("我的健康数据有什么关联"))
         XCTAssertFalse(PersonalHealthInsightLoader.matches("How many steps today?"))
     }
+
+    func testWellnessPlanRequiresExplicitValidActivation() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let goal = WellnessGoal(
+            metricKind: .sleepDurationHours,
+            direction: .consistency,
+            targetValue: nil,
+            targetUnit: "hours",
+            reviewDate: date.addingTimeInterval(14 * 86_400)
+        )
+        let action = WellnessAction(
+            title: "Keep a regular wind-down time",
+            detail: "Choose a realistic 20-minute wind-down window.",
+            category: .sleepRoutine,
+            daysPerWeek: 5,
+            estimatedMinutes: 20
+        )
+        let draft = WellnessPlan(
+            title: "Sleep consistency",
+            summary: "A user-controlled wellness plan.",
+            origin: .assistantDraft,
+            goals: [goal],
+            actions: [action],
+            createdAt: date,
+            updatedAt: date
+        )
+
+        let active = try WellnessPlanLifecycle.transition(draft, to: .active, at: date)
+        let paused = try WellnessPlanLifecycle.transition(active, to: .paused, at: date)
+
+        XCTAssertEqual(active.status, .active)
+        XCTAssertEqual(active.activatedAt, date)
+        XCTAssertEqual(paused.status, .paused)
+        XCTAssertThrowsError(try WellnessPlanLifecycle.transition(paused, to: .completed))
+    }
+
+    func testEmptyWellnessPlanCannotActivate() {
+        let plan = WellnessPlan(
+            title: "Empty",
+            summary: "No actions yet",
+            origin: .userCreated,
+            goals: [],
+            actions: []
+        )
+
+        XCTAssertThrowsError(try WellnessPlanLifecycle.transition(plan, to: .active)) { error in
+            XCTAssertEqual(error as? WellnessPlanTransitionError, .emptyPlan)
+        }
+    }
+
+    func testWellnessDraftUsesPersonalBaselineAndRequiresConfirmation() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let report = PersonalHealthInsightReport(
+            windowDays: 30,
+            generatedAt: date,
+            coverage: [],
+            deviations: [PersonalMetricDeviation(
+                metricKind: .sleepDurationHours,
+                currentMedian: 6.5,
+                baselineMedian: 7.5,
+                robustDistance: -3,
+                direction: .lower,
+                baselineObservedDays: 20,
+                currentObservedDays: 7
+            )],
+            relationships: []
+        )
+
+        let draft = WellnessPlanDraftBuilder.build(from: report, now: date)
+
+        XCTAssertEqual(draft.plan.status, .draft)
+        XCTAssertEqual(draft.plan.origin, .assistantDraft)
+        XCTAssertEqual(draft.plan.goals.first?.targetValue, 6.5)
+        XCTAssertTrue(draft.rationale.first?.contains("your own earlier baseline") == true)
+        XCTAssertTrue(draft.limitations.contains { $0.contains("until you confirm") })
+    }
+
+    func testWellnessDraftAvoidsMetricTargetsWhenBaselineIsInsufficient() {
+        let report = PersonalHealthInsightReport(
+            windowDays: 30,
+            generatedAt: .now,
+            coverage: [],
+            deviations: [],
+            relationships: []
+        )
+
+        let draft = WellnessPlanDraftBuilder.build(from: report)
+
+        XCTAssertTrue(draft.plan.goals.isEmpty)
+        XCTAssertEqual(draft.plan.actions.first?.category, .checkIn)
+        XCTAssertTrue(draft.plan.actions.first?.isOptional == true)
+    }
+
+    func testOnlyActiveWellnessPlansProduceDailyActions() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let goal = WellnessGoal(
+            metricKind: .steps,
+            direction: .maintain,
+            targetValue: 6_000,
+            targetUnit: "steps",
+            reviewDate: date
+        )
+        let action = WellnessAction(
+            title: "Movement break",
+            detail: "A comfortable activity",
+            category: .movement,
+            daysPerWeek: 7,
+            estimatedMinutes: 10
+        )
+        let draft = WellnessPlan(
+            title: "Plan",
+            summary: "Draft",
+            origin: .userCreated,
+            goals: [goal],
+            actions: [action]
+        )
+        let active = try WellnessPlanLifecycle.transition(draft, to: .active, at: date)
+
+        XCTAssertTrue(WellnessDailySchedule.actions(for: draft, on: date).isEmpty)
+        XCTAssertEqual(WellnessDailySchedule.actions(for: active, on: date), [action])
+    }
+
+    func testWeeklyReviewKeepsMissingRecordsSeparateFromSkipped() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let end = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-08T12:00:00Z"))
+        let action = WellnessAction(
+            title: "Daily check-in",
+            detail: "Brief reflection",
+            category: .checkIn,
+            daysPerWeek: 7,
+            estimatedMinutes: 2
+        )
+        let goal = WellnessGoal(
+            metricKind: .sleepDurationHours,
+            direction: .consistency,
+            targetValue: nil,
+            targetUnit: "hours",
+            reviewDate: end
+        )
+        let draft = WellnessPlan(
+            title: "Plan",
+            summary: "Summary",
+            origin: .userCreated,
+            goals: [goal],
+            actions: [action]
+        )
+        let plan = try WellnessPlanLifecycle.transition(draft, to: .active, at: end)
+        let records = [
+            WellnessActionRecord(
+                id: UUID(),
+                planID: plan.id,
+                actionID: action.id,
+                day: end,
+                outcome: .skipped,
+                recordedAt: end
+            )
+        ]
+
+        let review = WellnessWeeklyReviewBuilder.build(
+            plan: plan,
+            records: records,
+            endingAt: end,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(review.scheduledCount, 7)
+        XCTAssertEqual(review.skippedCount, 1)
+        XCTAssertEqual(review.unrecordedCount, 6)
+        XCTAssertEqual(review.adjustment, .considerSimplifying)
+    }
 }
