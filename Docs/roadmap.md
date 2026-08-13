@@ -5,7 +5,7 @@
 
 ## 当前基线
 
-- H01～H27、H30～H33 已合并到 `main`；H34 正在补齐发布质量与可审计证据。
+- H01～H27、H30～H35 已合并或在当前主题完成；生产写入、真机和硬件证据仍须继续验收。
 - 支持的 AI 只有用户显式选择的 Apple 端侧 AI 和 Omer 在线 AI。
 - 下载式 Phi/MLX 模型、模拟回答、固定人群阈值、自动健康目标和临床风险评分已退休。
 - 当前闭环是健康管理闭环，不是诊断或治疗闭环。
@@ -63,6 +63,9 @@ H29 / US-203 的完成证据：
 
 当前签名 Archive 已验证阻塞在 Xcode 账户凭据和 Verifiable Health Records profile 能力，
 详见 [`release-validation.md`](release-validation.md)。不得通过删除临床记录 entitlement 绕过。
+
+Omer 最新 `main` 已部署到 Production，且部署后已认证历史会话可正常读取；新消息计费、
+订阅映射、同意撤回和删除仍须用测试账号与脱敏服务端记录验证。
 
 ### 2. H28/H29 真机与硬件验收（P1）
 

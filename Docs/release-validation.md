@@ -16,6 +16,20 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
 | 真实 S2Y 设备 | 未开始 | 无真实硬件证据 | US-203 握手、停止与审计证据 |
 | TestFlight/App Store | 未开始 | 未上传构建 | 分发、安装、回滚与审核证据 |
 
+## 2026-08-13 生产认证读取验证
+
+| 检查 | 结果 | 证据边界 |
+|---|---|---|
+| Omer 主线 | 通过 | 统一权限/用量与 Home 认证兼容改动已由 Omer PR #8～#10 合并；质量整理由 PR #12 合并，当前 `main` 为 `b41323c` |
+| Omer Production | 通过 | Vercel Production 为 Ready，`chat.s2y.us` 指向该最新部署；未记录部署 ID 或环境变量值 |
+| 已认证读取 | 通过 | 部署后刷新既有生产对话成功，历史用户问题与 Omer 回复可见，页面控制台无错误 |
+| Home 登录入口 | 通过 | `www.s2y.us/auth/login` 展示 Google、邮箱登录入口，Firebase 配置不再显示 incomplete/internal-error，页面控制台无错误 |
+| 新消息与计费 | 未验证 | 本轮未新增生产聊天记录；不能据此声称 token 账本、订阅映射或写入幂等已通过 |
+| 同意与数据生命周期 | 未验证 | 尚需测试账号逐范围 grant/revoke，并用脱敏服务端证据确认停止新增与删除行为 |
+
+验证没有读取浏览器 cookie、local storage、Firebase ID Token、数据库内容或环境变量值，
+也没有把个人健康数据或聊天正文复制进本记录。
+
 ## 签名阻塞的正确处理
 
 1. 在 Xcode Accounts 中重新登录具备该 App 权限的 Apple Developer 账户。
