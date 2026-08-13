@@ -22,30 +22,30 @@ struct Welcome: View {
             areas: [
                 OnboardingInformationView.Area(
                     icon: {
-                        Image(systemName: "apps.iphone")
+                        Image(systemName: "heart.text.clipboard")
                             .accessibilityHidden(true)
                     },
-                    title: "S2Y Platform",
+                    title: "Apple Health",
                     description: "WELCOME_AREA1_DESCRIPTION"
                 ),
                 OnboardingInformationView.Area(
                     icon: {
-                        Image(systemName: "shippingbox.fill")
+                        Image(systemName: "brain.head.profile")
                             .accessibilityHidden(true)
                     },
-                    title: "Swift Package Manager",
+                    title: "Choose your AI",
                     description: "WELCOME_AREA2_DESCRIPTION"
                 ),
                 OnboardingInformationView.Area(
                     icon: {
-                        Image(systemName: "list.bullet.clipboard.fill")
+                        Image(systemName: "hand.raised.fill")
                             .accessibilityHidden(true)
                     },
-                    title: "Core Modules",
+                    title: "You stay in control",
                     description: "WELCOME_AREA3_DESCRIPTION"
                 )
             ],
-            actionText: "Learn More",
+            actionText: "Continue",
             action: {
                 managedNavigationPath.nextStep()
             }
