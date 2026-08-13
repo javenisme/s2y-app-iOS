@@ -27,6 +27,7 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
 | Home 登录入口 | 通过 | `www.s2y.us/auth/login` 展示 Google、邮箱登录入口，Firebase 配置不再显示 incomplete/internal-error，页面控制台无错误 |
 | Home 公开边界 | 通过 | Home PR #25、#26 已正常合并；生产首页、Omer、StVNS、企业与复核页均采用健康教育/用户控制措辞，旧高风险文章不再公开 |
 | 新消息与计费 | 部分通过 | 已登录测试账号的最小非健康消息及 AI 回复可读取；Omer PR #15 部署后，订阅状态接口的 Free 用量由 0 增长为正数且剩余额度同步减少；未读取数据库明细，付费档位仍未验收 |
+| 付费订阅映射 | 代码通过，生产阻塞 | OMR-019 已部署并失败关闭冲突用户映射、多价格项、异常数量与未知计划；Production 缺少 Stripe 密钥、订阅 Webhook 密钥和四个价格映射，本地密钥已失效 |
 | 同意与数据生命周期 | 代码门已通过，生产行为待验收 | OMR-017～018 已部署；新版请求缺少范围授权时会在模型、计费或会话写入前拒绝。尚需测试账号逐范围 grant/revoke，并用脱敏服务端证据确认生产停止新增与删除行为 |
 
 验证没有读取浏览器 cookie、local storage、Firebase ID Token、数据库内容或环境变量值，
@@ -65,6 +66,19 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
   仅确认已编译进测试包，不能记录为已运行通过。
 - 尚未使用生产测试账号读取数据库或执行逐范围 grant/revoke；本节不证明生产数据库
   状态变化、云端历史删除或旧客户端强制门，US-201 继续保持外部验收状态。
+
+## 2026-08-13 Omer 订阅权限映射安全
+
+- Omer PR #19 以 OMR-019 单一故事提交组成，Vercel Preview 成功后以普通权限合并，
+  Production 部署检查成功。
+- Webhook 现在要求订阅元数据、Checkout 与已有记录指向同一用户；冲突时返回处理失败并
+  由 Stripe 重试，不会把权限授予另一账户。每个订阅只允许一个价格项且数量必须为 1。
+- 数据库出现未定义计划时，AI 权限降级到 Free，不再通过类型断言构造未定义配额。
+- 完整单元测试 454 项通过，8 项数据库集成测试按默认配置跳过；TypeScript、改动文件
+  格式检查与 Production build 均通过。
+- 只读配置检查确认 Vercel Production 尚无 `STRIPE_SECRET_KEY`、订阅 Webhook 密钥及
+  Basic/Pro 月付和年付四个价格映射；本地 Stripe 密钥认证也已失效。因此未读取 Stripe
+  产品、价格或 Webhook，未创建外部资源，生产 Checkout/升级/降级仍未验收。
 
 ## 2026-08-13 Omer 健康管理安全验证
 
