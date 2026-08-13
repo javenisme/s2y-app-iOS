@@ -12,7 +12,7 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
 | iOS 工程 | 通过 | 完整 `S2YTests`、模拟器 build 和 build-for-testing 通过 | 签名真机 UI 遍历 |
 | 静态质量 | 增量通过 | 10 条已知问题已修复；493 条历史债务进入版本化 SwiftLint baseline；新增问题仍失败 | 分批消减历史 baseline |
 | 签名 Archive | 阻塞 | 工程 Bundle ID、entitlements、自动签名设置可读取；存在有效 Apple Development identity | Xcode 账户凭据不可用；profile 缺少 Verifiable Health Records 能力 |
-| 合资格 iPhone | 部分 | 已检测到一台运行 iOS 26.6 的真实 iPhone；设备标识未记录 | 机型资格、签名安装、Apple 端侧推理及 HealthKit 验收 |
+| 合资格 iPhone | 部分 | 已检测到 iPhone 16e（iOS 26.6），设备已配对且 Developer Mode 开启；设备标识未记录 | 签名安装、Apple Intelligence 开关/模型下载状态、端侧推理及 HealthKit 验收 |
 | 真实 S2Y 设备 | 未开始 | 无真实硬件证据 | US-203 握手、停止与审计证据 |
 | TestFlight/App Store | 未开始 | 未上传构建 | 分发、安装、回滚与审核证据 |
 
@@ -69,8 +69,21 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
   `-skipMacroValidation` 后已越过该门，未修改依赖或工程源码。
 - 随后构建在签名阶段按预期失败：Xcode 没有可用开发者账户，且现有 profile 不包含
   HealthKit Access（Verifiable Health Records）能力。
-- 因 `.app` 未生成，尚未执行安装或启动，也不能据此判断该 iPhone 是否支持 Apple
-  Foundation Models。US-202 与 US-204 继续保持待外部验证。
+- 因 `.app` 未生成，尚未执行安装或启动；本次构建尝试本身不能判断该 iPhone 是否支持
+  Apple Foundation Models。后续 HLT-147 只读确认硬件资格，US-202 与 US-204 仍待外部验证。
+
+## 2026-08-13 合资格 iPhone 硬件证据
+
+- Xcode `devicectl` 只读检测确认设备为 iPhone 16e、iOS 26.6，配对状态正常且
+  Developer Mode 已开启；未记录 UDID、序列号、设备名称或其他持久标识。
+- Apple 官方将 iPhone 16 系列列入 Apple Intelligence 支持范围；iPhone 16e 官方规格
+  也明确支持 Apple Intelligence。参考 [Apple Intelligence 要求](https://support.apple.com/en-euro/121115)
+  与 [iPhone 16e 技术规格](https://support.apple.com/en-us/122208)。
+- 硬件资格不等于系统模型可用。Apple 要求运行时检查 `SystemLanguageModel.availability`；
+  Apple Intelligence 未开启或模型尚未下载时仍会不可用。参考
+  [Foundation Models 可用性说明](https://developer.apple.com/documentation/FoundationModels/generating-content-and-performing-tasks-with-foundation-models)。
+- 因签名 profile 仍缺失，尚未安装 App，也未读取设备上的 Apple Intelligence 设置；
+  H28 只能记录“硬件资格已确认”，不能标记端侧 AI 验收完成。
 
 ## 每个候选版本必须记录
 

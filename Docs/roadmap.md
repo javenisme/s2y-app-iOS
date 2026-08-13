@@ -61,8 +61,9 @@ H29 / US-203 的完成证据：
 仓库预检与公开端点 smoke check 已交付；继续使用生产测试账号完成 Firebase/Omer
 认证证据，并完成签名、TestFlight 安装和回滚。不能在代码中伪造通过。
 
-当前已检测到一台运行 iOS 26.6 的真实 iPhone，但 Debug 真机构建与签名 Archive 均已
-验证阻塞在 Xcode 账户凭据和 Verifiable Health Records profile 能力，详见
+当前已确认已配对且开启 Developer Mode 的 iPhone 16e（iOS 26.6）具备 Apple
+Intelligence 硬件资格，但 Debug 真机构建与签名 Archive 均已验证阻塞在 Xcode 账户
+凭据和 Verifiable Health Records profile 能力，详见
 [`release-validation.md`](release-validation.md)。不得通过删除临床记录 entitlement 绕过。
 
 Omer 最新 `main` 已部署到 Production；已认证的新消息、AI 回复、刷新后读取和 Free
