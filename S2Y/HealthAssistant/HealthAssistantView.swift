@@ -316,7 +316,9 @@ struct HealthAssistantView: View {
         VStack(spacing: 0) {
             Divider()
             
-            HStack {
+            (dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                : AnyLayout(HStackLayout(spacing: 8))) {
                 Menu {
                     Picker("AI provider", selection: aiModeBinding) {
                         ForEach(AssistantAIMode.allCases) { mode in
@@ -332,15 +334,20 @@ struct HealthAssistantView: View {
                 .accessibilityValue(selectedAIMode.title)
                 .accessibilityHint("Opens a menu to choose on-device or Omer online AI")
                 .accessibilityIdentifier("health-assistant-ai-mode")
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Spacer()
+                }
                 Text(selectedAIMode.dataBoundaryDescription)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal)
             .padding(.top, 6)
             
-            HStack(spacing: 12) {
+            (dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .trailing, spacing: 12))
+                : AnyLayout(HStackLayout(spacing: 12))) {
                 TextField("Ask about your health data...", text: $inputText, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(1...4)
@@ -1083,11 +1090,13 @@ struct ChatMarkdownBlock: Identifiable, Sendable {
 
 struct MessageBubble: View {
     let message: ChatMessage
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     
     var body: some View {
         HStack {
             if message.role == .user {
-                Spacer(minLength: 60)
+                Spacer(minLength: dynamicTypeSize.isAccessibilitySize ? 12 : 60)
             }
             
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
@@ -1128,7 +1137,7 @@ struct MessageBubble: View {
             .accessibilityLabel(message.role == .user ? "Your message" : "Assistant response")
             
             if message.role == .assistant {
-                Spacer(minLength: 60)
+                Spacer(minLength: dynamicTypeSize.isAccessibilitySize ? 12 : 60)
             }
         }
     }

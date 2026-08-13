@@ -308,7 +308,10 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
-                .background(Color.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(
+                    Color(uiColor: .secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                )
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 14)
@@ -377,7 +380,8 @@ struct HomeView: View {
                     Text(tab.subtitle)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Spacer(minLength: 12)
@@ -392,7 +396,11 @@ struct HomeView: View {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(selectedTab == tab ? Color.white.opacity(0.9) : Color.clear)
+                    .fill(
+                        selectedTab == tab
+                            ? Color(uiColor: .secondarySystemGroupedBackground)
+                            : Color.clear
+                    )
             )
         }
         .buttonStyle(.plain)
