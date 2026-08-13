@@ -42,6 +42,22 @@ public final class EnhancedHealthChatController: ObservableObject {
         defer {
             isProcessing = false
         }
+
+        if let escalation = HealthSafetyTriage.evaluate(message) {
+            HealthSafetyEventStore.shared.record(escalation)
+            let response = EnhancedChatResponse(
+                content: escalation.userMessage,
+                contentCN: escalation.userMessage,
+                source: .safetyEscalation,
+                confidence: 1,
+                structuredData: nil,
+                processingMetadata: ProcessingMetadata(
+                    safetyEscalationLevel: escalation.level
+                )
+            )
+            lastResponse = response
+            return response
+        }
         
         do {
             // Step 1: Check if clarification is needed
@@ -321,6 +337,7 @@ public struct EnhancedChatResponse {
         case healthOnly  // Health Intelligence only
         case clarification // Needs user clarification
         case fallback    // Error fallback
+        case safetyEscalation // Deterministic local emergency guidance
     }
 }
 
@@ -357,6 +374,7 @@ public struct ProcessingMetadata {
     public let contextUsed: Bool
     public let error: LLMError?
     public let fallbackUsed: Bool
+    public let safetyEscalationLevel: HealthSafetyEscalationLevel?
     
     public init(
         needsClarification: Bool = false,
@@ -365,7 +383,8 @@ public struct ProcessingMetadata {
         llmSource: LLMResponse.ResponseSource? = nil,
         contextUsed: Bool = false,
         error: LLMError? = nil,
-        fallbackUsed: Bool = false
+        fallbackUsed: Bool = false,
+        safetyEscalationLevel: HealthSafetyEscalationLevel? = nil
     ) {
         self.needsClarification = needsClarification
         self.clarificationReason = clarificationReason
@@ -374,6 +393,7 @@ public struct ProcessingMetadata {
         self.contextUsed = contextUsed
         self.error = error
         self.fallbackUsed = fallbackUsed
+        self.safetyEscalationLevel = safetyEscalationLevel
     }
 }
 

@@ -36,6 +36,12 @@ struct HealthAssistantSettingsView: View {
 
             Section {
                 Toggle("Share Health summary with Omer", isOn: $omerIncludeHealthContext)
+
+                NavigationLink {
+                    HealthSafetyActivityView()
+                } label: {
+                    Label("Safety Activity", systemImage: "shield.checkered")
+                }
             } header: {
                 Text("Privacy")
             } footer: {

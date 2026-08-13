@@ -8,6 +8,31 @@
 
 import Foundation
 
+enum HealthCommunicationKind: String, Codable, Sendable, Equatable {
+    case healthObservation
+    case wellnessGuidance
+    case urgentAction
+
+    var title: String {
+        switch self {
+        case .healthObservation: "Health data observation"
+        case .wellnessGuidance: "General wellness guidance"
+        case .urgentAction: "Urgent safety guidance"
+        }
+    }
+
+    var disclosure: String {
+        switch self {
+        case .healthObservation:
+            "Describes available data and coverage; it is not a medical conclusion."
+        case .wellnessGuidance:
+            "For general wellbeing and health management, not diagnosis or treatment."
+        case .urgentAction:
+            "Local safety guidance only; contact emergency or crisis services now."
+        }
+    }
+}
+
 enum HealthInterpretationPolicy {
     static let wellnessBoundary = "Health trends are wellness information, not a diagnosis or treatment recommendation."
 
