@@ -175,7 +175,6 @@ final class ClinicalRecordIndexStore: ObservableObject {
     private let fileManager: FileManager
     private let fileURL: URL
     private let encoder = JSONEncoder()
-    private let decoder = JSONDecoder()
 
     init(fileManager: FileManager = .default, fileURL: URL? = nil) {
         self.fileManager = fileManager
@@ -184,7 +183,7 @@ final class ClinicalRecordIndexStore: ObservableObject {
             .appendingPathComponent("ClinicalRecords", isDirectory: true)
             .appendingPathComponent("summary-index.json")
         self.index = (try? Data(contentsOf: self.fileURL))
-            .flatMap { try? decoder.decode(ClinicalRecordIndex.self, from: $0) }
+            .flatMap { try? JSONDecoder().decode(ClinicalRecordIndex.self, from: $0) }
     }
 
     func replace(with index: ClinicalRecordIndex) throws {

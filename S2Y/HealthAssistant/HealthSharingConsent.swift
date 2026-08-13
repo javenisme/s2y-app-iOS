@@ -18,6 +18,10 @@ public enum HealthSharingScope: String, Codable, Sendable, CaseIterable, Hashabl
     case onDeviceConversationSync
     /// A bounded set of selected clinical record summary fields.
     case clinicalRecordSummary
+    /// A completed questionnaire response stored in the user's S2Y account.
+    case wellbeingCheckInCloudBackup
+    /// A bounded set of recent wellbeing check-in summary fields.
+    case wellbeingCheckInSummary
 }
 
 public struct HealthSharingAuthorization: Codable, Sendable, Equatable {
@@ -50,6 +54,8 @@ private extension HealthSharingScope {
         case .relevantHealthSummary: "relevant Health summary"
         case .onDeviceConversationSync: "on-device conversation sync"
         case .clinicalRecordSummary: "selected clinical record summaries"
+        case .wellbeingCheckInCloudBackup: "wellbeing check-in account backup"
+        case .wellbeingCheckInSummary: "recent wellbeing check-in summaries"
         }
     }
 }
