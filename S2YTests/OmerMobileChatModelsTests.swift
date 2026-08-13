@@ -1397,6 +1397,19 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertLessThanOrEqual(context.count, 500)
     }
 
+    func testLocalHealthDataInventoryIncludesEveryCategoryAndBoundsCounts() {
+        let snapshot = LocalHealthDataInventorySnapshot(counts: [
+            .wellbeingCheckIns: 3,
+            .safetyActivity: -1
+        ])
+
+        XCTAssertEqual(snapshot.items.count, LocalHealthDataCategory.allCases.count)
+        XCTAssertEqual(Set(snapshot.items.map(\.category)), Set(LocalHealthDataCategory.allCases))
+        XCTAssertEqual(snapshot.items.first { $0.category == .wellbeingCheckIns }?.itemCount, 3)
+        XCTAssertEqual(snapshot.items.first { $0.category == .safetyActivity }?.itemCount, 0)
+        XCTAssertTrue(snapshot.items.allSatisfy { !$0.storageDescription.isEmpty })
+    }
+
     func testRevokingOnDeviceSyncDoesNotRevokeOmerQuestionConsent() {
         var ledger = HealthSharingConsentLedger()
         ledger.apply(.granted, scopes: [.omerChatText, .onDeviceConversationSync])

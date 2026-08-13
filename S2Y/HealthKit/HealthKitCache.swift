@@ -25,6 +25,11 @@ public final class HealthKitCache {
     
     private var cache: [String: CachedResult] = [:]
     private let defaultExpiryInterval: TimeInterval = 300 // 5 minutes
+
+    public var entryCount: Int {
+        cleanupExpired()
+        return cache.count
+    }
     
     private init() {}
     
