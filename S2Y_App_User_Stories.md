@@ -6,6 +6,7 @@
 
 本文是 iOS 工程的权威用户故事目录。旧版中 Phi/MLX 下载模型、Minimax
 路由、自动诊断、自动目标和“治疗效果”描述已被当前架构取代，不再是产品承诺。
+早期 GitHub 工单与当前故事的逐项状态见 [`Docs/backlog-traceability.md`](Docs/backlog-traceability.md)。
 
 ## 状态定义
 
