@@ -950,6 +950,63 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(WellnessDailySchedule.actions(for: plan, on: monday, calendar: calendar), [action])
     }
 
+    func testWellnessNotificationPlannerUsesGenericPrivateCopy() {
+        let planID = UUID()
+        let actionID = UUID()
+        let privateDetail = "Discuss a sensitive symptom"
+        let plan = WellnessPlan(
+            id: planID,
+            title: "Private plan",
+            summary: "Private summary",
+            status: .active,
+            origin: .userCreated,
+            goals: [],
+            actions: [WellnessAction(
+                id: actionID,
+                title: "Sensitive action title",
+                detail: privateDetail,
+                category: .checkIn,
+                daysPerWeek: 2,
+                estimatedMinutes: 2,
+                confirmedAt: .now,
+                scheduledWeekdays: [2, 6],
+                reminderHour: 19,
+                reminderMinute: 30
+            )]
+        )
+
+        let requests = WellnessNotificationPlanner.requests(for: plan)
+
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertEqual(requests.map(\.dateComponents.weekday), [2, 6])
+        XCTAssertTrue(requests.allSatisfy { $0.dateComponents.hour == 19 && $0.dateComponents.minute == 30 })
+        XCTAssertTrue(requests.allSatisfy { !$0.body.contains(privateDetail) })
+        XCTAssertTrue(requests.allSatisfy {
+            $0.identifier.hasPrefix(WellnessNotificationPlanner.identifierPrefix(for: planID))
+        })
+    }
+
+    func testInactivePlanProducesNoWellnessNotifications() {
+        let plan = WellnessPlan(
+            title: "Draft",
+            summary: "Not active",
+            origin: .userCreated,
+            goals: [],
+            actions: [WellnessAction(
+                title: "Action",
+                detail: "Detail",
+                category: .checkIn,
+                daysPerWeek: 1,
+                estimatedMinutes: 1,
+                scheduledWeekdays: [1],
+                reminderHour: 9,
+                reminderMinute: 0
+            )]
+        )
+
+        XCTAssertTrue(WellnessNotificationPlanner.requests(for: plan).isEmpty)
+    }
+
     func testWeeklyReviewKeepsMissingRecordsSeparateFromSkipped() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
