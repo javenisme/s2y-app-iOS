@@ -147,6 +147,18 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
 - 本主题不证明 ResearchKit 的所有可选任务已投入产品，也不扩大采集范围；App Store 权限申报、
   本地化权限文案、签名 Archive 与 TestFlight 弹窗仍须在发布渠道验收。
 
+## 2026-08-13 账户入口产品化验收
+
+- iPhone 16e 模拟器的实际账户页截图发现仍展示 “Template Application” 和 Firebase
+  模块演示说明；该问题不属于框架依赖名称，而是直接面向用户的遗留产品文案。
+- HLT-161 将账户副标题改为 S2Y Health Assistant 与 Omer Online 的真实用途，登录说明
+  不再描述示例应用；同时补齐账户标题、未登录说明和已登录说明的简体中文。
+- 新增账户中英文回归断言，并明确阻止 `template`/`module` 再进入英文副标题。专项本地化
+  测试 3 项、0 失败；完整 `S2YTests` 为 162 项 XCTest 与 6 项 Swift Testing，共
+  168 项、0 失败；带本地签名的模拟器构建成功并启动到 Health Assistant。
+- Mac 锁定期间无法重新导航到账户页进行修复后截图，因此当前证据证明编译产物、自动化测试
+  和 App 启动，不声称登录操作已完成。Firebase 登录及生产同意授权继续属于 US-201。
+
 ## 2026-08-13 Omer 健康管理安全验证
 
 - Omer PR #13 以 7 个独立故事提交合并，Vercel Preview 检查通过后正常进入
