@@ -9,6 +9,7 @@
 - 性能、取消与缓存边界：[`assistant-performance.md`](assistant-performance.md)
 - 可分享健康摘要边界：[`shareable-health-summary.md`](shareable-health-summary.md)
 - 可达性与本地化边界：[`accessibility-localization.md`](accessibility-localization.md)
+- 选择性跨设备同步边界：[`selective-cross-device-sync.md`](selective-cross-device-sync.md)
 - 心脏分析安全边界：[`cardiac-analysis-safety.md`](cardiac-analysis-safety.md)
 
 新增工作必须先分配唯一 HLT 编号，并遵守一个故事一个提交、一个主题一个 PR。

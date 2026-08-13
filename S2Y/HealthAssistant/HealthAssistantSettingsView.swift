@@ -52,11 +52,6 @@ struct HealthAssistantSettingsView: View {
                 )
 
                 Toggle(
-                    "Sync on-device conversations",
-                    isOn: consentBinding(for: .onDeviceConversationSync)
-                )
-
-                Toggle(
                     "Share selected clinical record summaries",
                     isOn: consentBinding(for: .clinicalRecordSummary)
                 )
@@ -75,6 +70,12 @@ struct HealthAssistantSettingsView: View {
                     HealthSafetyActivityView()
                 } label: {
                     Label("Safety Activity", systemImage: "shield.checkered")
+                }
+
+                NavigationLink {
+                    CrossDeviceSyncSettingsView()
+                } label: {
+                    Label("Cross-Device Sync", systemImage: "arrow.triangle.2.circlepath.icloud")
                 }
             } header: {
                 Text("Privacy")

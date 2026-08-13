@@ -242,12 +242,18 @@ actor OmerChatService {
         userText: String,
         assistantMessageID: UUID,
         assistantText: String,
-        authorization: HealthSharingAuthorization
+        authorization: HealthSharingAuthorization,
+        conversationID requestedConversationID: UUID? = nil
     ) async throws -> OmerLocalChatSyncResponse {
         try HealthSharingConsentPolicy.require([.onDeviceConversationSync], authorization: authorization)
         let serviceURL = try configuredServiceURL()
         let key = sessionKey(for: serviceURL)
-        let conversationID = await existingOrNewConversationID(sessionKey: key)
+        let conversationID: UUID
+        if let requestedConversationID {
+            conversationID = requestedConversationID
+        } else {
+            conversationID = await existingOrNewConversationID(sessionKey: key)
+        }
         let request = OmerLocalChatSyncRequest(
             requestId: UUID(),
             conversationId: conversationID,
@@ -274,6 +280,32 @@ actor OmerChatService {
         )
         await sessionStore.saveLastChatId(response.conversationId.uuidString, sessionKey: key)
         return response
+    }
+
+    func syncPendingOnDeviceChats(authorization: HealthSharingAuthorization) async throws -> Int {
+        try HealthSharingConsentPolicy.require([.onDeviceConversationSync], authorization: authorization)
+        let pending = chatCache.details.filter { $0.chat.visibility == "private-local" }
+        var synchronized = 0
+        for detail in pending {
+            let serviceURL = try configuredServiceURL()
+            let request = OmerLocalChatSyncRequest(
+                requestId: UUID(),
+                conversationId: detail.chat.id,
+                source: "ios-on-device",
+                messages: detail.messages.map {
+                    .init(id: $0.id, role: $0.role, content: $0.content)
+                }
+            )
+            let url = serviceURL.appendingPathComponent("api/mobile/v1/chats/sync")
+            do {
+                _ = try await performLocalSync(request, url: url, forceTokenRefresh: false)
+            } catch OmerChatServiceError.unauthorized {
+                _ = try await performLocalSync(request, url: url, forceTokenRefresh: true)
+            }
+            markCachedChatSynchronized(id: detail.chat.id)
+            synchronized += 1
+        }
+        return synchronized
     }
 
     func saveOnDeviceExchangeLocally(
@@ -340,6 +372,27 @@ actor OmerChatService {
         }
         chatCache.details = Array(chatCache.details.prefix(50))
         mergeCachedSummaries([detail.chat])
+    }
+
+    private func markCachedChatSynchronized(id: UUID) {
+        guard let summaryIndex = chatCache.chats.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        let oldSummary = chatCache.chats[summaryIndex]
+        let summary = OmerChatSummary(
+            id: oldSummary.id,
+            createdAt: oldSummary.createdAt,
+            title: oldSummary.title,
+            visibility: "private"
+        )
+        chatCache.chats[summaryIndex] = summary
+        if let detailIndex = chatCache.details.firstIndex(where: { $0.chat.id == id }) {
+            chatCache.details[detailIndex] = OmerChatDetailResponse(
+                chat: summary,
+                messages: chatCache.details[detailIndex].messages
+            )
+        }
+        persistCache()
     }
 
     private func mergeCachedSummaries(_ summaries: [OmerChatSummary]) {

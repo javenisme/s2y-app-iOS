@@ -251,11 +251,15 @@ final class WellnessPlanStore: ObservableObject {
 
     private let defaults: UserDefaults
     private let storageKey = "wellnessPlans.v1"
+    private let syncRecordsKey = "wellnessPlans.syncRecords.v1"
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private let deviceIdentity: CrossDeviceDeviceIdentity
+    private var syncRecords: [CrossDeviceSyncRecord<WellnessPlan>] = []
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        self.deviceIdentity = CrossDeviceDeviceIdentity(defaults: defaults)
         load()
     }
 
@@ -269,6 +273,14 @@ final class WellnessPlanStore: ObservableObject {
         } else {
             plans.insert(plan, at: 0)
         }
+        replaceSyncRecord(
+            CrossDeviceSyncRecord(
+                id: plan.id.uuidString,
+                payload: plan,
+                modifiedAt: .now,
+                modifiedBy: deviceIdentity.id
+            )
+        )
         persist()
         reconcileNotifications(for: plan)
     }
@@ -276,6 +288,7 @@ final class WellnessPlanStore: ObservableObject {
     func removeArchivedPlans() {
         let removedIDs = plans.filter { $0.status == .archived }.map(\.id)
         plans.removeAll { $0.status == .archived }
+        recordDeletions(removedIDs)
         persist()
         for planID in removedIDs {
             Task { await WellnessNotificationCoordinator.removePendingRequests(for: planID) }
@@ -285,23 +298,44 @@ final class WellnessPlanStore: ObservableObject {
     func clear() {
         let planIDs = plans.map(\.id)
         plans = []
-        defaults.removeObject(forKey: storageKey)
+        recordDeletions(planIDs)
+        persist()
         for planID in planIDs {
             Task { await WellnessNotificationCoordinator.removePendingRequests(for: planID) }
         }
     }
 
     private func load() {
-        guard let data = defaults.data(forKey: storageKey),
-              let decoded = try? decoder.decode([WellnessPlan].self, from: data) else {
-            return
+        if let data = defaults.data(forKey: storageKey),
+           let decoded = try? decoder.decode([WellnessPlan].self, from: data) {
+            plans = decoded
         }
-        plans = decoded
+        if let recordsData = defaults.data(forKey: syncRecordsKey),
+           let records = try? decoder.decode([CrossDeviceSyncRecord<WellnessPlan>].self, from: recordsData) {
+            syncRecords = records
+        } else {
+            syncRecords = plans.map { plan in
+                CrossDeviceSyncRecord(
+                    id: plan.id.uuidString,
+                    payload: plan,
+                    modifiedAt: plan.updatedAt,
+                    modifiedBy: deviceIdentity.id
+                )
+            }
+        }
     }
 
-    private func persist() {
-        guard let data = try? encoder.encode(plans) else { return }
+    private func persist(notifyChange: Bool = true) {
+        guard let data = try? encoder.encode(plans) else {
+            return
+        }
         defaults.set(data, forKey: storageKey)
+        if let recordsData = try? encoder.encode(syncRecords) {
+            defaults.set(recordsData, forKey: syncRecordsKey)
+        }
+        if notifyChange {
+            NotificationCenter.default.post(name: .wellnessPlansDidChange, object: nil)
+        }
     }
 
     private func reconcileNotifications(for plan: WellnessPlan) {
@@ -314,4 +348,85 @@ final class WellnessPlanStore: ObservableObject {
             }
         }
     }
+
+    func crossDeviceSyncRecords() -> [CrossDeviceSyncRecord<WellnessPlan>] {
+        syncRecords
+    }
+
+    func mergeCrossDeviceSyncRecords(_ remote: [CrossDeviceSyncRecord<WellnessPlan>]) {
+        let safeRemote = remote.filter(WellnessPlanSyncValidation.accepts)
+        let merged = CrossDeviceSyncMerge.records(local: syncRecords, remote: safeRemote)
+        guard merged != syncRecords else {
+            return
+        }
+        syncRecords = merged
+        plans = merged.compactMap(\.payload).sorted { $0.updatedAt > $1.updatedAt }
+        persist(notifyChange: false)
+        for plan in plans {
+            reconcileNotifications(for: plan)
+        }
+    }
+
+    private func replaceSyncRecord(_ record: CrossDeviceSyncRecord<WellnessPlan>) {
+        syncRecords.removeAll { $0.id == record.id }
+        syncRecords.append(record)
+    }
+
+    private func recordDeletions(_ ids: [UUID]) {
+        for id in ids {
+            replaceSyncRecord(
+                CrossDeviceSyncRecord(
+                    id: id.uuidString,
+                    payload: nil,
+                    modifiedAt: .now,
+                    modifiedBy: deviceIdentity.id
+                )
+            )
+        }
+    }
+}
+
+private enum WellnessPlanSyncValidation {
+    static func accepts(_ record: CrossDeviceSyncRecord<WellnessPlan>) -> Bool {
+        guard UUID(uuidString: record.id) != nil,
+              !record.modifiedBy.isEmpty,
+              record.modifiedBy.count <= 64,
+              record.modifiedAt <= Date.now.addingTimeInterval(5 * 60) else {
+            return false
+        }
+        guard let plan = record.payload else {
+            return true
+        }
+        guard plan.id.uuidString.caseInsensitiveCompare(record.id) == .orderedSame,
+              !plan.title.isEmpty,
+              plan.title.count <= 200,
+              plan.summary.count <= 2_000,
+              plan.goals.count <= 20,
+              plan.actions.count <= 50,
+              plan.createdAt <= plan.updatedAt,
+              plan.updatedAt <= Date.now.addingTimeInterval(5 * 60) else {
+            return false
+        }
+        let goalsAreValid = plan.goals.allSatisfy { goal in
+            goal.targetUnit.count <= 40
+                && goal.targetValue.map { $0.isFinite && $0 > 0 } != false
+                && goal.reviewDate >= plan.createdAt
+        }
+        let actionsAreValid = plan.actions.allSatisfy { action in
+            !action.title.isEmpty
+                && action.title.count <= 200
+                && action.detail.count <= 2_000
+                && (1...7).contains(action.daysPerWeek)
+                && (1...240).contains(action.estimatedMinutes)
+                && action.effectiveWeekdays.allSatisfy { (1...7).contains($0) }
+                && action.reminderHour.map { (0...23).contains($0) } != false
+                && action.reminderMinute.map { (0...59).contains($0) } != false
+                && (action.reminderHour == nil) == (action.reminderMinute == nil)
+        }
+        return goalsAreValid && actionsAreValid
+    }
+}
+
+extension Notification.Name {
+    static let wellnessPlansDidChange = Notification.Name("S2Y.wellnessPlansDidChange")
 }

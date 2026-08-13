@@ -1,9 +1,36 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow only authenticated content owners access
-    match /users/{userId}/{documents=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      match /sync/{category} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && category in ['appPreferences', 'wellnessPlans']
+          && request.resource.data.keys().hasOnly([
+            'schemaVersion',
+            'category',
+            'payload',
+            'clientUpdatedAt',
+            'modifiedBy'
+          ])
+          && request.resource.data.schemaVersion == 1
+          && request.resource.data.category == category
+          && request.resource.data.payload is string
+          && request.resource.data.payload.size() < 950000
+          && request.resource.data.clientUpdatedAt is timestamp
+          && request.resource.data.modifiedBy is string
+          && request.resource.data.modifiedBy.size() <= 64;
+      }
+
+      match /{collection}/{document=**} {
+        allow read, write: if isOwner(userId) && collection != 'sync';
+      }
     }
   }
 }
