@@ -20,6 +20,7 @@ struct BluetoothDevicesView: View {
             scanningSection
             connectedDevicesSectionIfNeeded
             discoveredDevicesSectionIfNeeded
+            wellnessDeviceSafetySection
             supportedDevicesSection
         }
         .navigationTitle("Bluetooth Devices")
@@ -31,6 +32,27 @@ struct BluetoothDevicesView: View {
         }
         .sheet(item: $selectedDevice) { device in
             BluetoothDeviceDetailView(device: device)
+        }
+    }
+
+    @ViewBuilder
+    private var wellnessDeviceSafetySection: some View {
+        Section {
+            Label("No compatible wellness device configured", systemImage: "shield.checkered")
+                .foregroundStyle(.secondary)
+
+            NavigationLink {
+                WellnessSessionHistoryView()
+            } label: {
+                Label("Wellness Session History", systemImage: "clock.arrow.circlepath")
+            }
+        } header: {
+            Text("Wellness Device Safety")
+        } footer: {
+            Text(
+                "Wellness sessions remain unavailable until verified hardware is supported. "
+                    + "Any future session will require your confirmation and include an immediate stop control."
+            )
         }
     }
     
@@ -373,6 +395,49 @@ struct MeasurementRow: View {
             Text(unit)
                 .font(.caption)
                 .foregroundColor(.secondary)
+        }
+    }
+}
+
+private struct WellnessSessionHistoryView: View {
+    @StateObject private var auditStore = WellnessSessionAuditStore.shared
+
+    var body: some View {
+        List {
+            if auditStore.log.records.isEmpty {
+                ContentUnavailableView(
+                    "No Wellness Sessions",
+                    systemImage: "shield.checkered",
+                    description: Text("Session activity will be stored on this device for your review.")
+                )
+            } else {
+                ForEach(auditStore.log.records) { record in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(record.purpose.displayName)
+                            .font(.headline)
+                        Text(
+                            "\(record.requestedDurationMinutes) min · Comfort level \(record.comfortLevel)"
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        Text(record.confirmedAt, style: .date)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+        .navigationTitle("Session History")
+    }
+}
+
+private extension WellnessSessionPurpose {
+    var displayName: String {
+        switch self {
+        case .relaxation: "Relaxation"
+        case .mindfulBreak: "Mindful Break"
+        case .windDown: "Wind Down"
         }
     }
 }

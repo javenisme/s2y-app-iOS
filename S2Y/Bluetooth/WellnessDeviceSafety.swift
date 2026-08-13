@@ -214,7 +214,7 @@ public struct ActiveWellnessSession: Sendable, Equatable {
     public let scheduledEndAt: Date
 }
 
-public enum WellnessSessionStopReason: String, Sendable, Equatable {
+public enum WellnessSessionStopReason: String, Codable, Sendable, Equatable {
     case userStopped
     case safetyStop
     case completed

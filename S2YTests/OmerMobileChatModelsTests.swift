@@ -956,6 +956,48 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(controller.state, .stopped(stopped))
     }
 
+    func testWellnessSessionAuditRecordsUserVisibleFieldsWithoutHardwarePayload() throws {
+        let validated = try validatedWellnessSession()
+        let active = ActiveWellnessSession(
+            session: validated,
+            confirmedAt: validated.validatedAt,
+            scheduledEndAt: validated.validatedAt.addingTimeInterval(600)
+        )
+        var log = WellnessSessionAuditLog()
+        log.begin(active)
+        let stopped = StoppedWellnessSession(
+            request: validated.request,
+            stoppedAt: validated.validatedAt.addingTimeInterval(120),
+            reason: .userStopped
+        )
+        log.finish(stopped)
+
+        let record = try XCTUnwrap(log.records.first)
+        XCTAssertEqual(record.stopReason, .userStopped)
+        XCTAssertEqual(record.endedAt, stopped.stoppedAt)
+
+        let json = String(decoding: try encoder.encode(log), as: UTF8.self)
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("amplitude"))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("frequency"))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("treatment"))
+    }
+
+    func testWellnessSessionAuditLogCapsLocalHistory() throws {
+        let validated = try validatedWellnessSession()
+        let active = ActiveWellnessSession(
+            session: validated,
+            confirmedAt: validated.validatedAt,
+            scheduledEndAt: validated.validatedAt.addingTimeInterval(600)
+        )
+        var log = WellnessSessionAuditLog(maximumRecordCount: 2)
+
+        log.begin(active)
+        log.begin(active)
+        log.begin(active)
+
+        XCTAssertEqual(log.records.count, 2)
+    }
+
     private func validatedWellnessSession() throws -> ValidatedWellnessSession {
         let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
         let deviceID = UUID()
