@@ -20,26 +20,26 @@ struct HomeView: View {
         var title: String {
             switch self {
             case .healthAssistant:
-                return "Health Assistant"
+                return String(localized: "Health Assistant")
             case .schedule:
-                return "Schedule"
+                return String(localized: "Schedule")
             case .contact:
-                return "Account"
+                return String(localized: "Account")
             case .settings:
-                return "Settings"
+                return String(localized: "Settings")
             }
         }
 
         var subtitle: String {
             switch self {
             case .healthAssistant:
-                return "Chat, insights, and connected health tools"
+                return String(localized: "Chat, insights, and connected health tools")
             case .schedule:
-                return "Tasks, reminders, and care routines"
+                return String(localized: "Tasks, reminders, and care routines")
             case .contact:
-                return "Profile, sign-in, and personal details"
+                return String(localized: "Profile, sign-in, and personal details")
             case .settings:
-                return "Preferences, permissions, and support"
+                return String(localized: "Preferences, permissions, and support")
             }
         }
 
@@ -72,6 +72,8 @@ struct HomeView: View {
 
 
     @AppStorage(StorageKeys.homeTabSelection) private var selectedTab = Tabs.healthAssistant
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var presentingAccount = false
     @State private var isDrawerOpen = false
@@ -86,7 +88,9 @@ struct HomeView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let drawerWidth = min(geometry.size.width * 0.82, 320)
+            let drawerWidth = dynamicTypeSize.isAccessibilitySize
+                ? min(geometry.size.width * 0.92, 420)
+                : min(geometry.size.width * 0.82, 320)
 
             ZStack(alignment: .leading) {
                 Color(uiColor: .systemGroupedBackground)
@@ -96,7 +100,10 @@ struct HomeView: View {
 
                 contentLayer(drawerWidth: drawerWidth)
             }
-            .animation(.snappy(duration: 0.28, extraBounce: 0), value: isDrawerOpen)
+            .animation(
+                accessibilityReduceMotion ? nil : .snappy(duration: 0.28, extraBounce: 0),
+                value: isDrawerOpen
+            )
         }
         .sheet(isPresented: $presentingAccount) {
             AccountSheet(dismissAfterSignIn: false) // presentation was user initiated, do not automatically dismiss
@@ -155,6 +162,7 @@ struct HomeView: View {
 
         return selectedContent
             .environment(\.homeDrawerProgress, drawerProgress)
+            .accessibilityHidden(isDrawerOpen)
             .overlay {
                 if isDrawerOpen {
                     Color.black
@@ -239,6 +247,7 @@ struct HomeView: View {
             }
         }
         .frame(width: width, alignment: .leading)
+        .accessibilityHidden(!isDrawerOpen)
         .padding(.top, 20)
         .padding(.bottom, 16)
         .background(
@@ -271,6 +280,7 @@ struct HomeView: View {
                         Image(systemName: "heart.text.square.fill")
                             .font(.title3)
                             .foregroundStyle(.red)
+                            .accessibilityHidden(true)
                     }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -298,7 +308,10 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 14)
-                .background(Color.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .background(
+                    Color(uiColor: .secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                )
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 14)
@@ -315,6 +328,7 @@ struct HomeView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "bubble.left")
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                     Text(chat.title)
                         .font(.subheadline)
                         .foregroundStyle(.primary)
@@ -356,6 +370,7 @@ struct HomeView: View {
                         Image(systemName: tab.systemImage)
                             .font(.title3)
                             .foregroundStyle(tab.tint)
+                            .accessibilityHidden(true)
                     }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -365,7 +380,8 @@ struct HomeView: View {
                     Text(tab.subtitle)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Spacer(minLength: 12)
@@ -373,17 +389,24 @@ struct HomeView: View {
                 if selectedTab == tab {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(tab.tint)
+                        .accessibilityHidden(true)
                 }
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(selectedTab == tab ? Color.white.opacity(0.9) : Color.clear)
+                    .fill(
+                        selectedTab == tab
+                            ? Color(uiColor: .secondarySystemGroupedBackground)
+                            : Color.clear
+                    )
             )
         }
         .buttonStyle(.plain)
         .accessibilityLabel(tab.title)
+        .accessibilityValue(selectedTab == tab ? "Selected" : "")
+        .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
         .accessibilityIdentifier(tab == .contact ? "drawer.account" : "drawer.\(tab.rawValue)")
         .padding(.horizontal, 14)
     }

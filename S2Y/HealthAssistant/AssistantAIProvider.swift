@@ -15,8 +15,8 @@ enum AssistantAIMode: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .onDevice: "On-device"
-        case .omer: "Omer Online"
+        case .onDevice: String(localized: "On-device")
+        case .omer: String(localized: "Omer Online")
         }
     }
 
@@ -33,8 +33,8 @@ enum AssistantAIMode: String, CaseIterable, Identifiable, Sendable {
 
     var dataBoundaryDescription: String {
         switch self {
-        case .onDevice: "Runs on this iPhone"
-        case .omer: "Uses Omer online"
+        case .onDevice: String(localized: "Runs on this iPhone")
+        case .omer: String(localized: "Uses Omer online")
         }
     }
 }

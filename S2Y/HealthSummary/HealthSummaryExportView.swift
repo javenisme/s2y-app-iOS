@@ -9,6 +9,7 @@ import PDFKit
 import SwiftUI
 
 struct HealthSummaryExportView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var selectedDays = 7
     @State private var selectedMetrics: Set<HealthKitService.MetricKind> = [
         .steps,
@@ -23,12 +24,13 @@ struct HealthSummaryExportView: View {
     var body: some View {
         Form {
             Section("Time range") {
-                Picker("Period", selection: $selectedDays) {
-                    Text("Last 7 days").tag(7)
-                    Text("Last 30 days").tag(30)
-                    Text("Last 90 days").tag(90)
+                if dynamicTypeSize.isAccessibilitySize {
+                    periodPicker
+                        .pickerStyle(.navigationLink)
+                } else {
+                    periodPicker
+                        .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
             }
 
             Section {
@@ -65,8 +67,9 @@ struct HealthSummaryExportView: View {
 
             if let errorMessage {
                 Section {
-                    Text(errorMessage)
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
+                        .accessibilityElement(children: .combine)
                 }
             }
         }
@@ -79,6 +82,14 @@ struct HealthSummaryExportView: View {
             if generatedPDF == nil {
                 removeGeneratedPDF()
             }
+        }
+    }
+
+    private var periodPicker: some View {
+        Picker("Period", selection: $selectedDays) {
+            Text("Last 7 days").tag(7)
+            Text("Last 30 days").tag(30)
+            Text("Last 90 days").tag(90)
         }
     }
 
@@ -152,6 +163,7 @@ private struct HealthSummaryPDFPreview: View {
                         ShareLink(item: pdf.url) {
                             Label("Share", systemImage: "square.and.arrow.up")
                         }
+                        .accessibilityHint("Opens the system share sheet for this health summary")
                     }
                 }
                 .safeAreaInset(edge: .bottom) {
@@ -180,6 +192,7 @@ private struct HealthSummaryPDFView: UIViewRepresentable {
         view.autoScales = true
         view.displayMode = .singlePageContinuous
         view.displayDirection = .vertical
+        view.accessibilityLabel = "Health summary PDF preview"
         return view
     }
 

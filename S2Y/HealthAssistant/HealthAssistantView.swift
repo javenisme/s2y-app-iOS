@@ -53,6 +53,7 @@ enum HealthAssistantError: Error, LocalizedError {
 
 struct HealthAssistantView: View {
     @Environment(\.homeDrawerProgress) private var homeDrawerProgress
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding private var requestedConversationID: UUID?
 
@@ -270,11 +271,14 @@ struct HealthAssistantView: View {
                         HStack {
                             ProgressView()
                                 .scaleEffect(0.8)
+                                .accessibilityHidden(true)
                             Text("Analyzing your health data...")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                         .padding()
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Assistant is analyzing your health data")
                     }
                 }
                 .padding()
@@ -285,15 +289,23 @@ struct HealthAssistantView: View {
             }
             .onChange(of: messages.count) {
                 if let lastMessage = messages.last {
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    if accessibilityReduceMotion {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    } else {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
                     }
                 }
             }
             .onChange(of: streamTick) {
                 if let lastMessage = messages.last {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    if accessibilityReduceMotion {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    } else {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
                     }
                 }
             }
@@ -304,7 +316,9 @@ struct HealthAssistantView: View {
         VStack(spacing: 0) {
             Divider()
             
-            HStack {
+            (dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
+                : AnyLayout(HStackLayout(spacing: 8))) {
                 Menu {
                     Picker("AI provider", selection: aiModeBinding) {
                         ForEach(AssistantAIMode.allCases) { mode in
@@ -317,16 +331,23 @@ struct HealthAssistantView: View {
                         .font(.caption.weight(.semibold))
                 }
                 .accessibilityLabel("AI provider")
+                .accessibilityValue(selectedAIMode.title)
+                .accessibilityHint("Opens a menu to choose on-device or Omer online AI")
                 .accessibilityIdentifier("health-assistant-ai-mode")
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Spacer()
+                }
                 Text(selectedAIMode.dataBoundaryDescription)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal)
             .padding(.top, 6)
             
-            HStack(spacing: 12) {
+            (dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .trailing, spacing: 12))
+                : AnyLayout(HStackLayout(spacing: 12))) {
                 TextField("Ask about your health data...", text: $inputText, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(1...4)
@@ -348,30 +369,36 @@ struct HealthAssistantView: View {
                 } label: {
                     Image(systemName: isProcessing ? "stop.fill" : "paperplane.fill")
                         .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                         .background(isProcessing ? Color.red : (inputText.isEmpty ? Color.gray : Color.blue))
                         .clipShape(Circle())
-                        .accessibilityLabel(isProcessing ? "Stop Response" : "Send Message")
+                        .accessibilityHidden(true)
                 }
                 .disabled(!isProcessing && inputText.isEmpty)
+                .accessibilityLabel(isProcessing ? "Stop Response" : "Send Message")
+                .accessibilityHint(isProcessing ? "Stops the current AI response" : "Sends your health question")
                 .accessibilityIdentifier(isProcessing ? "health-assistant-stop" : "health-assistant-send")
             }
             .padding()
         }
         .background(.bar)
         .offset(y: homeDrawerProgress * 84)
-        .animation(.snappy(duration: 0.28, extraBounce: 0), value: homeDrawerProgress)
+        .animation(
+            accessibilityReduceMotion ? nil : .snappy(duration: 0.28, extraBounce: 0),
+            value: homeDrawerProgress
+        )
     }
     
     private func noticeCard(notice: AssistantNotice) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: notice.tone.systemImage)
                 .foregroundColor(notice.tone.tint)
-                .accessibilityLabel(notice.tone.accessibilityLabel)
+                .accessibilityHidden(true)
 
             Text(notice.message)
                 .font(.subheadline)
                 .foregroundStyle(.primary)
+                .accessibilityLabel("\(notice.tone.accessibilityLabel): \(notice.message)")
             Spacer()
 
             Button("Dismiss") {
@@ -804,7 +831,7 @@ struct HealthAssistantView: View {
                 .foregroundStyle(.red)
                 .frame(width: 44, height: 44)
                 .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .accessibilityLabel("Health Assistant Icon")
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 5) {
                 Text("Ask about your health")
@@ -835,29 +862,29 @@ struct HealthQuickQuerySuggestion: Identifiable, Equatable, Sendable {
                 id: "steps",
                 metricKind: .steps,
                 icon: "figure.walk",
-                title: "Step Trends",
-                query: "How have my step counts trended over the past 7 days?"
+                title: String(localized: "Step Trends"),
+                query: String(localized: "How have my step counts trended over the past 7 days?")
             ),
             HealthQuickQuerySuggestion(
                 id: "heart-rate",
                 metricKind: .heartRateAverage,
                 icon: "heart.fill",
-                title: "Heart Rate",
-                query: "Compare my average heart rate this week versus last week."
+                title: String(localized: "Heart Rate"),
+                query: String(localized: "Compare my average heart rate this week versus last week.")
             ),
             HealthQuickQuerySuggestion(
                 id: "sleep",
                 metricKind: .sleepDurationHours,
                 icon: "bed.double.fill",
-                title: "Sleep Quality",
-                query: "How has my sleep quality been over the past 7 days?"
+                title: String(localized: "Sleep Quality"),
+                query: String(localized: "How has my sleep quality been over the past 7 days?")
             ),
             HealthQuickQuerySuggestion(
                 id: "active-energy",
                 metricKind: .activeEnergy,
                 icon: "flame.fill",
-                title: "Active Energy",
-                query: "How has my active energy changed over the past 30 days?"
+                title: String(localized: "Active Energy"),
+                query: String(localized: "How has my active energy changed over the past 30 days?")
             )
         ]
 
@@ -1063,11 +1090,13 @@ struct ChatMarkdownBlock: Identifiable, Sendable {
 
 struct MessageBubble: View {
     let message: ChatMessage
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     
     var body: some View {
         HStack {
             if message.role == .user {
-                Spacer(minLength: 60)
+                Spacer(minLength: dynamicTypeSize.isAccessibilitySize ? 12 : 60)
             }
             
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
@@ -1104,9 +1133,11 @@ struct MessageBubble: View {
                     }
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(message.role == .user ? "Your message" : "Assistant response")
             
             if message.role == .assistant {
-                Spacer(minLength: 60)
+                Spacer(minLength: dynamicTypeSize.isAccessibilitySize ? 12 : 60)
             }
         }
     }
@@ -1222,5 +1253,7 @@ private struct QuickQueryRow: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(suggestion.title)
+        .accessibilityHint("Places this question in the message field")
     }
 }
