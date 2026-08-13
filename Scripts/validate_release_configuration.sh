@@ -19,6 +19,16 @@ fail() {
     exit 1
 }
 
+plist_value() {
+    ruby -r rexml/document -e '
+        document = REXML::Document.new(File.read(ARGV[0]))
+        elements = document.elements["plist/dict"].elements.to_a
+        index = elements.index { |element| element.name == "key" && element.text == ARGV[1] }
+        abort("missing plist key") unless index && elements[index + 1]
+        puts(elements[index + 1].text)
+    ' "$1" "$2"
+}
+
 project_bundle_id="$({
     sed -n 's/.*PRODUCT_BUNDLE_IDENTIFIER = \([^;]*\);/\1/p' \
         "${REPOSITORY_ROOT}/S2Y.xcodeproj/project.pbxproj"
@@ -27,16 +37,16 @@ fastlane_bundle_id="$(
     sed -n 's/.*default_app_identifier: "\([^"]*\)".*/\1/p' \
         "${REPOSITORY_ROOT}/fastlane/Fastfile"
 )"
-firebase_bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' \
-    "${REPOSITORY_ROOT}/S2Y/Supporting Files/GoogleService-Info.plist")"
-firebase_project_id="$(/usr/libexec/PlistBuddy -c 'Print :PROJECT_ID' \
-    "${REPOSITORY_ROOT}/S2Y/Supporting Files/GoogleService-Info.plist")"
+firebase_bundle_id="$(plist_value \
+    "${REPOSITORY_ROOT}/S2Y/Supporting Files/GoogleService-Info.plist" BUNDLE_ID)"
+firebase_project_id="$(plist_value \
+    "${REPOSITORY_ROOT}/S2Y/Supporting Files/GoogleService-Info.plist" PROJECT_ID)"
 firebase_deploy_project="$(
     sed -n 's/.*"default": "\([^"]*\)".*/\1/p' \
         "${REPOSITORY_ROOT}/firebase/.firebaserc"
 )"
-plist_omer_url="$(/usr/libexec/PlistBuddy -c 'Print :OmerChat.BaseURL' \
-    "${REPOSITORY_ROOT}/S2Y/Supporting Files/Info.plist")"
+plist_omer_url="$(plist_value \
+    "${REPOSITORY_ROOT}/S2Y/Supporting Files/Info.plist" OmerChat.BaseURL)"
 source_omer_url="$(
     sed -n 's/.*defaultBaseURL = "\([^"]*\)".*/\1/p' \
         "${REPOSITORY_ROOT}/S2Y/LLM/Omer/OmerChatService.swift"
