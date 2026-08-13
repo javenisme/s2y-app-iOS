@@ -772,7 +772,7 @@ final class OmerMobileChatModelsTests: XCTestCase {
         }
     }
 
-    func testWellnessDraftUsesPersonalBaselineAndRequiresConfirmation() throws {
+    func testWellnessDraftUsesPersonalBaselineWithoutChoosingGoal() throws {
         let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
         let report = PersonalHealthInsightReport(
             windowDays: 30,
@@ -794,8 +794,10 @@ final class OmerMobileChatModelsTests: XCTestCase {
 
         XCTAssertEqual(draft.plan.status, .draft)
         XCTAssertEqual(draft.plan.origin, .assistantDraft)
-        XCTAssertEqual(draft.plan.goals.first?.targetValue, 6.5)
+        XCTAssertTrue(draft.plan.goals.isEmpty)
+        XCTAssertEqual(draft.plan.actions.first?.category, .sleepRoutine)
         XCTAssertTrue(draft.rationale.first?.contains("your own earlier baseline") == true)
+        XCTAssertTrue(draft.limitations.contains { $0.contains("does not choose a personal target") })
         XCTAssertTrue(draft.limitations.contains { $0.contains("until you confirm") })
     }
 
