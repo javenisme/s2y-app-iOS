@@ -156,6 +156,7 @@
 
 - 在支持 Apple Foundation Models 的 iPhone 上验证可用性、首 token 延迟、流式输出、HealthKit 上下文和不可用提示。
 - 模拟器只能验证 unavailable UX，不能证明端侧推理成功。
+- 当前证据：H36 / HLT-144 已检测到运行 iOS 26.6 的真实 iPhone，但签名能力阻止安装；机型资格与端侧推理均未验证。
 
 ### US-203：S2Y 真实设备闭环验收
 
@@ -167,6 +168,7 @@
 - Archive/签名、TestFlight、隐私清单、崩溃监控、App Store 元数据与回滚流程通过。
 - 仓库证据：H34（HLT-138～141）已提供增量静态质量、应用隐私清单、发布预检和脱敏验收记录。
 - 外部缺口：签名 Archive 当前受 Xcode 账户凭据及 Verifiable Health Records profile 能力阻塞；TestFlight 安装、崩溃监控、元数据、回滚和审核尚未验收，不能标记完成。
+- 真机补充证据：H36 / HLT-144 的 Debug 真机构建在越过已锁定依赖的宏信任门后，仍在相同两项签名条件失败；未生成或安装 `.app`。
 
 ## 非当前范围
 
