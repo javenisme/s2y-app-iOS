@@ -22,6 +22,7 @@ public struct WellnessGoal: Codable, Identifiable, Sendable, Equatable {
     public var targetValue: Double?
     public var targetUnit: String
     public var reviewDate: Date
+    public var confirmedAt: Date?
 
     public init(
         id: UUID = UUID(),
@@ -29,7 +30,8 @@ public struct WellnessGoal: Codable, Identifiable, Sendable, Equatable {
         direction: Direction,
         targetValue: Double?,
         targetUnit: String,
-        reviewDate: Date
+        reviewDate: Date,
+        confirmedAt: Date? = nil
     ) {
         self.id = id
         self.metricKind = metricKind
@@ -37,6 +39,24 @@ public struct WellnessGoal: Codable, Identifiable, Sendable, Equatable {
         self.targetValue = targetValue
         self.targetUnit = targetUnit
         self.reviewDate = reviewDate
+        self.confirmedAt = confirmedAt
+    }
+
+    public static func userSelected(
+        metricKind: HealthKitService.MetricKind,
+        direction: Direction,
+        targetValue: Double?,
+        reviewDate: Date,
+        confirmedAt: Date = .now
+    ) -> WellnessGoal {
+        WellnessGoal(
+            metricKind: metricKind,
+            direction: direction,
+            targetValue: targetValue,
+            targetUnit: metricKind.unit,
+            reviewDate: reviewDate,
+            confirmedAt: confirmedAt
+        )
     }
 }
 
@@ -129,6 +149,8 @@ public struct WellnessPlan: Codable, Identifiable, Sendable, Equatable {
 public enum WellnessPlanTransitionError: Error, Equatable {
     case invalidTransition
     case emptyPlan
+    case unconfirmedGoal
+    case invalidGoal
 }
 
 public enum WellnessPlanLifecycle {
@@ -139,6 +161,16 @@ public enum WellnessPlanLifecycle {
     ) throws -> WellnessPlan {
         if status == .active, plan.goals.isEmpty || plan.actions.isEmpty {
             throw WellnessPlanTransitionError.emptyPlan
+        }
+        if status == .active, plan.goals.contains(where: { $0.confirmedAt == nil }) {
+            throw WellnessPlanTransitionError.unconfirmedGoal
+        }
+        if status == .active, plan.goals.contains(where: { goal in
+            goal.targetUnit != goal.metricKind.unit
+                || goal.targetValue.map { !$0.isFinite || $0 <= 0 } == true
+                || goal.confirmedAt.map { goal.reviewDate < $0 } == true
+        }) {
+            throw WellnessPlanTransitionError.invalidGoal
         }
         let allowed: Set<WellnessPlan.Status>
         switch plan.status {
