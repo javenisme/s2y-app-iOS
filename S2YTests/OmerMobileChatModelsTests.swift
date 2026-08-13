@@ -1047,6 +1047,32 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertTrue(HealthCommunicationKind.wellnessGuidance.disclosure.contains("not diagnosis"))
     }
 
+    func testHealthSafetyAuditExcludesRawMessageAndProviderContact() throws {
+        let escalation = try XCTUnwrap(HealthSafetyTriage.evaluate("I have chest pain"))
+        let event = HealthSafetyEvent(escalation: escalation)
+        var log = HealthSafetyEventLog(maximumEventCount: 2)
+
+        log.record(event)
+        log.record(event)
+        log.record(event)
+
+        XCTAssertEqual(log.events.count, 2)
+        XCTAssertFalse(event.aiProviderContacted)
+        let json = String(decoding: try encoder.encode(log), as: UTF8.self)
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("I have chest pain"))
+        XCTAssertTrue(json.contains("chest-pain"))
+    }
+
+    func testHealthSafetyAuditCanBeClearedLocally() throws {
+        let escalation = try XCTUnwrap(HealthSafetyTriage.evaluate("I have chest pain"))
+        var log = HealthSafetyEventLog()
+        log.record(HealthSafetyEvent(escalation: escalation))
+
+        log.clear()
+
+        XCTAssertTrue(log.events.isEmpty)
+    }
+
     private func validatedWellnessSession() throws -> ValidatedWellnessSession {
         let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
         let deviceID = UUID()

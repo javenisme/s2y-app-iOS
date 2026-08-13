@@ -44,6 +44,7 @@ public final class EnhancedHealthChatController: ObservableObject {
         }
 
         if let escalation = HealthSafetyTriage.evaluate(message) {
+            HealthSafetyEventStore.shared.record(escalation)
             let response = EnhancedChatResponse(
                 content: escalation.userMessage,
                 contentCN: escalation.userMessage,

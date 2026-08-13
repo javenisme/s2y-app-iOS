@@ -444,6 +444,7 @@ struct HealthAssistantView: View {
         inputText = ""
         isInputFocused = false
         if let escalation = HealthSafetyTriage.evaluate(query) {
+            HealthSafetyEventStore.shared.record(escalation)
             messages.append(
                 ChatMessage(
                     role: .assistant,
