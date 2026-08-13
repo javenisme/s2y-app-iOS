@@ -49,12 +49,9 @@ struct NotificationPermissions: View {
                             if ProcessInfo.processInfo.isPreviewSimulator {
                                 try await _Concurrency.Task.sleep(for: .seconds(5))
                             } else {
-                                var opts: UNAuthorizationOptions = [.alert, .sound, .badge]
-                                if !UserDefaults.standard.bool(forKey: StorageKeys.disableTimeSensitiveNotifications) {
-                                    if #available(iOS 15.0, *) {
-                                        opts.insert(.timeSensitive)
-                                    }
-                                }
+                                // Time-sensitive delivery is controlled by the app entitlement and
+                                // each notification's interruption level, not an authorization option.
+                                let opts: UNAuthorizationOptions = [.alert, .sound, .badge]
                                 _ = try await requestNotificationAuthorization(options: opts)
                             }
                         } catch {
