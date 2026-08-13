@@ -65,6 +65,11 @@
 	<array>
 		<string>fetch</string>
 		<string>bluetooth-central</string>
+		<string>remote-notification</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>edu.stanford.spezi.scheduler.notifications-scheduling</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict>
