@@ -1287,6 +1287,47 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertLessThanOrEqual(context.count, 500)
     }
 
+    func testWellbeingCheckInBuildsMinimizedSnapshotWithoutFreeTextNotes() throws {
+        let response = Data(#"""
+        {
+          "item": [
+            {"linkId":"overall-wellness","answer":[{"valueCoding":{"code":"good"}}]},
+            {"linkId":"sleep-hours","answer":[{"valueDecimal":7.5}]},
+            {"linkId":"symptoms","answer":[
+              {"valueCoding":{"code":"headache"}},
+              {"valueCoding":{"code":"fatigue"}}
+            ]},
+            {"linkId":"notes","answer":[{"valueString":"Private free text details"}]},
+            {"linkId":"goals-today","answer":[{"valueCoding":{"code":"better-sleep"}}]}
+          ]
+        }
+        """#.utf8)
+
+        let snapshot = try WellbeingCheckInSnapshotBuilder.build(
+            responseData: response,
+            questionnaireIdentifier: "DailyHealth"
+        )
+
+        XCTAssertEqual(snapshot.overallWellbeing, "good")
+        XCTAssertEqual(snapshot.sleepHours, 7.5)
+        XCTAssertEqual(snapshot.reportedSymptoms, ["headache", "fatigue"])
+        XCTAssertEqual(snapshot.goalFocus, "better-sleep")
+        let encoded = String(decoding: try encoder.encode(snapshot), as: UTF8.self)
+        XCTAssertFalse(encoded.contains("Private free text details"))
+        XCTAssertFalse(encoded.contains("notes"))
+    }
+
+    func testWellbeingCheckInBoundsInvalidValuesAndSymptomCount() {
+        let snapshot = WellbeingCheckInSnapshot(
+            questionnaireIdentifier: "DailyHealth",
+            sleepHours: 25,
+            reportedSymptoms: (0..<12).map { "symptom-\($0)" }
+        )
+
+        XCTAssertNil(snapshot.sleepHours)
+        XCTAssertEqual(snapshot.reportedSymptoms.count, 8)
+    }
+
     func testRevokingOnDeviceSyncDoesNotRevokeOmerQuestionConsent() {
         var ledger = HealthSharingConsentLedger()
         ledger.apply(.granted, scopes: [.omerChatText, .onDeviceConversationSync])
