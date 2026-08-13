@@ -30,4 +30,54 @@ final class HealthQueryToolRequestTests: XCTestCase {
     func testToolOperationsRemainExplicitAndFinite() {
         XCTAssertEqual(HealthQueryToolRequest.Operation.allCases, [.trend, .comparePeriods])
     }
+
+    func testValidationResolvesKnownMetric() throws {
+        let request = HealthQueryToolRequest(
+            operation: .trend,
+            metric: .heartRateAverage,
+            windowDays: 30
+        )
+
+        XCTAssertEqual(
+            try request.validated(),
+            ValidatedHealthQueryToolRequest(
+                operation: .trend,
+                metric: .heartRateAverage,
+                windowDays: 30
+            )
+        )
+    }
+
+    func testValidationRejectsUnknownMetricFromDecodedPayload() throws {
+        let data = try XCTUnwrap(
+            #"{"version":1,"operation":"trend","metric":"readinessScore","windowDays":7}"#
+                .data(using: .utf8)
+        )
+        let request = try JSONDecoder().decode(HealthQueryToolRequest.self, from: data)
+
+        XCTAssertThrowsError(try request.validated()) { error in
+            XCTAssertEqual(error as? HealthQueryToolRequestError, .unknownMetric("readinessScore"))
+        }
+    }
+
+    func testValidationRejectsUnsupportedVersionAndUnsafeWindows() throws {
+        let futureVersion = HealthQueryToolRequest(
+            version: 2,
+            operation: .trend,
+            metric: .steps,
+            windowDays: 7
+        )
+        let oversized = HealthQueryToolRequest(
+            operation: .trend,
+            metric: .steps,
+            windowDays: 365
+        )
+
+        XCTAssertThrowsError(try futureVersion.validated()) { error in
+            XCTAssertEqual(error as? HealthQueryToolRequestError, .unsupportedVersion(2))
+        }
+        XCTAssertThrowsError(try oversized.validated()) { error in
+            XCTAssertEqual(error as? HealthQueryToolRequestError, .windowOutOfRange(365))
+        }
+    }
 }
