@@ -72,6 +72,8 @@ struct HomeView: View {
 
 
     @AppStorage(StorageKeys.homeTabSelection) private var selectedTab = Tabs.healthAssistant
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var presentingAccount = false
     @State private var isDrawerOpen = false
@@ -86,7 +88,9 @@ struct HomeView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let drawerWidth = min(geometry.size.width * 0.82, 320)
+            let drawerWidth = dynamicTypeSize.isAccessibilitySize
+                ? min(geometry.size.width * 0.92, 420)
+                : min(geometry.size.width * 0.82, 320)
 
             ZStack(alignment: .leading) {
                 Color(uiColor: .systemGroupedBackground)
@@ -96,7 +100,10 @@ struct HomeView: View {
 
                 contentLayer(drawerWidth: drawerWidth)
             }
-            .animation(.snappy(duration: 0.28, extraBounce: 0), value: isDrawerOpen)
+            .animation(
+                accessibilityReduceMotion ? nil : .snappy(duration: 0.28, extraBounce: 0),
+                value: isDrawerOpen
+            )
         }
         .sheet(isPresented: $presentingAccount) {
             AccountSheet(dismissAfterSignIn: false) // presentation was user initiated, do not automatically dismiss

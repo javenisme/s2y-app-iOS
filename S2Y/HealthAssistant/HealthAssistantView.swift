@@ -53,6 +53,7 @@ enum HealthAssistantError: Error, LocalizedError {
 
 struct HealthAssistantView: View {
     @Environment(\.homeDrawerProgress) private var homeDrawerProgress
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding private var requestedConversationID: UUID?
 
@@ -285,15 +286,23 @@ struct HealthAssistantView: View {
             }
             .onChange(of: messages.count) {
                 if let lastMessage = messages.last {
-                    withAnimation(.easeInOut(duration: 0.3)) {
+                    if accessibilityReduceMotion {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    } else {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
                     }
                 }
             }
             .onChange(of: streamTick) {
                 if let lastMessage = messages.last {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    if accessibilityReduceMotion {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    } else {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
                     }
                 }
             }
@@ -360,7 +369,10 @@ struct HealthAssistantView: View {
         }
         .background(.bar)
         .offset(y: homeDrawerProgress * 84)
-        .animation(.snappy(duration: 0.28, extraBounce: 0), value: homeDrawerProgress)
+        .animation(
+            accessibilityReduceMotion ? nil : .snappy(duration: 0.28, extraBounce: 0),
+            value: homeDrawerProgress
+        )
     }
     
     private func noticeCard(notice: AssistantNotice) -> some View {
