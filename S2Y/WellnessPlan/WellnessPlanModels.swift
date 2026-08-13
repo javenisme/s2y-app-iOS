@@ -247,6 +247,7 @@ final class WellnessPlanStore: ObservableObject {
     static let shared = WellnessPlanStore()
 
     @Published private(set) var plans: [WellnessPlan] = []
+    @Published private(set) var reminderErrorDescription: String?
 
     private let defaults: UserDefaults
     private let storageKey = "wellnessPlans.v1"
@@ -269,16 +270,25 @@ final class WellnessPlanStore: ObservableObject {
             plans.insert(plan, at: 0)
         }
         persist()
+        reconcileNotifications(for: plan)
     }
 
     func removeArchivedPlans() {
+        let removedIDs = plans.filter { $0.status == .archived }.map(\.id)
         plans.removeAll { $0.status == .archived }
         persist()
+        for planID in removedIDs {
+            Task { await WellnessNotificationCoordinator.removePendingRequests(for: planID) }
+        }
     }
 
     func clear() {
+        let planIDs = plans.map(\.id)
         plans = []
         defaults.removeObject(forKey: storageKey)
+        for planID in planIDs {
+            Task { await WellnessNotificationCoordinator.removePendingRequests(for: planID) }
+        }
     }
 
     private func load() {
@@ -292,5 +302,16 @@ final class WellnessPlanStore: ObservableObject {
     private func persist() {
         guard let data = try? encoder.encode(plans) else { return }
         defaults.set(data, forKey: storageKey)
+    }
+
+    private func reconcileNotifications(for plan: WellnessPlan) {
+        Task {
+            do {
+                try await WellnessNotificationCoordinator.reconcile(plan)
+                reminderErrorDescription = nil
+            } catch {
+                reminderErrorDescription = "The plan was saved, but its reminders could not be updated."
+            }
+        }
     }
 }
