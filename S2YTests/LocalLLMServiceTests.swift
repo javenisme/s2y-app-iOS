@@ -148,6 +148,23 @@ final class LocalLLMServiceTests: XCTestCase {
         // Just verify state is consistent
         XCTAssertNotNil(service)
     }
+
+#if targetEnvironment(simulator)
+    func testLoadModelRestoresUnloadedContainerFromMemoryCache() async throws {
+        try await service.loadModel(.tinyLlama)
+        await service.unloadModel()
+        var progress: [Double] = []
+
+        try await service.loadModel(.tinyLlama) { value in
+            progress.append(value)
+        }
+
+        XCTAssertTrue(service.isModelLoaded)
+        XCTAssertEqual(service.currentModel, .tinyLlama)
+        XCTAssertEqual(progress, [0.1, 1.0])
+        XCTAssertNil(service.lastError)
+    }
+#endif
     
     // MARK: - Unload Model Tests
     
