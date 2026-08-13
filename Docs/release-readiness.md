@@ -36,6 +36,8 @@ a secret store.
 
 Record these results for every production candidate:
 
+Use [`release-validation.md`](release-validation.md) as the redacted evidence record.
+
 | Check | Required evidence |
 |---|---|
 | Firebase sign-in | Test account completes the intended provider flow and receives a Firebase UID |
