@@ -541,6 +541,30 @@ public final class HealthKitService {
         }
     }
 
+    public struct Distribution: Sendable, Codable, Equatable {
+        public let observedCount: Int
+        public let minimum: Double
+        public let firstQuartile: Double
+        public let median: Double
+        public let thirdQuartile: Double
+        public let maximum: Double
+
+        static func summarize(_ values: [Double]) -> Distribution? {
+            let sorted = values.filter(\.isFinite).sorted()
+            guard let minimum = sorted.first, let maximum = sorted.last else {
+                return nil
+            }
+            return Distribution(
+                observedCount: sorted.count,
+                minimum: minimum,
+                firstQuartile: sorted.quantile(0.25),
+                median: sorted.quantile(0.5),
+                thirdQuartile: sorted.quantile(0.75),
+                maximum: maximum
+            )
+        }
+    }
+
     public struct Trend: Sendable, Codable {
         public let windowDays: Int
         public let points: [DailyMetric]
@@ -555,8 +579,12 @@ public final class HealthKitService {
             return Double(observedDays) / Double(expectedDays)
         }
 
+        public var distribution: Distribution? {
+            Distribution.summarize(points.filter(\.isObserved).map(\.value))
+        }
+
         static func summarize(windowDays: Int, points: [DailyMetric]) -> Trend {
-            let observed = points.filter(\.isObserved)
+            let observed = points.filter { $0.isObserved && $0.value.isFinite }
             let values = observed.map(\.value)
             let average = values.average()
             let changeRate: Double
@@ -742,5 +770,16 @@ extension Array where Element == Double {
     func average() -> Double {
         guard !isEmpty else { return 0 }
         return reduce(0, +) / Double(count)
+    }
+
+    func quantile(_ probability: Double) -> Double {
+        guard !isEmpty else { return 0 }
+        let boundedProbability = Swift.min(Swift.max(probability, 0), 1)
+        let position = boundedProbability * Double(count - 1)
+        let lowerIndex = Int(position.rounded(FloatingPointRoundingRule.down))
+        let upperIndex = Int(position.rounded(FloatingPointRoundingRule.up))
+        guard lowerIndex != upperIndex else { return self[lowerIndex] }
+        let fraction = position - Double(lowerIndex)
+        return self[lowerIndex] + ((self[upperIndex] - self[lowerIndex]) * fraction)
     }
 }
