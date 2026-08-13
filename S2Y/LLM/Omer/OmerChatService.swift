@@ -190,6 +190,17 @@ actor OmerChatService {
         return detail
     }
 
+    func deleteChat(id: UUID) async throws {
+        let serviceURL = try configuredServiceURL()
+        let url = serviceURL
+            .appendingPathComponent("api/mobile/v1/chats")
+            .appendingPathComponent(id.uuidString)
+        try await authenticatedDELETE(url: url)
+        chatCache.removeChat(id: id)
+        persistCache()
+        await sessionStore.saveLastChatId(nil, sessionKey: sessionKey(for: serviceURL))
+    }
+
     func cachedChats(limit: Int = 50) -> [OmerChatSummary] {
         Array(chatCache.chats.prefix(max(1, limit)))
     }
@@ -389,6 +400,24 @@ actor OmerChatService {
         } catch OmerChatServiceError.unauthorized {
             return try await performAuthenticatedGET(url: url, forceTokenRefresh: true)
         }
+    }
+
+    private func authenticatedDELETE(url: URL) async throws {
+        do {
+            try await performAuthenticatedDELETE(url: url, forceTokenRefresh: false)
+        } catch OmerChatServiceError.unauthorized {
+            try await performAuthenticatedDELETE(url: url, forceTokenRefresh: true)
+        }
+    }
+
+    private func performAuthenticatedDELETE(url: URL, forceTokenRefresh: Bool) async throws {
+        let token = try await firebaseIDToken(forceRefresh: forceTokenRefresh)
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data)
     }
 
     private func performAuthenticatedGET(url: URL, forceTokenRefresh: Bool) async throws -> Data {

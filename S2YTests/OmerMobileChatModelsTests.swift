@@ -1471,6 +1471,35 @@ final class OmerMobileChatModelsTests: XCTestCase {
         )
     }
 
+    func testOmerCacheRemovalDeletesSummaryAndMessagesTogether() {
+        let deletedID = UUID()
+        let retainedID = UUID()
+        let deleted = OmerChatSummary(
+            id: deletedID,
+            createdAt: "2026-08-12T18:00:00Z",
+            title: "Delete me",
+            visibility: "private"
+        )
+        let retained = OmerChatSummary(
+            id: retainedID,
+            createdAt: "2026-08-11T18:00:00Z",
+            title: "Keep me",
+            visibility: "private"
+        )
+        var snapshot = OmerChatCacheSnapshot(
+            chats: [deleted, retained],
+            details: [
+                OmerChatDetailResponse(chat: deleted, messages: []),
+                OmerChatDetailResponse(chat: retained, messages: [])
+            ]
+        )
+
+        snapshot.removeChat(id: deletedID)
+
+        XCTAssertEqual(snapshot.chats.map(\.id), [retainedID])
+        XCTAssertEqual(snapshot.details.map(\.chat.id), [retainedID])
+    }
+
     @MainActor
     func testClearingSharingReceiptsAlsoReturnsEveryScopeToDefaultDeny() {
         let suiteName = "HealthSharingConsentStoreTests.\(UUID().uuidString)"

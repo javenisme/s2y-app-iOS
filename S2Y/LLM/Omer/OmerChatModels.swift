@@ -199,6 +199,11 @@ struct OmerChatDetailResponse: Codable, Sendable {
 struct OmerChatCacheSnapshot: Codable, Sendable {
     var chats: [OmerChatSummary]
     var details: [OmerChatDetailResponse]
+
+    mutating func removeChat(id: UUID) {
+        chats.removeAll { $0.id == id }
+        details.removeAll { $0.chat.id == id }
+    }
 }
 
 struct OmerAPIErrorResponse: Decodable {
