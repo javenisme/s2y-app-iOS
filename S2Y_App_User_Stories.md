@@ -156,7 +156,7 @@
 
 - 在支持 Apple Foundation Models 的 iPhone 上验证可用性、首 token 延迟、流式输出、HealthKit 上下文和不可用提示。
 - 模拟器只能验证 unavailable UX，不能证明端侧推理成功。
-- 当前证据：H36 / HLT-144 已检测到运行 iOS 26.6 的真实 iPhone，但签名能力阻止安装；机型资格与端侧推理均未验证。
+- 当前证据：H36 / HLT-144 已检测到真实 iPhone；H28 / HLT-147 进一步确认设备为已配对、开启 Developer Mode 的 iPhone 16e（iOS 26.6），具备 Apple Intelligence 硬件资格。签名能力仍阻止安装，系统模型开关/下载状态及端侧推理均未验证。
 
 ### US-203：S2Y 真实设备闭环验收
 
