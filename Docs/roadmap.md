@@ -5,7 +5,7 @@
 
 ## 当前基线
 
-- H01～H27、H30～H44、H47～H55 已合并或在当前主题完成；本地 GitHub backlog 已收口到明确证据，剩余开放工单只跟踪 Firebase 生产闭环与 TestFlight。付费订阅生产配置与购买验收、撤回后健康正文停止新增及真实账号删除验收、签名真机和真实设备仍未完成。
+- H01～H27、H30～H44、H47～H56 已合并或在当前主题完成；本地 GitHub backlog 已收口到明确证据，剩余开放工单只跟踪 Firebase 生产闭环与 TestFlight。付费订阅生产配置与购买验收、撤回后健康正文停止新增及真实账号删除验收、签名真机和真实设备仍未完成。
 - 支持的 AI 只有用户显式选择的 Apple 端侧 AI 和 Omer 在线 AI。
 - 下载式 Phi/MLX 模型、模拟回答、固定人群阈值、自动健康目标和临床风险评分已退休。
 - 当前闭环是健康管理闭环，不是诊断或治疗闭环。
@@ -60,6 +60,9 @@ H29 / US-203 的完成证据：
 
 仓库预检与公开端点 smoke check 已交付；继续使用生产测试账号完成 Firebase/Omer
 认证证据，并完成签名、TestFlight 安装和回滚。不能在代码中伪造通过。
+
+H56 已移除发布预检对 macOS `plutil` 的依赖，隐私清单现在由 Python 标准库在 Ubuntu
+和 macOS 使用相同规则校验；这只修复 CI 预检可移植性，不提供 Apple 签名凭据。
 
 当前已确认已配对且开启 Developer Mode 的 iPhone 16e（iOS 26.6）具备 Apple
 Intelligence 硬件资格，但 Debug 真机构建与签名 Archive 均已验证阻塞在 Xcode 账户

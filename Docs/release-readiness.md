@@ -24,6 +24,9 @@ without printing credential values that:
 - retired `chat-bak.s2y.us` and embedded test-account material do not remain in
   executable/configuration paths.
 
+Privacy manifest validation uses Python's standard `plistlib`, so the same
+fail-closed checks run on both macOS development machines and Ubuntu CI runners.
+
 The workflow also runs `Scripts/check_public_production_endpoints.sh`. It verifies
 only that the public login page responds and that an unauthenticated Omer mobile
 request is rejected. It never follows an authenticated flow or prints response

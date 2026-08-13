@@ -95,6 +95,17 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
   Firebase Bearer ID Token，证明路由仍失败关闭。没有读取或删除任何既有生产聊天、
   健康正文、凭据或数据库业务行，因此真实账号删除和撤回后停止新增仍属于 US-201 验收。
 
+## 2026-08-13 跨平台发布预检
+
+- HLT-175 定位最近连续失败的 Deployment：Ubuntu `releaseconfiguration` job 在调用仅
+  macOS 提供的 `plutil` 时退出，尚未进入构建、签名或 TestFlight 阶段。
+- 隐私清单校验改用 Python 标准库 `plistlib`，保持无追踪、精确数据类型、数据关联状态和
+  Required Reason API 的原失败关闭规则；错误只报告配置类别，不打印清单内容或凭据。
+- 7 项正反向测试覆盖已审核清单、追踪开启、未知/缺失数据类型、错误 Required Reason、
+  缺失 API 类型和畸形 plist；完整发布配置预检与差异检查通过。
+- GitHub 只读元数据确认仓库与 `staging` 环境没有发布密钥或变量，`production` 环境尚未
+  建立。本主题不创建环境、不写入凭据，也不宣称 Archive 或 TestFlight 已可用。
+
 ## 2026-08-13 Omer 订阅权限映射安全
 
 - Omer PR #19 以 OMR-019 单一故事提交组成，Vercel Preview 成功后以普通权限合并，
