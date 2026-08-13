@@ -51,4 +51,37 @@ final class AssistantConversationPolicyTests: XCTestCase {
             "How is my activity?\nHealth metric: step count."
         )
     }
+
+    func testFollowUpInheritsMostRecentMetricWithinConversation() {
+        XCTAssertEqual(
+            AssistantConversationPolicy.resolve(
+                query: "What about last month?",
+                recentUserMessages: [
+                    "How did my step count change?",
+                    "How has my sleep changed this week?"
+                ]
+            ),
+            .ready("What about last month?\nHealth metric: sleep duration and consistency.")
+        )
+    }
+
+    func testFollowUpWithoutConversationContextRequestsMetric() throws {
+        guard case .needsClarification(let clarification) = AssistantConversationPolicy.resolve(
+            query: "What about last month?"
+        ) else {
+            return XCTFail("Expected metric clarification")
+        }
+
+        XCTAssertEqual(clarification.kind, .metric)
+    }
+
+    func testExplicitMetricOnFollowUpIsNeverOverridden() {
+        XCTAssertEqual(
+            AssistantConversationPolicy.resolve(
+                query: "What about my heart rate last month?",
+                recentUserMessages: ["How was my sleep this week?"]
+            ),
+            .ready("What about my heart rate last month?")
+        )
+    }
 }

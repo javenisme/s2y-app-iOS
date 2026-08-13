@@ -62,7 +62,8 @@ enum AssistantConversationPolicy {
         )
         let inheritedNormalized = inheritedQuery.lowercased()
 
-        if needsMetricClarification(inheritedNormalized) {
+        if needsMetricClarification(inheritedNormalized)
+            || (isFollowUp(normalized) && !containsSpecificMetric(inheritedNormalized)) {
             return .needsClarification(
                 AssistantClarification(
                     kind: .metric,
