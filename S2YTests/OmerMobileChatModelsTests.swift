@@ -1428,6 +1428,24 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertFalse(json.contains("resourceType"))
     }
 
+    func testAppleOnDeviceAvailabilityProvidesExplicitRecoveryWithoutAutomaticFallback() {
+        let states: [AppleFoundationModelAvailability] = [
+            .unavailable(.requiresNewerOS),
+            .unavailable(.deviceNotEligible),
+            .unavailable(.appleIntelligenceNotEnabled),
+            .unavailable(.modelNotReady),
+            .unavailable(.simulatorUnsupported),
+            .unavailable(.frameworkUnavailable)
+        ]
+
+        for state in states {
+            XCTAssertFalse(state.statusTitle.isEmpty)
+            XCTAssertFalse(state.recoveryGuidance.isEmpty)
+            XCTAssertFalse(state.recoveryGuidance.contains("Using Omer instead"))
+        }
+        XCTAssertEqual(AppleFoundationModelAvailability.available.statusTitle, "Ready")
+    }
+
     @MainActor
     func testClearingSharingReceiptsAlsoReturnsEveryScopeToDefaultDeny() {
         let suiteName = "HealthSharingConsentStoreTests.\(UUID().uuidString)"

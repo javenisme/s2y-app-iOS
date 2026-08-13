@@ -27,22 +27,34 @@ enum AppleFoundationModelAvailability: Equatable, Sendable {
         self == .available
     }
 
-    var fallbackExplanation: String {
+    var statusTitle: String {
+        switch self {
+        case .available: "Ready"
+        case .unavailable(.requiresNewerOS): "Requires a newer iOS version"
+        case .unavailable(.deviceNotEligible): "Not supported on this device"
+        case .unavailable(.appleIntelligenceNotEnabled): "Apple Intelligence is off"
+        case .unavailable(.modelNotReady): "Apple model is preparing"
+        case .unavailable(.simulatorUnsupported): "Unavailable in Simulator"
+        case .unavailable(.frameworkUnavailable): "Unavailable in this build"
+        }
+    }
+
+    var recoveryGuidance: String {
         switch self {
         case .available:
-            return ""
+            return "On-device requests stay on this iPhone."
         case .unavailable(.requiresNewerOS):
-            return "On-device AI requires iOS 26 or later. Using Omer instead."
+            return "Update iOS to use Apple's on-device model, or manually choose Omer Online."
         case .unavailable(.deviceNotEligible):
-            return "This device does not support Apple Intelligence. Using Omer instead."
+            return "This device cannot run Apple's on-device model. Manually choose Omer Online to continue."
         case .unavailable(.appleIntelligenceNotEnabled):
-            return "Apple Intelligence is turned off. Using Omer instead."
+            return "Turn on Apple Intelligence in iPhone Settings, then return here and try again."
         case .unavailable(.modelNotReady):
-            return "The on-device Apple model is not ready yet. Using Omer instead."
+            return "Keep the iPhone connected to power and Wi-Fi while Apple finishes preparing its model."
         case .unavailable(.simulatorUnsupported):
-            return "On-device Apple AI is not available in Simulator. Using Omer instead."
+            return "Use an eligible iPhone to test Apple on-device AI, or manually choose Omer Online."
         case .unavailable(.frameworkUnavailable):
-            return "On-device AI is unavailable in this build. Using Omer instead."
+            return "Install a build that includes Apple Foundation Models, or manually choose Omer Online."
         }
     }
 }
@@ -53,7 +65,7 @@ enum AppleFoundationModelError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unavailable(let availability):
-            return availability.fallbackExplanation
+            return availability.recoveryGuidance
         }
     }
 }
