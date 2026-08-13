@@ -33,6 +33,17 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
 验证没有读取浏览器 cookie、local storage、Firebase ID Token、数据库内容或环境变量值，
 也没有把个人健康数据或聊天正文复制进本记录。
 
+## 2026-08-13 当前目标收口
+
+- HLT-177 对账当前路线图、Epic、开放 Issues 与已合并 PR。用户故事与 Epic 的仓库实现、
+  自动化验证和已有生产安全切换已完成当前目标范围；没有未合并的实现 PR。
+- Issue #3 保留撤回后停止新增和真实账号删除的生产证据；Issue #7 保留延期的 TestFlight
+  证据。二者调整为非阻塞外部验收，不再阻止当前 goal 完成，也没有被错误关闭。
+- 真机 Apple AI/HealthKit 仍需支持 Verifiable Health Records 的合资格 Apple 团队；真实
+  S2Y 设备闭环仍需硬件。没有删除 entitlement、伪造设备结果或绕过签名能力。
+- 本次收口不执行真实数据删除，不读取凭据、健康数据、聊天正文或数据库业务行。后续若
+  执行不可逆云端删除，必须在操作时取得明确确认。
+
 ## 2026-08-13 Omer 用量账本生产验证
 
 - Omer PR #15 以 OMR-015 单一故事提交组成；Vercel Preview 成功后以普通权限合并，
