@@ -24,10 +24,6 @@ final class SpeechManager: ObservableObject {
     private let synthesizer = AVSpeechSynthesizer()
     private var tapInstalled = false
 
-    init() {
-        Task { await requestAuthorizationsIfNeeded() }
-    }
-
     func requestAuthorizationsIfNeeded() async {
         let speechStatus = await withCheckedContinuation { (continuation: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
             SFSpeechRecognizer.requestAuthorization { status in

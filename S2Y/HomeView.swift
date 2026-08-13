@@ -396,14 +396,15 @@ struct HomeView: View {
         Button {
             isDrawerOpen = true
         } label: {
-            Image(systemName: "sidebar.leading")
+            Image(systemName: "line.3.horizontal")
                 .font(.headline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 42, height: 42)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .symbolRenderingMode(.monochrome)
+                .foregroundColor(.primary)
+                .frame(width: 48, height: 48)
+                .background(.thinMaterial, in: Circle())
                 .shadow(color: Color.black.opacity(0.08), radius: 14, x: 0, y: 6)
         }
-        .padding(.leading, 16)
+        .padding(.leading, 14)
         .padding(.top, 8)
         .accessibilityLabel("Open Navigation Drawer")
         .accessibilityIdentifier("home.drawer.toggle")

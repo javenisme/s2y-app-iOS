@@ -53,7 +53,6 @@ enum HealthAssistantError: Error, LocalizedError {
 
 struct HealthAssistantView: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding private var requestedConversationID: UUID?
 
     @State private var inputText: String = ""
@@ -67,6 +66,7 @@ struct HealthAssistantView: View {
     @State private var availableSuggestionMetrics: Set<HealthKitService.MetricKind> = []
     @State private var didLoadSuggestionAvailability = false
     @State private var responseTask: Task<Void, Never>?
+    @StateObject private var speechManager = SpeechManager()
     @FocusState private var isInputFocused: Bool
     @AppStorage(StorageKeys.healthAssistantAIMode) private var aiModeRawValue = AssistantAIMode.onDevice.rawValue
 
@@ -92,7 +92,7 @@ struct HealthAssistantView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                providerTabs
+                topBar
 
                 if messages.isEmpty {
                     welcomeView
@@ -102,17 +102,7 @@ struct HealthAssistantView: View {
 
                 inputBar
             }
-            .navigationTitle("Health Assistant")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .accessibilityLabel("Settings")
-                    }
-                }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("Done") {
@@ -120,6 +110,7 @@ struct HealthAssistantView: View {
                     }
                 }
             }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingSettings) {
                 NavigationStack {
                     HealthAssistantSettingsView(showsDismissButton: true)
@@ -138,7 +129,14 @@ struct HealthAssistantView: View {
         .onChange(of: newChatRequestID) {
             Task { await beginNewConversation() }
         }
-        .onDisappear(perform: stopResponse)
+        .onChange(of: speechManager.transcript) {
+            guard speechManager.isRecording else { return }
+            inputText = speechManager.transcript
+        }
+        .onDisappear {
+            stopResponse()
+            speechManager.stopRecording()
+        }
         .alert(item: $pendingToolApproval) { approval in
             Alert(
                 title: Text("Allow Omer action?"),
@@ -198,56 +196,56 @@ struct HealthAssistantView: View {
     }
 
     private var welcomeView: some View {
-        ScrollView {
-            welcomeContent
-        }
-        .scrollDismissesKeyboard(.interactively)
-        .onTapGesture {
-            isInputFocused = false
+        GeometryReader { geometry in
+            ScrollView {
+                welcomeContent
+                    .frame(minHeight: geometry.size.height, alignment: .bottom)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .onTapGesture {
+                isInputFocused = false
+            }
         }
     }
 
     private var welcomeContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            welcomeHero
-
+        VStack(alignment: .leading, spacing: 18) {
             if let notice {
                 noticeCard(notice: notice)
             }
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Try asking")
-                    .font(.headline)
-                    .padding(.horizontal, 4)
+            Spacer(minLength: 120)
 
-                LazyVGrid(columns: suggestionColumns, spacing: 10) {
-                    ForEach(quickQuerySuggestions) { suggestion in
-                        QuickQueryRow(suggestion: suggestion) {
-                            inputText = suggestion.query
-                            isInputFocused = true
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(displayedSuggestions) { suggestion in
+                    Button {
+                        inputText = suggestion.query
+                        isInputFocused = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: suggestion.icon)
+                                .font(.body.weight(.medium))
+                                .frame(width: 26)
+                                .accessibilityHidden(true)
+
+                            Text(suggestionPromptTitle(for: suggestion))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+
+                            Spacer(minLength: 0)
                         }
+                        .frame(minHeight: 56)
+                        .contentShape(Rectangle())
                     }
-                }
-
-                if didLoadSuggestionAvailability, quickQuerySuggestions.isEmpty {
-                    ContentUnavailableView(
-                        "No recent Health data",
-                        systemImage: "heart.text.clipboard",
-                        description: Text("Connect Health data to see questions tailored to the information available on this iPhone.")
-                    )
-                    .frame(maxWidth: .infinity)
-                } else if !didLoadSuggestionAvailability {
-                    ProgressView("Checking available Health data…")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Copies this health question into the message field")
                 }
             }
-
-            Spacer(minLength: 24)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 24)
+        .padding(.horizontal, 24)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
     }
     
     private var messagesScrollView: some View {
@@ -312,16 +310,37 @@ struct HealthAssistantView: View {
         }
     }
 
-    private var providerTabs: some View {
-        HStack(spacing: 0) {
-            providerTab(.onDevice, title: "Local AI")
-            providerTab(.omer, title: "Omer")
+    private var topBar: some View {
+        ZStack {
+            HStack(spacing: 0) {
+                providerTab(.onDevice, title: "Local AI")
+                providerTab(.omer, title: "Omer")
+            }
+            .padding(5)
+            .background(Color(uiColor: .secondarySystemBackground), in: Capsule())
+            .frame(maxWidth: 210)
+
+            HStack {
+                Spacer()
+
+                Button {
+                    showingSettings = true
+                } label: {
+                    Image(systemName: "person.crop.circle")
+                        .font(.title3.weight(.medium))
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundColor(.primary)
+                        .frame(width: 44, height: 44)
+                        .background(.thinMaterial, in: Circle())
+                        .shadow(color: Color.black.opacity(0.07), radius: 12, x: 0, y: 5)
+                }
+                .accessibilityLabel("Health Assistant settings")
+                .accessibilityIdentifier("health-assistant-settings")
+            }
         }
+        .frame(minHeight: 60)
         .padding(.horizontal, 16)
-        .background(Color(uiColor: .systemBackground))
-        .overlay(alignment: .bottom) {
-            Divider()
-        }
+        .padding(.top, 4)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("AI provider")
     }
@@ -332,18 +351,17 @@ struct HealthAssistantView: View {
         return Button {
             aiModeRawValue = mode.rawValue
         } label: {
-            VStack(spacing: 8) {
-                Text(title)
-                    .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-                    .frame(maxWidth: .infinity)
-
-                Capsule()
-                    .fill(isSelected ? Color.primary : Color.clear)
-                    .frame(height: 2)
-            }
-            .padding(.top, 10)
-            .contentShape(Rectangle())
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity)
+                .frame(height: 38)
+                .background(
+                    isSelected ? Color(uiColor: .systemBackground) : Color.clear,
+                    in: Capsule()
+                )
+                .shadow(color: Color.black.opacity(isSelected ? 0.06 : 0), radius: 5, x: 0, y: 2)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(isProcessing)
@@ -355,46 +373,114 @@ struct HealthAssistantView: View {
     }
     
     private var inputBar: some View {
-        VStack(spacing: 0) {
-            Divider()
-
-            (dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .trailing, spacing: 12))
-                : AnyLayout(HStackLayout(spacing: 12))) {
-                TextField("Ask about your health data...", text: $inputText, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(1...4)
-                    .disabled(isProcessing)
-                    .focused($isInputFocused)
-                    .submitLabel(.send)
-                    .onSubmit {
-                        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isProcessing else { return }
-                        startSending()
-                    }
-                    .accessibilityIdentifier("health-assistant-input")
-                
-                Button {
-                    if isProcessing {
-                        stopResponse()
-                    } else {
-                        startSending()
-                    }
-                } label: {
-                    Image(systemName: isProcessing ? "stop.fill" : "paperplane.fill")
-                        .foregroundColor(.white)
-                        .frame(width: 44, height: 44)
-                        .background(isProcessing ? Color.red : (inputText.isEmpty ? Color.gray : Color.blue))
-                        .clipShape(Circle())
-                        .accessibilityHidden(true)
+        HStack(spacing: 8) {
+            Menu {
+                Button("New chat", systemImage: "square.and.pencil") {
+                    Task { await beginNewConversation() }
                 }
-                .disabled(!isProcessing && inputText.isEmpty)
-                .accessibilityLabel(isProcessing ? "Stop Response" : "Send Message")
-                .accessibilityHint(isProcessing ? "Stops the current AI response" : "Sends your health question")
-                .accessibilityIdentifier(isProcessing ? "health-assistant-stop" : "health-assistant-send")
+
+                Button("Assistant settings", systemImage: "gearshape") {
+                    showingSettings = true
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.title3.weight(.medium))
+                    .symbolRenderingMode(.monochrome)
+                    .foregroundColor(.primary)
+                    .frame(width: 40, height: 44)
             }
-            .padding()
+            .tint(.primary)
+            .accessibilityLabel("Chat actions")
+            .accessibilityIdentifier("health-assistant-actions")
+
+            TextField("Ask about your health", text: $inputText, axis: .vertical)
+                .textFieldStyle(.plain)
+                .lineLimit(1...4)
+                .disabled(isProcessing)
+                .focused($isInputFocused)
+                .submitLabel(.send)
+                .onSubmit {
+                    guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isProcessing else { return }
+                    startSending()
+                }
+                .accessibilityIdentifier("health-assistant-input")
+
+            Button {
+                toggleVoiceInput()
+            } label: {
+                Image(systemName: speechManager.isRecording ? "stop.circle.fill" : "mic")
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(speechManager.isRecording ? Color.red : Color.primary)
+                    .frame(width: 40, height: 44)
+            }
+            .disabled(isProcessing)
+            .accessibilityLabel(speechManager.isRecording ? "Stop dictation" : "Dictate message")
+            .accessibilityIdentifier("health-assistant-dictation")
+
+            Button {
+                if isProcessing {
+                    stopResponse()
+                } else if inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    toggleVoiceInput()
+                } else {
+                    startSending()
+                }
+            } label: {
+                Image(systemName: inputActionSystemImage)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(isProcessing ? Color.red : Color(uiColor: .label), in: Circle())
+                    .accessibilityHidden(true)
+            }
+            .accessibilityLabel(inputActionAccessibilityLabel)
+            .accessibilityIdentifier(inputActionAccessibilityIdentifier)
         }
-        .background(.bar)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .stroke(Color.white.opacity(0.7), lineWidth: 0.8)
+        }
+        .shadow(color: Color.black.opacity(0.09), radius: 22, x: 0, y: 9)
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
+    }
+
+    private var inputActionSystemImage: String {
+        if isProcessing { return "stop.fill" }
+        if inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "waveform" }
+        return "arrow.up"
+    }
+
+    private var inputActionAccessibilityLabel: String {
+        if isProcessing { return "Stop Response" }
+        if inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Start voice input" }
+        return "Send Message"
+    }
+
+    private var inputActionAccessibilityIdentifier: String {
+        if isProcessing { return "health-assistant-stop" }
+        if inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "health-assistant-voice" }
+        return "health-assistant-send"
+    }
+
+    @MainActor
+    private func toggleVoiceInput() {
+        if speechManager.isRecording {
+            speechManager.stopRecording()
+            return
+        }
+
+        Task { @MainActor in
+            do {
+                try await speechManager.startRecording(languageCode: nil)
+            } catch {
+                notice = AssistantNotice(message: error.localizedDescription, tone: .warning)
+            }
+        }
     }
     
     private func noticeCard(notice: AssistantNotice) -> some View {
@@ -872,29 +958,23 @@ struct HealthAssistantView: View {
         streamTick += 1
     }
 
-    private var welcomeHero: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: "heart.text.square.fill")
-                .font(.title2)
-                .foregroundStyle(.red)
-                .frame(width: 44, height: 44)
-                .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Ask about your health")
-                    .font(.title3.weight(.semibold))
-
-                Text("Get a clear summary of your sleep, activity, heart rate, and other Health data.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(.vertical, 6)
-    }
-
     private var quickQuerySuggestions: [HealthQuickQuerySuggestion] {
         HealthQuickQuerySuggestion.catalog.filter { availableSuggestionMetrics.contains($0.metricKind) }
+    }
+
+    private var displayedSuggestions: [HealthQuickQuerySuggestion] {
+        let available = quickQuerySuggestions
+        return Array((available.isEmpty ? HealthQuickQuerySuggestion.catalog : available).prefix(3))
+    }
+
+    private func suggestionPromptTitle(for suggestion: HealthQuickQuerySuggestion) -> String {
+        switch suggestion.id {
+        case "steps": String(localized: "Review my 7-day step trend")
+        case "heart-rate": String(localized: "Compare this week's heart rate")
+        case "sleep": String(localized: "How has my sleep quality changed?")
+        case "active-energy": String(localized: "Review my active energy trend")
+        default: suggestion.query
+        }
     }
 }
 
@@ -942,13 +1022,6 @@ struct HealthQuickQuerySuggestion: Identifiable, Equatable, Sendable {
 }
 
 private extension HealthAssistantView {
-    var suggestionColumns: [GridItem] {
-        if dynamicTypeSize.isAccessibilitySize {
-            return [GridItem(.flexible())]
-        }
-        return [GridItem(.flexible()), GridItem(.flexible())]
-    }
-
     var selectedAIMode: AssistantAIMode {
         AssistantAIMode(rawValue: aiModeRawValue) ?? .onDevice
     }

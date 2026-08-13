@@ -29,6 +29,10 @@ final class HealthAssistantChatUITests: XCTestCase {
         omerTab.tap()
         XCTAssertEqual(omerTab.value as? String, "Selected")
         XCTAssertFalse(app.buttons["health-assistant-ai-mode"].exists)
+        XCTAssertTrue(app.buttons["health-assistant-settings"].exists)
+        XCTAssertTrue(app.buttons["health-assistant-actions"].exists)
+        XCTAssertTrue(app.buttons["health-assistant-dictation"].exists)
+        XCTAssertTrue(app.buttons["health-assistant-voice"].exists)
 
         let input = app.textFields["health-assistant-input"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))
