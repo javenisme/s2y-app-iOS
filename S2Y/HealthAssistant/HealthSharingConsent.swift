@@ -16,6 +16,8 @@ public enum HealthSharingScope: String, Codable, Sendable, CaseIterable, Hashabl
     case relevantHealthSummary
     /// User and assistant text produced during an on-device conversation.
     case onDeviceConversationSync
+    /// A bounded set of selected clinical record summary fields.
+    case clinicalRecordSummary
 }
 
 public struct HealthSharingAuthorization: Codable, Sendable, Equatable {
@@ -47,6 +49,7 @@ private extension HealthSharingScope {
         case .omerChatText: "Omer chat text"
         case .relevantHealthSummary: "relevant Health summary"
         case .onDeviceConversationSync: "on-device conversation sync"
+        case .clinicalRecordSummary: "selected clinical record summaries"
         }
     }
 }

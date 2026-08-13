@@ -8,6 +8,7 @@
 
 import Foundation
 import HealthKit
+import SwiftUI
 
 public enum ClinicalRecordCategory: String, CaseIterable, Identifiable, Sendable {
     case allergies
@@ -58,7 +59,154 @@ public struct ClinicalRecordSummary: Codable, Equatable, Identifiable, Sendable 
     public let displayName: String
     public let recordedAt: Date
     public let sourceName: String
-    public let fhirResourceIdentifier: String?
+    public let hasLinkedFHIRResource: Bool
+
+    public func recency(relativeTo referenceDate: Date = .now) -> ClinicalRecordRecency {
+        let age = max(0, referenceDate.timeIntervalSince(recordedAt))
+        if age <= 90 * 24 * 60 * 60 {
+            return .recent
+        }
+        if age <= 365 * 24 * 60 * 60 {
+            return .older
+        }
+        return .historical
+    }
+}
+
+public enum ClinicalRecordRecency: String, Codable, Sendable, Equatable {
+    case recent
+    case older
+    case historical
+}
+
+public struct ClinicalRecordIndexAssessment: Sendable, Equatable {
+    public let totalRecordCount: Int
+    public let sourceCount: Int
+    public let categoryCounts: [ClinicalRecordCategory: Int]
+    public let selectedCategoriesWithoutReadableRecords: Set<ClinicalRecordCategory>
+    public let newestRecordedAt: Date?
+    public let oldestRecordedAt: Date?
+}
+
+public struct ClinicalRecordIndex: Codable, Sendable, Equatable {
+    public private(set) var records: [ClinicalRecordSummary]
+    public let selectedCategories: Set<ClinicalRecordCategory>
+    public let refreshedAt: Date
+    public let maximumRecordCount: Int
+
+    public init(
+        records: [ClinicalRecordSummary],
+        selectedCategories: Set<ClinicalRecordCategory>,
+        refreshedAt: Date = .now,
+        maximumRecordCount: Int = 200
+    ) {
+        self.maximumRecordCount = max(1, maximumRecordCount)
+        self.selectedCategories = selectedCategories
+        self.refreshedAt = refreshedAt
+
+        var seenIDs = Set<UUID>()
+        self.records = records
+            .filter { selectedCategories.contains($0.category) }
+            .sorted { $0.recordedAt > $1.recordedAt }
+            .filter { seenIDs.insert($0.id).inserted }
+        self.records = Array(self.records.prefix(self.maximumRecordCount))
+    }
+
+    public var assessment: ClinicalRecordIndexAssessment {
+        let categoryCounts = Dictionary(grouping: records, by: \.category)
+            .mapValues(\.count)
+        return ClinicalRecordIndexAssessment(
+            totalRecordCount: records.count,
+            sourceCount: Set(records.map(\.sourceName)).count,
+            categoryCounts: categoryCounts,
+            selectedCategoriesWithoutReadableRecords: selectedCategories.subtracting(categoryCounts.keys),
+            newestRecordedAt: records.map(\.recordedAt).max(),
+            oldestRecordedAt: records.map(\.recordedAt).min()
+        )
+    }
+}
+
+public enum ClinicalRecordContextBuilder {
+    public static func build(
+        from index: ClinicalRecordIndex?,
+        maximumRecordCount: Int = 10,
+        maximumCharacterCount: Int = 2_000
+    ) -> String? {
+        guard let index, !index.records.isEmpty else {
+            return nil
+        }
+        let recordLimit = max(1, maximumRecordCount)
+        let characterLimit = max(1, maximumCharacterCount)
+        var lines: [String] = []
+
+        for record in index.records.prefix(recordLimit) {
+            let line = [
+                "category=\(record.category.title)",
+                "name=\(sanitized(record.displayName, limit: 120))",
+                "date=\(record.recordedAt.formatted(.iso8601.year().month().day()))",
+                "source=\(sanitized(record.sourceName, limit: 80))"
+            ].joined(separator: "; ")
+            let candidate = (lines + [line]).joined(separator: "\n")
+            guard candidate.count <= characterLimit else {
+                break
+            }
+            lines.append(line)
+        }
+
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
+    }
+
+    private static func sanitized(_ value: String, limit: Int) -> String {
+        String(
+            value
+                .split(whereSeparator: \.isWhitespace)
+                .joined(separator: " ")
+                .prefix(limit)
+        )
+    }
+}
+
+@MainActor
+final class ClinicalRecordIndexStore: ObservableObject {
+    static let shared = ClinicalRecordIndexStore()
+
+    @Published private(set) var index: ClinicalRecordIndex?
+
+    private let fileManager: FileManager
+    private let fileURL: URL
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+
+    init(fileManager: FileManager = .default, fileURL: URL? = nil) {
+        self.fileManager = fileManager
+        let supportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        self.fileURL = fileURL ?? supportDirectory
+            .appendingPathComponent("ClinicalRecords", isDirectory: true)
+            .appendingPathComponent("summary-index.json")
+        self.index = (try? Data(contentsOf: self.fileURL))
+            .flatMap { try? decoder.decode(ClinicalRecordIndex.self, from: $0) }
+    }
+
+    func replace(with index: ClinicalRecordIndex) throws {
+        let directory = fileURL.deletingLastPathComponent()
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        var resourceValues = URLResourceValues()
+        resourceValues.isExcludedFromBackup = true
+        var mutableDirectory = directory
+        try? mutableDirectory.setResourceValues(resourceValues)
+        try encoder.encode(index).write(
+            to: fileURL,
+            options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]
+        )
+        self.index = index
+    }
+
+    func clear() throws {
+        if fileManager.fileExists(atPath: fileURL.path) {
+            try fileManager.removeItem(at: fileURL)
+        }
+        index = nil
+    }
 }
 
 extension ClinicalRecordCategory: Codable {}
@@ -112,7 +260,7 @@ extension HealthKitService {
                 displayName: record.displayName,
                 recordedAt: record.startDate,
                 sourceName: record.sourceRevision.source.name,
-                fhirResourceIdentifier: record.fhirResource?.identifier
+                hasLinkedFHIRResource: record.fhirResource != nil
             )
         }
     }

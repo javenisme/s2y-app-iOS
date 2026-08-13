@@ -298,7 +298,7 @@ final class OmerMobileChatModelsTests: XCTestCase {
             displayName: "Example laboratory result",
             recordedAt: date,
             sourceName: "Example Health Provider",
-            fhirResourceIdentifier: "Observation/example"
+            hasLinkedFHIRResource: true
         )
 
         let data = try encoder.encode(summary)
@@ -306,6 +306,114 @@ final class OmerMobileChatModelsTests: XCTestCase {
 
         XCTAssertEqual(decoded, summary)
         XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("resourceType"))
+    }
+
+    func testClinicalRecordIndexFiltersDeduplicatesAndBoundsSummaries() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let selectedID = UUID()
+        let selected = ClinicalRecordSummary(
+            id: selectedID,
+            category: .labResults,
+            displayName: "Selected result",
+            recordedAt: date,
+            sourceName: "Provider A",
+            hasLinkedFHIRResource: true
+        )
+        let olderDuplicate = ClinicalRecordSummary(
+            id: selectedID,
+            category: .labResults,
+            displayName: "Duplicate result",
+            recordedAt: date.addingTimeInterval(-60),
+            sourceName: "Provider A",
+            hasLinkedFHIRResource: true
+        )
+        let unselected = ClinicalRecordSummary(
+            id: UUID(),
+            category: .medications,
+            displayName: "Medication",
+            recordedAt: date,
+            sourceName: "Provider B",
+            hasLinkedFHIRResource: true
+        )
+
+        let index = ClinicalRecordIndex(
+            records: [olderDuplicate, selected, unselected],
+            selectedCategories: [.labResults],
+            refreshedAt: date,
+            maximumRecordCount: 1
+        )
+
+        XCTAssertEqual(index.records, [selected])
+        XCTAssertEqual(index.maximumRecordCount, 1)
+        let json = String(decoding: try encoder.encode(index), as: UTF8.self)
+        XCTAssertFalse(json.contains("resourceType"))
+    }
+
+    func testClinicalRecordIndexReportsProvenanceCoverageAndRecency() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let recent = ClinicalRecordSummary(
+            id: UUID(),
+            category: .labResults,
+            displayName: "Recent result",
+            recordedAt: now.addingTimeInterval(-30 * 24 * 60 * 60),
+            sourceName: "Provider A",
+            hasLinkedFHIRResource: true
+        )
+        let historical = ClinicalRecordSummary(
+            id: UUID(),
+            category: .conditions,
+            displayName: "Historical condition",
+            recordedAt: now.addingTimeInterval(-400 * 24 * 60 * 60),
+            sourceName: "Provider B",
+            hasLinkedFHIRResource: false
+        )
+        let index = ClinicalRecordIndex(
+            records: [recent, historical],
+            selectedCategories: [.labResults, .conditions, .medications],
+            refreshedAt: now
+        )
+
+        XCTAssertEqual(recent.recency(relativeTo: now), .recent)
+        XCTAssertEqual(historical.recency(relativeTo: now), .historical)
+        XCTAssertEqual(index.assessment.totalRecordCount, 2)
+        XCTAssertEqual(index.assessment.sourceCount, 2)
+        XCTAssertEqual(index.assessment.categoryCounts[.labResults], 1)
+        XCTAssertEqual(index.assessment.selectedCategoriesWithoutReadableRecords, [.medications])
+        XCTAssertEqual(index.assessment.newestRecordedAt, recent.recordedAt)
+        XCTAssertEqual(index.assessment.oldestRecordedAt, historical.recordedAt)
+
+        let json = String(decoding: try encoder.encode(index), as: UTF8.self)
+        XCTAssertFalse(json.contains("Observation/"))
+        XCTAssertFalse(json.contains("FHIRResourceIdentifier"))
+    }
+
+    @MainActor
+    func testClinicalRecordIndexStorePersistsAndClearsLocalSummaryFile() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let fileURL = directory.appendingPathComponent("summary-index.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let record = ClinicalRecordSummary(
+            id: UUID(),
+            category: .conditions,
+            displayName: "Example condition",
+            recordedAt: .now,
+            sourceName: "Provider A",
+            hasLinkedFHIRResource: true
+        )
+        let index = ClinicalRecordIndex(records: [record], selectedCategories: [.conditions])
+        let store = ClinicalRecordIndexStore(fileURL: fileURL)
+
+        try store.replace(with: index)
+
+        XCTAssertEqual(store.index, index)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
+        XCTAssertEqual(ClinicalRecordIndexStore(fileURL: fileURL).index, index)
+
+        try store.clear()
+
+        XCTAssertNil(store.index)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
     }
 
     func testWearableMeasurementsNormalizeUnitsAndPreserveOrigin() throws {
@@ -1087,6 +1195,7 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertTrue(HealthSharingConsentPolicy.permits(.omerChatText, authorization: authorization))
         XCTAssertFalse(HealthSharingConsentPolicy.permits(.relevantHealthSummary, authorization: authorization))
         XCTAssertFalse(HealthSharingConsentPolicy.permits(.onDeviceConversationSync, authorization: authorization))
+        XCTAssertFalse(HealthSharingConsentPolicy.permits(.clinicalRecordSummary, authorization: authorization))
         XCTAssertEqual(
             HealthSharingConsentPolicy.decision(
                 requestedScopes: [.omerChatText, .relevantHealthSummary],
@@ -1144,6 +1253,38 @@ final class OmerMobileChatModelsTests: XCTestCase {
                 HealthSharingConsentFailure(missingScopes: [.relevantHealthSummary])
             )
         }
+    }
+
+    func testClinicalRecordContextIsBoundedAndExcludesIdentifiers() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let records = (0..<3).map { offset in
+            ClinicalRecordSummary(
+                id: UUID(),
+                category: .labResults,
+                displayName: "Example result \(offset)\nwith whitespace",
+                recordedAt: now.addingTimeInterval(TimeInterval(-offset * 60)),
+                sourceName: "Example Provider",
+                hasLinkedFHIRResource: true
+            )
+        }
+        let index = ClinicalRecordIndex(
+            records: records,
+            selectedCategories: [.labResults],
+            refreshedAt: now
+        )
+
+        let context = try XCTUnwrap(ClinicalRecordContextBuilder.build(
+            from: index,
+            maximumRecordCount: 2,
+            maximumCharacterCount: 500
+        ))
+
+        XCTAssertEqual(context.components(separatedBy: "\n").count, 2)
+        XCTAssertTrue(context.contains("Example result 0 with whitespace"))
+        XCTAssertTrue(context.contains("source=Example Provider"))
+        XCTAssertFalse(context.contains(records[0].id.uuidString))
+        XCTAssertFalse(context.localizedCaseInsensitiveContains("fhir"))
+        XCTAssertLessThanOrEqual(context.count, 500)
     }
 
     func testRevokingOnDeviceSyncDoesNotRevokeOmerQuestionConsent() {

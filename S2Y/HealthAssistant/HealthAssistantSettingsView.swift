@@ -51,6 +51,11 @@ struct HealthAssistantSettingsView: View {
                     isOn: consentBinding(for: .onDeviceConversationSync)
                 )
 
+                Toggle(
+                    "Share selected clinical record summaries",
+                    isOn: consentBinding(for: .clinicalRecordSummary)
+                )
+
                 NavigationLink {
                     HealthSafetyActivityView()
                 } label: {
@@ -61,6 +66,7 @@ struct HealthAssistantSettingsView: View {
             } footer: {
                 Text(
                     "Each sharing choice is independent and can be withdrawn immediately. "
+                        + "Clinical record summaries are never included under the general Health summary choice. "
                         + "On-device analysis stays on this iPhone unless conversation sync is enabled."
                 )
             }
@@ -74,6 +80,12 @@ struct HealthAssistantSettingsView: View {
             }
 
             Section {
+                NavigationLink {
+                    ClinicalRecordsSettingsView()
+                } label: {
+                    Label("Clinical Record Summaries", systemImage: "cross.case")
+                }
+
                 Button("Clear locally saved chat history", role: .destructive) {
                     Task {
                         await OmerChatService.shared.clearLocalChatCache()
@@ -88,7 +100,7 @@ struct HealthAssistantSettingsView: View {
             } header: {
                 Text("Data")
             } footer: {
-                Text("This removes cached Health summaries from this iPhone. It does not delete data from Apple Health.")
+                Text("Manage clinical summaries separately. Cache actions never delete data from Apple Health.")
             }
         }
         .navigationTitle("Health Assistant")

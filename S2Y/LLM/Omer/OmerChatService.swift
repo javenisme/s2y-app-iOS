@@ -43,13 +43,22 @@ actor OmerChatService {
         let sessionKey = sessionKey(for: serviceURL)
         let conversationID = await existingOrNewConversationID(sessionKey: sessionKey)
         let requestID = UUID()
-        let healthContext = await OmerHealthContextBuilder.buildSummary(
+        var healthContext = await OmerHealthContextBuilder.buildSummary(
             for: message,
             includeHealthContext: includeHealthContext && HealthSharingConsentPolicy.permits(
                 .relevantHealthSummary,
                 authorization: authorization
             )
         )
+        if HealthSharingConsentPolicy.permits(.clinicalRecordSummary, authorization: authorization),
+           let clinicalSummary = await ClinicalRecordContextBuilder.build(
+               from: ClinicalRecordIndexStore.shared.index
+           ) {
+            healthContext = (healthContext ?? [:]).merging(
+                ["selectedClinicalRecordSummaries": clinicalSummary],
+                uniquingKeysWith: { _, clinical in clinical }
+            )
+        }
         let body = OmerMobileChatRequest(
             requestId: requestID,
             conversationId: conversationID,
