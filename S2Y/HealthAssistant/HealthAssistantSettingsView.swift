@@ -81,6 +81,12 @@ struct HealthAssistantSettingsView: View {
 
             Section {
                 NavigationLink {
+                    WellbeingCheckInHistoryView()
+                } label: {
+                    Label("Daily Check-in History", systemImage: "checkmark.circle")
+                }
+
+                NavigationLink {
                     ClinicalRecordsSettingsView()
                 } label: {
                     Label("Clinical Record Summaries", systemImage: "cross.case")
