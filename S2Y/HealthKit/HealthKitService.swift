@@ -695,7 +695,39 @@ public final class HealthKitService {
         }
     }
 
+    struct ComparisonDateWindows: Equatable {
+        let currentStart: Date
+        let currentEnd: Date
+        let previousStart: Date
+        let previousEnd: Date
+    }
+
+    nonisolated static func comparisonDateWindows(
+        windowDays: Int,
+        endingAt end: Date,
+        calendar: Calendar = .current
+    ) -> ComparisonDateWindows {
+        let days = max(windowDays, 1)
+        let currentEnd = calendar.startOfDay(for: end)
+        let currentStart = calendar.date(byAdding: .day, value: -days + 1, to: currentEnd) ?? currentEnd
+        let previousEnd = calendar.date(byAdding: .day, value: -1, to: currentStart) ?? currentStart
+        let previousStart = calendar.date(byAdding: .day, value: -days + 1, to: previousEnd) ?? previousEnd
+        return ComparisonDateWindows(
+            currentStart: currentStart,
+            currentEnd: currentEnd,
+            previousStart: previousStart,
+            previousEnd: previousEnd
+        )
+    }
+
     public func compare(kind: MetricKind, windowDays: Int, endingAt end: Date = Date(), useCache: Bool = true) async throws -> Comparison {
+        guard windowDays > 0 else {
+            throw NSError(
+                domain: "HealthKit",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Comparison window must include at least one day."]
+            )
+        }
         let cache = HealthKitCache.shared
         let cacheKey = cache.comparisonCacheKey(kind: kind, windowDays: windowDays, endDate: end)
         
@@ -705,14 +737,20 @@ public final class HealthKitService {
             return cached
         }
         
-        let calendar = Calendar.current
-        let endOfDay = calendar.startOfDay(for: end)
-        let startCurrent = calendar.date(byAdding: .day, value: -windowDays + 1, to: endOfDay) ?? endOfDay
-        let endPrev = calendar.date(byAdding: .day, value: -windowDays, to: startCurrent) ?? startCurrent
-        let startPrev = calendar.date(byAdding: .day, value: -windowDays + 1, to: endPrev) ?? endPrev
+        let windows = Self.comparisonDateWindows(windowDays: windowDays, endingAt: end)
 
-        async let current = fetchDailyMetrics(kind: kind, start: startCurrent, end: endOfDay, useCache: useCache)
-        async let previous = fetchDailyMetrics(kind: kind, start: startPrev, end: endPrev, useCache: useCache)
+        async let current = fetchDailyMetrics(
+            kind: kind,
+            start: windows.currentStart,
+            end: windows.currentEnd,
+            useCache: useCache
+        )
+        async let previous = fetchDailyMetrics(
+            kind: kind,
+            start: windows.previousStart,
+            end: windows.previousEnd,
+            useCache: useCache
+        )
 
         let (curSeries, prevSeries) = try await (current, previous)
         let result = Comparison.summarize(

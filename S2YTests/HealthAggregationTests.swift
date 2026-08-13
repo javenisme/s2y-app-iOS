@@ -64,4 +64,29 @@ final class HealthAggregationTests: XCTestCase {
 
         XCTAssertNil(trend.movingAverage(windowDays: 7).first?.value)
     }
+
+    func testComparisonWindowsAreAdjacentAndEqualLength() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let end = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+
+        let windows = HealthKitService.comparisonDateWindows(
+            windowDays: 7,
+            endingAt: end,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(windows.currentStart, try XCTUnwrap(date("2026-08-06T00:00:00Z")))
+        XCTAssertEqual(windows.currentEnd, try XCTUnwrap(date("2026-08-12T00:00:00Z")))
+        XCTAssertEqual(windows.previousStart, try XCTUnwrap(date("2026-07-30T00:00:00Z")))
+        XCTAssertEqual(windows.previousEnd, try XCTUnwrap(date("2026-08-05T00:00:00Z")))
+        XCTAssertEqual(
+            calendar.date(byAdding: .day, value: 1, to: windows.previousEnd),
+            windows.currentStart
+        )
+    }
+
+    private func date(_ value: String) -> Date? {
+        ISO8601DateFormatter().date(from: value)
+    }
 }
