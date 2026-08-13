@@ -91,10 +91,21 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
 - Debug 模拟器 App 安装并启动成功；等待初始化后进入 S2Y Health Assistant onboarding。
   该 smoke check 证明应用可启动，不证明 Firebase 登录、HealthKit 真机数据或 Apple
   Foundation Models 端侧推理。
-- 测试启动日志仍显示模拟器没有 Keychain entitlement、通知后台模式及 Spezi 调度声明；
-  测试未因此失败。这些属于模拟器/应用配置提示，不可当作真机签名或推送验收通过。
+- 测试启动日志显示无签名模拟器 App 没有 Keychain entitlement；测试未因此失败。通知后台模式与
+  Spezi 调度声明的两项真实工程缺口已由后续 H43 修复，不可将模拟器结果当作真机签名或推送验收通过。
 - PR #69、#70 的 SwiftLint 与 REUSE 检查成功；依赖自托管执行器的 Build、CodeQL、
   Periphery、DocC 和链接检查仍处于 queued，未将排队状态记录为通过或代码失败。
+
+## 2026-08-13 通知运行时配置验收
+
+- HLT-154 在应用声明中补齐 `remote-notification` 后台模式，使既有远程通知回调与系统能力一致；
+  同时允许 Spezi Scheduler 使用其固定后台刷新任务标识，避免启用 `fetch` 后注册被系统拒绝。
+- 新增 2 项运行时配置回归测试，直接读取构建后的 App 信息声明；专项测试 2 项、0 失败。
+- 完整 `S2YTests` 实际运行通过：159 项 XCTest 与 6 项 Swift Testing，共 165 项、0 失败；
+  `build-for-testing`、Info.plist 语法和完整 SwiftLint（124 个 Swift 文件、0 违规）通过。
+- 修复后的测试启动日志不再出现远程通知后台模式或 Spezi 调度任务未声明警告。仍存在的
+  Keychain entitlement 提示来自 `CODE_SIGNING_ALLOWED=NO` 的隔离模拟器构建，不代表签名真机验收。
+- 本主题只修复声明与回归保护，不证明 APNs 生产送达、后台唤醒时限、签名或 TestFlight 行为。
 
 ## 2026-08-13 Omer 健康管理安全验证
 

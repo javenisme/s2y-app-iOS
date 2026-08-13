@@ -167,7 +167,7 @@
 
 - Archive/签名、TestFlight、隐私清单、崩溃监控、App Store 元数据与回滚流程通过。
 - 仓库证据：H34（HLT-138～141）已提供增量静态质量、应用隐私清单、发布预检和脱敏验收记录。
-- 模拟器证据：H42 / HLT-153 已在独立 iPhone 16e 模拟器实际运行完整 `S2YTests`（163 项、0 失败）并完成应用启动 smoke check；该结果不替代签名、TestFlight 或真机验收。
+- 模拟器证据：H42 / HLT-153 已在独立 iPhone 16e 模拟器实际运行完整 `S2YTests`（当时 163 项、0 失败）并完成应用启动 smoke check；H43 / HLT-154～155 补齐远程通知后台模式与 Spezi 调度任务声明，并将完整测试更新为 165 项、0 失败。该结果不替代 APNs、签名、TestFlight 或真机验收。
 - 外部缺口：签名 Archive 当前受 Xcode 账户凭据及 Verifiable Health Records profile 能力阻塞；TestFlight 安装、崩溃监控、元数据、回滚和审核尚未验收，不能标记完成。
 - 真机补充证据：H36 / HLT-144 的 Debug 真机构建在越过已锁定依赖的宏信任门后，仍在相同两项签名条件失败；未生成或安装 `.app`。
 
