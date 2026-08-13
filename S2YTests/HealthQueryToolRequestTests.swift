@@ -5,8 +5,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-import XCTest
 @testable import S2Y
+import XCTest
 
 final class HealthQueryToolRequestTests: XCTestCase {
     func testToolRequestRoundTripsAsStableJSONSchema() throws {
@@ -111,7 +111,8 @@ final class HealthQueryToolRequestTests: XCTestCase {
         let result = try await HealthQueryProcessor.processQuery("Show my sleep trend for 365 days")
 
         guard case .textResponse(let message) = result else {
-            return XCTFail("Expected a validation response")
+            XCTFail("Expected a validation response")
+            return
         }
         XCTAssertEqual(message, "Choose a time window from 1 to 90 days.")
     }
