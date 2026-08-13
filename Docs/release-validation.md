@@ -20,12 +20,12 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
 
 | 检查 | 结果 | 证据边界 |
 |---|---|---|
-| Omer 主线 | 通过 | 统一权限/用量与 Home 认证兼容改动已由 Omer PR #8～#10 合并；质量整理由 PR #12 合并；健康管理安全边界由 PR #13 合并，当前生产合并提交为 `bacc6218` |
-| Omer Production | 通过 | Vercel Production 为 Ready，`chat.s2y.us` 指向该最新部署；未记录部署 ID 或环境变量值 |
+| Omer 主线 | 通过 | 统一权限/用量与 Home 认证兼容改动已由 Omer PR #8～#10 合并；质量整理由 PR #12 合并；运行时健康管理边界由 PR #13 合并；公开产品文案边界由 PR #14 合并 |
+| Omer Production | 通过 | Vercel Production 为 Ready，`chat.s2y.us` 指向 PR #14 的最新 `main` 部署；未记录部署 ID 或环境变量值 |
 | 已认证读取 | 通过 | 部署后刷新既有生产对话成功，历史用户问题与 Omer 回复可见，页面控制台无错误 |
 | 健康管理边界 | 通过 | 生产版本不再从问卷自动生成 tVNS 参数、运动处方、补充剂剂量或诊断表型；历史计划读取时过滤设备、药物与剂量内容 |
 | Home 登录入口 | 通过 | `www.s2y.us/auth/login` 展示 Google、邮箱登录入口，Firebase 配置不再显示 incomplete/internal-error，页面控制台无错误 |
-| 新消息与计费 | 未验证 | 本轮未新增生产聊天记录；不能据此声称 token 账本、订阅映射或写入幂等已通过 |
+| 新消息与计费 | 部分通过 | 已登录测试账号的最小非健康消息及 AI 回复在刷新后仍可读取；订阅状态接口返回 200，页面展示 Free 档位；未直接读取 token 账本记录，不能声称计费账本已完整验收 |
 | 同意与数据生命周期 | 未验证 | 尚需测试账号逐范围 grant/revoke，并用脱敏服务端证据确认停止新增与删除行为 |
 
 验证没有读取浏览器 cookie、local storage、Firebase ID Token、数据库内容或环境变量值，
@@ -40,6 +40,19 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
 - TypeScript 检查、Next.js Production build、改动文件格式检查和敏感信息模式扫描通过。
 - 生产 `chat.s2y.us` 已指向该合并部署；既有已认证会话可读取，页面控制台无错误。
 - 本次验证未发送新消息，因此不构成新写入、token 账本、订阅映射或同意撤回证据。
+
+## 2026-08-13 Omer 公开健康管理边界验证
+
+- Omer PR #14 以 OMR-012～014 三个独立故事提交合并，Vercel Preview 通过后正常
+  进入 Production，未绕过检查。
+- 定价页、能力目录、站点标题、SEO/分享元数据、页脚和设置页均已移除公开的
+  “Digital Therapy”、诊断、治疗、运动处方、补充剂剂量及 tVNS 参数承诺。
+- 完整单元测试 438 项通过，8 项数据库集成测试按显式开关跳过；TypeScript、纯
+  Next.js Production build、改动文件格式和敏感信息模式扫描通过。
+- 生产浏览器复验确认 `chat.s2y.us` 标题为 Health Management Platform，定价页明确
+  非诊断/非治疗边界，能力目录不再展示四个运行时禁用工具。
+- 既有最小非健康测试对话证明生产写入、AI 回复和刷新后读取；订阅状态接口返回 200。
+  未读取环境变量、Firebase token、数据库内容或 token 账本明细。
 
 ## 签名阻塞的正确处理
 
