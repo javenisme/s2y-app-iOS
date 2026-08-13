@@ -25,4 +25,4 @@
 ## 持续性
 - 隐私与合规：用途明示、导出/删除
 - 质量：测试与 SwiftLint、崩溃/日志
-- 本地模型分发：修复 `models.s2y.app` 不可达（DNS `NXDOMAIN`），确定可用下载源并兼容 `Documents/LocalModels` 直挂载运行（含 `model.safetensors` 与 `phi-3.5-mini-4bit.mlx` 文件名适配）。
+- 设备端 AI：持续验证 Apple Foundation Models 的系统兼容性与不可用状态，不引入下载模型或模拟回答。

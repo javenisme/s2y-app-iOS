@@ -29,10 +29,10 @@
   - `HealthKitModule`：权限、同步、缓存（本地加密）
   - `QueryPlanner`：自然语言解析、意图参数化
   - `Toolbox`：聚合（均值、移动均值、分位数）、对比、相关性
-  - `LLMOrchestrator`：提示模板、函数调用、结果校验与后处理
+  - `AssistantAIProvider`：提供者边界、用户显式选择与失败隔离
   - `InsightEngine`：洞察与个性化建议、目标引擎、提醒
   - `Visualization`：趋势/对比图与解释性注释
-- 模型与推理：云端 LLM 优先，预留 on-device 选项；Schema 校验与安全网
+- 模型与推理：用户显式选择 Apple 端侧模型或 Omer Online；绝不自动切换提供者；Schema 校验与安全网
 - 数据与隐私：端侧优先存储与加密；用途明示；最小化；可导出/删除
 
 ## 里程碑
@@ -56,7 +56,5 @@
 ## 依赖
 - Apple HealthKit（iOS 17+）
 - Spezi（模块化健康 App 框架）
-- LLM 提供方（OpenAI/Azure/本地）
+- Apple Foundation Models 与 Omer Online
 - 本地加密（Keychain/SQLCipher）
-
-
