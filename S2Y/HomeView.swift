@@ -71,9 +71,24 @@ struct HomeView: View {
                 Color(uiColor: .systemGroupedBackground)
                     .ignoresSafeArea()
 
-                drawer(width: drawerWidth)
+                contentLayer
 
-                contentLayer(drawerWidth: drawerWidth)
+                if isDrawerOpen {
+                    Color.black
+                        .opacity(0.16)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            closeDrawer()
+                        }
+                        .accessibilityLabel("Close Navigation Drawer")
+                        .accessibilityAddTraits(.isButton)
+                }
+
+                if isDrawerOpen {
+                    drawer(width: drawerWidth)
+                        .shadow(color: Color.black.opacity(0.16), radius: 24, x: 10, y: 0)
+                        .transition(.move(edge: .leading))
+                }
             }
             .animation(
                 accessibilityReduceMotion ? nil : .snappy(duration: 0.28, extraBounce: 0),
@@ -133,31 +148,14 @@ struct HomeView: View {
         }
     }
 
-    private func contentLayer(drawerWidth: CGFloat) -> some View {
-        let drawerProgress = isDrawerOpen ? 1.0 : 0.0
-
-        return selectedContent
-            .environment(\.homeDrawerProgress, drawerProgress)
+    private var contentLayer: some View {
+        selectedContent
             .accessibilityHidden(isDrawerOpen)
-            .overlay {
-                if isDrawerOpen {
-                    Color.black
-                        .opacity(0.16)
-                        .ignoresSafeArea()
-                        .onTapGesture {
-                            closeDrawer()
-                        }
+            .overlay(alignment: .topLeading) {
+                if !isDrawerOpen {
+                    drawerToggleButton
                 }
             }
-            .overlay(alignment: .topLeading) {
-                drawerToggleButton
-            }
-            .clipShape(
-                RoundedRectangle(cornerRadius: isDrawerOpen ? 32 : 0, style: .continuous)
-            )
-            .shadow(color: Color.black.opacity(isDrawerOpen ? 0.14 : 0), radius: 28, x: 0, y: 18)
-            .offset(x: isDrawerOpen ? drawerWidth * 0.78 : 0)
-            .scaleEffect(isDrawerOpen ? 0.96 : 1, anchor: .trailing)
     }
 
     private func drawer(width: CGFloat) -> some View {
@@ -237,6 +235,18 @@ struct HomeView: View {
                     .controlSize(.small)
                     .accessibilityLabel("Loading conversations")
             }
+
+            Button {
+                closeDrawer()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close Navigation Drawer")
+            .accessibilityIdentifier("home.drawer.toggle")
         }
         .padding(.horizontal, 18)
         .padding(.top, 12)
@@ -384,9 +394,9 @@ struct HomeView: View {
 
     private var drawerToggleButton: some View {
         Button {
-            isDrawerOpen.toggle()
+            isDrawerOpen = true
         } label: {
-            Image(systemName: isDrawerOpen ? "xmark" : "sidebar.leading")
+            Image(systemName: "sidebar.leading")
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .frame(width: 42, height: 42)
@@ -395,7 +405,7 @@ struct HomeView: View {
         }
         .padding(.leading, 16)
         .padding(.top, 8)
-        .accessibilityLabel(isDrawerOpen ? "Close Navigation Drawer" : "Open Navigation Drawer")
+        .accessibilityLabel("Open Navigation Drawer")
         .accessibilityIdentifier("home.drawer.toggle")
     }
 
@@ -451,17 +461,4 @@ struct HomeView: View {
                 }()
             )
         }
-}
-
-
-private struct HomeDrawerProgressKey: EnvironmentKey {
-    static let defaultValue: CGFloat = 0
-}
-
-
-extension EnvironmentValues {
-    var homeDrawerProgress: CGFloat {
-        get { self[HomeDrawerProgressKey.self] }
-        set { self[HomeDrawerProgressKey.self] = newValue }
-    }
 }

@@ -55,6 +55,10 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
   截图检查。
 - 真机安装仍受个人 Apple 团队不支持 HealthKit Access（Verifiable Health Records）阻塞；
   本主题不删除 entitlement、不伪造 profile，也不把模拟器结果声明为真机通过。
+- HLT-179 将抽屉改为覆盖式侧栏，主界面不再位移、缩放、裁切、模糊或添加动态圆角；
+  Health Assistant 使用固定小标题，顶部 `Local AI` / `Omer` 标签替代输入框上方的模型菜单。
+- 专项 UI 测试实际确认两项顶部标签可直接切换、旧底部模型菜单不存在，并继续覆盖键盘
+  收起与固定抽屉底栏；1 项测试通过，最终界面已截图检查。
 
 ## 2026-08-13 Omer 用量账本生产验证
 

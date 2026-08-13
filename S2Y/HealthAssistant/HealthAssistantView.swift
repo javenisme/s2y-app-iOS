@@ -52,7 +52,6 @@ enum HealthAssistantError: Error, LocalizedError {
 }
 
 struct HealthAssistantView: View {
-    @Environment(\.homeDrawerProgress) private var homeDrawerProgress
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Binding private var requestedConversationID: UUID?
@@ -93,6 +92,8 @@ struct HealthAssistantView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                providerTabs
+
                 if messages.isEmpty {
                     welcomeView
                 } else {
@@ -101,9 +102,8 @@ struct HealthAssistantView: View {
 
                 inputBar
             }
-            .blur(radius: homeDrawerProgress * 2)
             .navigationTitle("Health Assistant")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
@@ -311,40 +311,53 @@ struct HealthAssistantView: View {
             }
         }
     }
+
+    private var providerTabs: some View {
+        HStack(spacing: 0) {
+            providerTab(.onDevice, title: "Local AI")
+            providerTab(.omer, title: "Omer")
+        }
+        .padding(.horizontal, 16)
+        .background(Color(uiColor: .systemBackground))
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("AI provider")
+    }
+
+    private func providerTab(_ mode: AssistantAIMode, title: LocalizedStringKey) -> some View {
+        let isSelected = selectedAIMode == mode
+
+        return Button {
+            aiModeRawValue = mode.rawValue
+        } label: {
+            VStack(spacing: 8) {
+                Text(title)
+                    .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+                    .frame(maxWidth: .infinity)
+
+                Capsule()
+                    .fill(isSelected ? Color.primary : Color.clear)
+                    .frame(height: 2)
+            }
+            .padding(.top, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isProcessing)
+        .accessibilityLabel(title)
+        .accessibilityValue(isSelected ? "Selected" : "")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityHint(mode.dataBoundaryDescription)
+        .accessibilityIdentifier(mode == .onDevice ? "health-assistant-mode-local" : "health-assistant-mode-omer")
+    }
     
     private var inputBar: some View {
         VStack(spacing: 0) {
             Divider()
-            
-            (dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 6))
-                : AnyLayout(HStackLayout(spacing: 8))) {
-                Menu {
-                    Picker("AI provider", selection: aiModeBinding) {
-                        ForEach(AssistantAIMode.allCases) { mode in
-                            Label(mode.title, systemImage: mode.systemImage)
-                                .tag(mode)
-                        }
-                    }
-                } label: {
-                    Label(selectedAIMode.title, systemImage: selectedAIMode.systemImage)
-                        .font(.caption.weight(.semibold))
-                }
-                .accessibilityLabel("AI provider")
-                .accessibilityValue(selectedAIMode.title)
-                .accessibilityHint("Opens a menu to choose on-device or Omer online AI")
-                .accessibilityIdentifier("health-assistant-ai-mode")
-                if !dynamicTypeSize.isAccessibilitySize {
-                    Spacer()
-                }
-                Text(selectedAIMode.dataBoundaryDescription)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(.horizontal)
-            .padding(.top, 6)
-            
+
             (dynamicTypeSize.isAccessibilitySize
                 ? AnyLayout(VStackLayout(alignment: .trailing, spacing: 12))
                 : AnyLayout(HStackLayout(spacing: 12))) {
@@ -382,11 +395,6 @@ struct HealthAssistantView: View {
             .padding()
         }
         .background(.bar)
-        .offset(y: homeDrawerProgress * 84)
-        .animation(
-            accessibilityReduceMotion ? nil : .snappy(duration: 0.28, extraBounce: 0),
-            value: homeDrawerProgress
-        )
     }
     
     private func noticeCard(notice: AssistantNotice) -> some View {
@@ -945,12 +953,6 @@ private extension HealthAssistantView {
         AssistantAIMode(rawValue: aiModeRawValue) ?? .onDevice
     }
 
-    var aiModeBinding: Binding<AssistantAIMode> {
-        Binding(
-            get: { selectedAIMode },
-            set: { aiModeRawValue = $0.rawValue }
-        )
-    }
 }
 
 private struct AssistantNotice {

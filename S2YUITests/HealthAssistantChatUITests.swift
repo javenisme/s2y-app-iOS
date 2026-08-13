@@ -15,12 +15,20 @@ final class HealthAssistantChatUITests: XCTestCase {
         app.launchArguments = ["--setupTestAccount", "--skipOnboarding"]
         app.launch()
 
-        let providerMenu = app.buttons["health-assistant-ai-mode"]
-        XCTAssertTrue(providerMenu.waitForExistence(timeout: 10))
-        providerMenu.tap()
-        XCTAssertTrue(app.buttons["Omer Online"].waitForExistence(timeout: 3))
-        app.buttons["Omer Online"].tap()
-        XCTAssertTrue(app.staticTexts["Omer Online"].waitForExistence(timeout: 3))
+        app.openHomeDrawer()
+        let initialNewChat = app.buttons["drawer.new-chat"]
+        XCTAssertTrue(initialNewChat.waitForExistence(timeout: 5))
+        initialNewChat.tap()
+
+        let localTab = app.buttons["health-assistant-mode-local"]
+        let omerTab = app.buttons["health-assistant-mode-omer"]
+        XCTAssertTrue(localTab.waitForExistence(timeout: 10))
+        XCTAssertTrue(omerTab.waitForExistence(timeout: 3))
+        localTab.tap()
+        XCTAssertEqual(localTab.value as? String, "Selected")
+        omerTab.tap()
+        XCTAssertEqual(omerTab.value as? String, "Selected")
+        XCTAssertFalse(app.buttons["health-assistant-ai-mode"].exists)
 
         let input = app.textFields["health-assistant-input"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))
@@ -50,11 +58,14 @@ final class HealthAssistantChatUITests: XCTestCase {
         app.launchArguments = ["--setupTestAccount", "--skipOnboarding"]
         app.launch()
 
-        let providerMenu = app.buttons["health-assistant-ai-mode"]
-        XCTAssertTrue(providerMenu.waitForExistence(timeout: 10))
-        providerMenu.tap()
-        XCTAssertTrue(app.buttons["Omer Online"].waitForExistence(timeout: 3))
-        app.buttons["Omer Online"].tap()
+        app.openHomeDrawer()
+        let newChat = app.buttons["drawer.new-chat"]
+        XCTAssertTrue(newChat.waitForExistence(timeout: 5))
+        newChat.tap()
+
+        let omerTab = app.buttons["health-assistant-mode-omer"]
+        XCTAssertTrue(omerTab.waitForExistence(timeout: 10))
+        omerTab.tap()
 
         let input = app.textFields["health-assistant-input"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))
