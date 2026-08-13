@@ -168,6 +168,7 @@ struct HealthAssistantView: View {
 
     @MainActor
     private func displayConversation(_ detail: OmerChatDetailResponse) {
+        pendingClarification = nil
         messages = detail.messages.compactMap { message in
             guard !message.content.isEmpty else { return nil }
             return ChatMessage(
@@ -184,6 +185,7 @@ struct HealthAssistantView: View {
             try await omerChatService.startNewChat()
             messages = []
             notice = nil
+            pendingClarification = nil
             onHistoryChanged()
         } catch {
             notice = AssistantNotice(message: "A new conversation could not be started. Please try again.", tone: .warning)
@@ -756,7 +758,7 @@ struct HealthQuickQuerySuggestion: Identifiable, Equatable, Sendable {
                 metricKind: .sleepDurationHours,
                 icon: "bed.double.fill",
                 title: "Sleep Quality",
-                query: "How has my sleep quality been recently?"
+                query: "How has my sleep quality been over the past 7 days?"
             ),
             HealthQuickQuerySuggestion(
                 id: "active-energy",

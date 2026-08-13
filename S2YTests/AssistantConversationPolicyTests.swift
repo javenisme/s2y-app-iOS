@@ -84,4 +84,12 @@ final class AssistantConversationPolicyTests: XCTestCase {
             .ready("What about my heart rate last month?")
         )
     }
+
+    func testCuratedQuickQueriesNeverRequireClarification() {
+        for suggestion in HealthQuickQuerySuggestion.catalog {
+            guard case .ready = AssistantConversationPolicy.resolve(query: suggestion.query) else {
+                return XCTFail("Quick query unexpectedly requires clarification: \(suggestion.id)")
+            }
+        }
+    }
 }
