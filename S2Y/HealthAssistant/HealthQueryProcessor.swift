@@ -111,87 +111,26 @@ enum HealthQueryProcessor {
         comparison: HealthKitService.Comparison
     ) -> HealthInsight? {
         let metricName = metricTitle(kind: kind)
-        
-        // Analyze trend and comparison data
-        let trendDirection = trend.changeRate >= 0.05 ? "Increase" : (trend.changeRate <= -0.05 ? "Decrease" : "Stable")
-        let comparisonChange = abs(comparison.deltaRate * 100)
-        
-        var insight: String
-        var recommendation: String?
-        var severity: HealthInsight.Severity = .info
-        
-        switch kind {
-        case .steps:
-            if trend.average < 5000 {
-                insight = "Your daily average steps is \(String(format: "%.0f", trend.average)) steps, below the recommended 10,000 steps per day."
-                recommendation = "Consider increasing daily walking activities, try short walks, taking stairs, or evening strolls."
-                severity = .warning
-            } else if trend.average >= 10000 {
-                insight = "Your daily average steps is \(String(format: "%.0f", trend.average)) steps, meeting health standards!"
-                recommendation = "Maintain good activity habits and continue your daily step routine."
-                severity = .info
-            } else {
-                insight = "Your daily average steps is \(String(format: "%.0f", trend.average)) steps, close to health standards."
-                recommendation = "Keep it up! You're not far from the daily 10,000 steps goal."
-                severity = .info
-            }
-            
-        case .heartRateAverage:
-            if comparisonChange > 15 {
-                insight = "Your average heart rate shows significant \(trendDirection.lowercased()), with a change of \(String(format: "%.1f", comparisonChange))%."
-                recommendation = "Large heart rate variations detected. Consider monitoring sleep patterns and stress management. Consult a doctor if you experience discomfort."
-                severity = .warning
-            } else {
-                insight = "Your heart rate shows \(trendDirection.lowercased()), averaging \(String(format: "%.1f", trend.average)) bpm."
-                recommendation = nil
-                severity = .info
-            }
-            
-        case .sleepDurationHours:
-            if trend.average < 7 {
-                insight = "Your average sleep duration is \(String(format: "%.1f", trend.average)) hours, slightly less than the recommended 7-9 hours."
-                recommendation = "Consider adjusting your sleep schedule to ensure adequate rest for body recovery and health."
-                severity = .warning
-            } else if trend.average > 9 {
-                insight = "Your average sleep duration is \(String(format: "%.1f", trend.average)) hours, which is sufficient."
-                recommendation = "Your sleep quality is good. Focus on maintaining regular sleep schedule."
-                severity = .info
-            } else {
-                insight = "Your sleep duration is \(String(format: "%.1f", trend.average)) hours, within healthy range."
-                recommendation = nil
-                severity = .info
-            }
-            
-        case .activeEnergy:
-            if trend.average < 200 {
-                insight = "Your daily average active energy expenditure is \(String(format: "%.0f", trend.average)) kcal, which is relatively low."
-                recommendation = "Consider increasing moderate-intensity physical activities such as brisk walking, swimming, or cycling."
-                severity = .warning
-            } else {
-                insight = "Your daily average active energy expenditure is \(String(format: "%.0f", trend.average)) kcal, which is good."
-                recommendation = "Maintain good exercise habits. Moderate exercise benefits your health."
-                severity = .info
-            }
-            
-        default:
-            return nil
-        }
+        let insight = [
+            HealthInterpretationPolicy.trendContext(trend, kind: kind),
+            HealthInterpretationPolicy.comparisonContext(comparison, kind: kind)
+        ].joined(separator: "\n\n")
         
         return HealthInsight(
-            title: metricName + " Analysis",
+            title: metricName + " Observation",
             insight: insight,
-            recommendation: recommendation,
+            recommendation: HealthInterpretationPolicy.optionalWellnessActions(for: kind),
             icon: metricIcon(kind: kind),
-            color: severity == .warning ? "orange" : "blue",
-            severity: severity
+            color: "blue",
+            severity: .info
         )
     }
     
     private static func generateFallbackInsight() -> HealthInsight {
         HealthInsight(
-            title: "Health Reminder",
-            insight: "Maintaining good lifestyle habits is important for health.",
-            recommendation: "Regularly review your health data and monitor changes in your physical condition.",
+            title: "Health Data Unavailable",
+            insight: "There is not enough readable data to describe these trends. \(HealthInterpretationPolicy.wellnessBoundary)",
+            recommendation: nil,
             icon: "heart.circle",
             color: "blue",
             severity: .info
