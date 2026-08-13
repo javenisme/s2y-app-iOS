@@ -9,7 +9,7 @@
 import Foundation
 
 public struct WellnessGoal: Codable, Identifiable, Sendable, Equatable {
-    public enum Direction: String, Codable, Sendable {
+    public enum Direction: String, Codable, Sendable, CaseIterable {
         case increase
         case decrease
         case maintain
