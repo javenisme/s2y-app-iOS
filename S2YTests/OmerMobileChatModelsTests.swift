@@ -22,6 +22,7 @@ final class OmerMobileChatModelsTests: XCTestCase {
             agentId: "health-assistant",
             message: .init(id: messageID, text: "I feel dizzy"),
             locale: "en_US",
+            consentPolicyVersion: HealthSharingConsentPolicy.currentVersion,
             healthContext: ["recentSymptoms": "dizziness"],
             client: .init(platform: "ios", version: "1.0")
         )
@@ -30,6 +31,7 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(json["requestId"] as? String, requestID.uuidString)
         XCTAssertEqual(json["conversationId"] as? String, conversationID.uuidString)
         XCTAssertEqual(json["agentId"] as? String, "health-assistant")
+        XCTAssertEqual(json["consentPolicyVersion"] as? String, HealthSharingConsentPolicy.currentVersion)
         XCTAssertEqual((json["message"] as? [String: Any])?["text"] as? String, "I feel dizzy")
         XCTAssertEqual((json["client"] as? [String: Any])?["platform"] as? String, "ios")
     }
@@ -152,6 +154,7 @@ final class OmerMobileChatModelsTests: XCTestCase {
             requestId: requestID,
             conversationId: conversationID,
             source: "ios-on-device",
+            consentPolicyVersion: HealthSharingConsentPolicy.currentVersion,
             messages: [
                 .init(id: UUID(), role: "user", content: "How did I sleep?"),
                 .init(id: UUID(), role: "assistant", content: "Your on-device summary shows seven hours.")
@@ -159,6 +162,7 @@ final class OmerMobileChatModelsTests: XCTestCase {
         )
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(request)) as? [String: Any])
         XCTAssertEqual(json["source"] as? String, "ios-on-device")
+        XCTAssertEqual(json["consentPolicyVersion"] as? String, HealthSharingConsentPolicy.currentVersion)
         XCTAssertEqual((json["messages"] as? [[String: Any]])?.count, 2)
 
         let responseData = Data(#"""
@@ -171,6 +175,21 @@ final class OmerMobileChatModelsTests: XCTestCase {
         let response = try decoder.decode(OmerLocalChatSyncResponse.self, from: responseData)
         XCTAssertEqual(response.conversationId, conversationID)
         XCTAssertTrue(response.synced)
+    }
+
+    func testConsentReceiptMatchesOmerContract() throws {
+        var ledger = HealthSharingConsentLedger()
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-13T12:00:00Z"))
+        let receipt = ledger.apply(.granted, scopes: [.omerChatText], at: date)
+        let body = OmerHealthSharingConsentReceiptRequest(receipt: receipt)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(body)) as? [String: Any])
+
+        XCTAssertEqual(json["id"] as? String, receipt.id.uuidString)
+        XCTAssertEqual(json["policyVersion"] as? String, HealthSharingConsentPolicy.currentVersion)
+        XCTAssertEqual(json["change"] as? String, "granted")
+        XCTAssertEqual(json["changedScopes"] as? [String], ["omerChatText"])
+        XCTAssertEqual(json["resultingScopes"] as? [String], ["omerChatText"])
+        XCTAssertEqual(json["recordedAt"] as? String, "2026-08-13T12:00:00Z")
     }
 
     func testLocalChatCacheRoundTripsConversationContent() throws {
@@ -1768,6 +1787,23 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertTrue(store.ledger.receipts.isEmpty)
         XCTAssertTrue(store.authorization.grantedScopes.isEmpty)
         XCTAssertNil(defaults.data(forKey: "healthSharingConsent.v1"))
+    }
+
+    @MainActor
+    func testRevokeAllCreatesASyncableDefaultDenyReceipt() throws {
+        let suiteName = "HealthSharingConsentRevokeAllTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = HealthSharingConsentStore(defaults: defaults)
+        store.set(.omerChatText, granted: true)
+        store.set(.relevantHealthSummary, granted: true)
+
+        let receipt = try XCTUnwrap(store.revokeAll())
+
+        XCTAssertEqual(receipt.change, .revoked)
+        XCTAssertEqual(receipt.changedScopes, [.omerChatText, .relevantHealthSummary])
+        XCTAssertTrue(receipt.resultingAuthorization.grantedScopes.isEmpty)
+        XCTAssertTrue(store.authorization.grantedScopes.isEmpty)
     }
 
     func testRevokingOnDeviceSyncDoesNotRevokeOmerQuestionConsent() {

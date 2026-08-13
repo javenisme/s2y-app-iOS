@@ -29,7 +29,7 @@ enum LocalHealthDataDeletionService {
         case .safetyActivity:
             HealthSafetyEventStore.shared.clear()
         case .sharingConsentReceipts:
-            HealthSharingConsentStore.shared.clear()
+            try await clearSharingConsentReceipts()
         case .temporaryHealthCache:
             HealthKitCache.shared.clearAll()
         }
@@ -39,5 +39,12 @@ enum LocalHealthDataDeletionService {
         for category in LocalHealthDataCategory.allCases {
             try await clear(category)
         }
+    }
+
+    private static func clearSharingConsentReceipts() async throws {
+        if HealthSharingConsentStore.shared.revokeAll() != nil {
+            try await OmerChatService.shared.syncHealthSharingConsentReceipts()
+        }
+        HealthSharingConsentStore.shared.clear()
     }
 }
