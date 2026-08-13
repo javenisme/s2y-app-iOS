@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1600" role="img" aria-labelledby="title desc">
+  <title id="title">XOEGAN editable vector mark</title>
+  <desc id="desc">Monochrome angular XOEGAN mark with editable geometric vector layers and no text.</desc>
+  <rect id="background" width="1600" height="1600" fill="#000000"/>
+
+  <g id="logo-symbol" fill="#ffffff">
+    <path id="long-diagonal" d="M407 303 L431 303 L1215 1188 L1192 1188 Z"/>
+
+    <path id="left-chevron" d="
+      M405 303
+      L429 303
+      L698 735
+      L542 985
+      L724 986
+      L805 834
+      L886 1008
+      L903 1008
+      L806 797
+      L706 1017
+      L488 1017
+      L668 735
+      Z"/>
+
+    <path id="right-frame" d="
+      M878 459
+      L1125 460
+      L929 738
+      L1153 1135
+      L1129 1135
+      L896 738
+      L1052 492
+      L909 495
+      L805 658
+      L707 476
+      L729 467
+      L803 604
+      Z"/>
+
+    <path id="inner-left-notch" d="
+      M417 488
+      L475 488
+      L567 617
+      L520 646
+      Z"/>
+
+    <path id="center-lower-cut" d="
+      M804 868
+      L746 985
+      L719 985
+      L804 817
+      L895 1008
+      L866 1008
+      Z"/>
+  </g>
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1600" role="img" aria-labelledby="title desc">
+  <title id="title">lighting_left vector trace v2 open angle</title>
+  <desc id="desc">Editable SVG vector version of lighting_left.png with the third downward turn opened wider.</desc>
+  <rect id="background" width="1600" height="1600" fill="#000000"/>
+
+  <g id="lighting-left-element-v2" fill="#ffffff">
+    <path id="upper-left-bent-stroke" d="
+      M402 304
+      L426 304
+      L704 737
+      L548 980
+      L704 980
+      L735 1016
+      L484 1016
+      L674 737
+      Z"/>
+
+    <path id="lower-open-angle-stroke" d="
+      M704 980
+      L802 818
+      L894 1000
+      L890 1015
+      L803 868
+      L721 1016
+      Z"/>
+  </g>
+</svg>
