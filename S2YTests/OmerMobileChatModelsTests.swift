@@ -1007,6 +1007,37 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertTrue(WellnessNotificationPlanner.requests(for: plan).isEmpty)
     }
 
+    func testWellnessPlanRejectsPartialReminderConfiguration() {
+        let date = Date.now
+        let plan = WellnessPlan(
+            title: "Invalid reminder",
+            summary: "Missing minutes",
+            origin: .userCreated,
+            goals: [.userSelected(
+                metricKind: .steps,
+                direction: .consistency,
+                targetValue: nil,
+                reviewDate: date.addingTimeInterval(86_400),
+                confirmedAt: date
+            )],
+            actions: [WellnessAction(
+                title: "Action",
+                detail: "Detail",
+                category: .checkIn,
+                daysPerWeek: 1,
+                estimatedMinutes: 1,
+                confirmedAt: date,
+                scheduledWeekdays: [2],
+                reminderHour: 9,
+                reminderMinute: nil
+            )]
+        )
+
+        XCTAssertThrowsError(try WellnessPlanLifecycle.transition(plan, to: .active)) { error in
+            XCTAssertEqual(error as? WellnessPlanTransitionError, .invalidAction)
+        }
+    }
+
     func testWeeklyReviewKeepsMissingRecordsSeparateFromSkipped() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))

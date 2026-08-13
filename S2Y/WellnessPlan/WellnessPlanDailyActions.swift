@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import SpeziNotifications
 import SwiftUI
 
 struct WellnessActionRecord: Codable, Identifiable, Sendable, Equatable {
@@ -106,6 +107,7 @@ final class WellnessActionRecordStore: ObservableObject {
 }
 
 struct WellnessPlanSettingsView: View {
+    @Environment(\.requestNotificationAuthorization) private var requestNotificationAuthorization
     @StateObject private var planStore = WellnessPlanStore.shared
     @StateObject private var recordStore = WellnessActionRecordStore.shared
     @State private var isCreatingDraft = false
@@ -114,6 +116,20 @@ struct WellnessPlanSettingsView: View {
     @State private var goalDirection: WellnessGoal.Direction = .consistency
     @State private var goalTargetText = ""
     @State private var goalReviewDate = Calendar.current.date(byAdding: .day, value: 14, to: .now) ?? .now
+    @State private var isEditingAction = false
+    @State private var editingActionID: UUID?
+    @State private var actionTitle = ""
+    @State private var actionDetail = ""
+    @State private var actionCategory: WellnessAction.Category = .checkIn
+    @State private var actionWeekdays: Set<Int> = []
+    @State private var actionMinutes = 5
+    @State private var actionReminderEnabled = false
+    @State private var actionReminderTime = Calendar.current.date(
+        bySettingHour: 19,
+        minute: 0,
+        second: 0,
+        of: .now
+    ) ?? .now
     @State private var errorMessage: String?
 
     var body: some View {
@@ -152,6 +168,12 @@ struct WellnessPlanSettingsView: View {
             } footer: {
                 Text("S2Y creates an editable health-management draft. It never activates a plan or schedules an intervention without your confirmation.")
             }
+            if let reminderError = planStore.reminderErrorDescription {
+                Section("Reminder Status") {
+                    Text(reminderError)
+                        .foregroundStyle(.red)
+                }
+            }
         }
         .navigationTitle("Wellbeing Plan")
         .alert("Plan unavailable", isPresented: Binding(
@@ -164,6 +186,9 @@ struct WellnessPlanSettingsView: View {
         }
         .sheet(isPresented: $isAddingGoal) {
             goalEditor
+        }
+        .sheet(isPresented: $isEditingAction) {
+            actionEditor
         }
     }
 
@@ -206,6 +231,15 @@ struct WellnessPlanSettingsView: View {
                     Text(action.detail).font(.caption).foregroundStyle(.secondary)
                     Text("\(action.daysPerWeek) days/week · about \(action.estimatedMinutes) min")
                         .font(.caption2).foregroundStyle(.tertiary)
+                    Text(scheduleDescription(action))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    if plan.status == .draft || plan.status == .paused {
+                        Button("Edit action") {
+                            prepareActionEditor(action)
+                        }
+                        .font(.caption)
+                    }
                     if plan.status == .draft {
                         Button(action.confirmedAt == nil ? "Include this action" : "Included") {
                             toggleActionConfirmation(action, in: plan)
@@ -227,6 +261,8 @@ struct WellnessPlanSettingsView: View {
                         errorMessage = "A goal has an invalid value, unit, or review date. Edit it before activation."
                     } catch WellnessPlanTransitionError.unconfirmedAction {
                         errorMessage = "Choose which suggested actions to include before activation."
+                    } catch WellnessPlanTransitionError.invalidAction {
+                        errorMessage = "An action has an invalid schedule or reminder time. Edit it before activation."
                     } catch {
                         errorMessage = "Add at least one personal goal and keep at least one optional action before activation."
                     }
@@ -239,8 +275,11 @@ struct WellnessPlanSettingsView: View {
                 }
             } else if plan.status == .paused {
                 Button("Resume plan") {
-                    if let updated = try? WellnessPlanLifecycle.transition(plan, to: .active) {
+                    do {
+                        let updated = try WellnessPlanLifecycle.transition(plan, to: .active)
                         planStore.save(updated)
+                    } catch {
+                        errorMessage = "Review goals and actions before resuming this plan."
                     }
                 }
             }
@@ -349,6 +388,61 @@ struct WellnessPlanSettingsView: View {
         return Double(trimmed)
     }
 
+    private var actionEditor: some View {
+        NavigationStack {
+            Form {
+                Section("Action") {
+                    TextField("Title", text: $actionTitle)
+                    TextField("Details", text: $actionDetail, axis: .vertical)
+                    Picker("Category", selection: $actionCategory) {
+                        ForEach(WellnessAction.Category.allCases, id: \.self) { category in
+                            Text(categoryLabel(category)).tag(category)
+                        }
+                    }
+                    Stepper("About \(actionMinutes) minutes", value: $actionMinutes, in: 1...120)
+                }
+                Section("Days") {
+                    ForEach(weekdayOptions, id: \.value) { option in
+                        Toggle(option.label, isOn: Binding(
+                            get: { actionWeekdays.contains(option.value) },
+                            set: { isSelected in
+                                if isSelected {
+                                    actionWeekdays.insert(option.value)
+                                } else {
+                                    actionWeekdays.remove(option.value)
+                                }
+                            }
+                        ))
+                    }
+                }
+                Section("Reminder") {
+                    Toggle("Local reminder", isOn: $actionReminderEnabled)
+                    if actionReminderEnabled {
+                        DatePicker(
+                            "Time",
+                            selection: $actionReminderTime,
+                            displayedComponents: .hourAndMinute
+                        )
+                        Text("Lock-screen text stays generic and does not include the action or health details.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("Edit Action")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { isEditingAction = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { Task { await saveAction() } }
+                        .disabled(actionTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || actionWeekdays.isEmpty)
+                }
+            }
+        }
+    }
+
     private var isGoalTargetValid: Bool {
         let trimmed = goalTargetText.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty || parsedGoalTarget.map { $0.isFinite && $0 > 0 } == true
@@ -404,6 +498,92 @@ struct WellnessPlanSettingsView: View {
         }
         updated.updatedAt = .now
         planStore.save(updated)
+    }
+
+    private func prepareActionEditor(_ action: WellnessAction) {
+        editingActionID = action.id
+        actionTitle = action.title
+        actionDetail = action.detail
+        actionCategory = action.category
+        actionWeekdays = action.effectiveWeekdays
+        actionMinutes = action.estimatedMinutes
+        actionReminderEnabled = action.hasReminder
+        if let hour = action.reminderHour, let minute = action.reminderMinute {
+            actionReminderTime = Calendar.current.date(
+                bySettingHour: hour,
+                minute: minute,
+                second: 0,
+                of: .now
+            ) ?? .now
+        }
+        isEditingAction = true
+    }
+
+    private func saveAction() async {
+        guard var plan = planStore.currentPlan,
+              plan.status == .draft || plan.status == .paused,
+              let editingActionID,
+              let index = plan.actions.firstIndex(where: { $0.id == editingActionID }),
+              !actionWeekdays.isEmpty else { return }
+        if actionReminderEnabled {
+            do {
+                let allowed = try await requestNotificationAuthorization(options: [.alert, .sound, .badge])
+                guard allowed else {
+                    errorMessage = "Notifications are not allowed. The action was not changed."
+                    return
+                }
+            } catch {
+                errorMessage = "Notification permission could not be checked. The action was not changed."
+                return
+            }
+        }
+        let reminderComponents = actionReminderEnabled
+            ? Calendar.current.dateComponents([.hour, .minute], from: actionReminderTime)
+            : DateComponents()
+        plan.actions[index].title = actionTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        plan.actions[index].detail = actionDetail.trimmingCharacters(in: .whitespacesAndNewlines)
+        plan.actions[index].category = actionCategory
+        plan.actions[index].daysPerWeek = actionWeekdays.count
+        plan.actions[index].scheduledWeekdays = actionWeekdays
+        plan.actions[index].estimatedMinutes = actionMinutes
+        plan.actions[index].reminderHour = actionReminderEnabled ? reminderComponents.hour : nil
+        plan.actions[index].reminderMinute = actionReminderEnabled ? reminderComponents.minute : nil
+        plan.actions[index].confirmedAt = .now
+        plan.updatedAt = .now
+        planStore.save(plan)
+        isEditingAction = false
+    }
+
+    private var weekdayOptions: [(value: Int, label: String)] {
+        let symbols = Calendar.current.weekdaySymbols
+        return symbols.enumerated().map { index, label in (index + 1, label) }
+    }
+
+    private func scheduleDescription(_ action: WellnessAction) -> String {
+        let days = action.effectiveWeekdays.sorted().compactMap { weekday in
+            Calendar.current.shortWeekdaySymbols.indices.contains(weekday - 1)
+                ? Calendar.current.shortWeekdaySymbols[weekday - 1]
+                : nil
+        }.joined(separator: ", ")
+        if let hour = action.reminderHour, let minute = action.reminderMinute {
+            var components = DateComponents()
+            components.hour = hour
+            components.minute = minute
+            let time = Calendar.current.date(from: components)?.formatted(date: .omitted, time: .shortened)
+                ?? String(format: "%02d:%02d", hour, minute)
+            return "\(days) · reminder \(time)"
+        }
+        return "\(days) · no reminder"
+    }
+
+    private func categoryLabel(_ category: WellnessAction.Category) -> String {
+        switch category {
+        case .movement: "Movement"
+        case .sleepRoutine: "Sleep routine"
+        case .recovery: "Recovery"
+        case .mindfulness: "Mindfulness"
+        case .checkIn: "Check-in"
+        }
     }
 
     private func goalDescription(_ goal: WellnessGoal) -> String {
