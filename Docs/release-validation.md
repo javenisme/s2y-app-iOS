@@ -11,10 +11,10 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
 | 公开生产端点 | 通过 | 登录页可达；Omer mobile API 拒绝未认证请求 | 登录后 Firebase/Omer 链路 |
 | iOS 工程 | 通过 | 完整 `S2YTests`、模拟器 build 和 build-for-testing 通过 | 签名真机 UI 遍历 |
 | 静态质量 | 增量通过 | 10 条已知问题已修复；493 条历史债务进入版本化 SwiftLint baseline；新增问题仍失败 | 分批消减历史 baseline |
-| 签名 Archive | 阻塞 | 工程 Bundle ID、entitlements、自动签名设置可读取；存在有效 Apple Development identity | Xcode 账户凭据不可用；profile 缺少 Verifiable Health Records 能力 |
+| 签名 Archive | 阻塞 | 工程 Bundle ID、entitlements、自动签名设置可读取；Xcode 已登录有效个人团队并存在 Apple Development identity | 个人团队不支持 HealthKit Access（Verifiable Health Records）；profile 缺少该能力 |
 | 合资格 iPhone | 部分 | 已检测到 iPhone 16e（iOS 26.6），设备已配对且 Developer Mode 开启；设备标识未记录 | 签名安装、Apple Intelligence 开关/模型下载状态、端侧推理及 HealthKit 验收 |
 | 真实 S2Y 设备 | 未开始 | 无真实硬件证据 | US-203 握手、停止与审计证据 |
-| TestFlight/App Store | 未开始 | 未上传构建 | 分发、安装、回滚与审核证据 |
+| TestFlight/App Store | 延期 | 未上传构建；当前产品决定暂不外测 | 合资格团队签名、分发、安装、回滚与审核证据 |
 
 ## 2026-08-13 生产认证读取验证
 
@@ -28,7 +28,7 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
 | Home 公开边界 | 通过 | Home PR #25、#26 已正常合并；生产首页、Omer、StVNS、企业与复核页均采用健康教育/用户控制措辞，旧高风险文章不再公开 |
 | 新消息与计费 | 部分通过 | 已登录测试账号的最小非健康消息及 AI 回复可读取；Omer PR #15 部署后，订阅状态接口的 Free 用量由 0 增长为正数且剩余额度同步减少；未读取数据库明细，付费档位仍未验收 |
 | 付费订阅映射 | 代码通过，生产阻塞 | OMR-019 已部署并失败关闭冲突用户映射、多价格项、异常数量与未知计划；Production 缺少 Stripe 密钥、订阅 Webhook 密钥和四个价格映射，本地密钥已失效 |
-| 同意与数据生命周期 | 最小授权 grant/revoke 已在生产验证；删除实现已部署，正文生命周期待验收 | OMR-017～024 已部署；H54 从已登录 iOS 模拟器产生 `omerChatText` 授权并由 Omer 回查确认；H55 补齐移动端聊天数据库与 AI 记忆删除顺序及失败关闭。尚需验证撤回后健康正文停止新增和真实账号删除行为 |
+| 同意与数据生命周期 | 最小授权 grant/revoke、策略版本强制门已在生产验证；删除实现已部署，正文生命周期待验收 | OMR-017～025 已部署；H54 从已登录 iOS 模拟器产生 `omerChatText` 授权并由 Omer 回查确认；H55 补齐移动端聊天数据库与 AI 记忆删除顺序及失败关闭；H59 移除缺少策略版本的旧客户端兼容路径。尚需验证撤回后健康正文停止新增和真实账号删除行为 |
 
 验证没有读取浏览器 cookie、local storage、Firebase ID Token、数据库内容或环境变量值，
 也没有把个人健康数据或聊天正文复制进本记录。
@@ -105,6 +105,21 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
   缺失 API 类型和畸形 plist；完整发布配置预检与差异检查通过。
 - GitHub 只读元数据确认仓库与 `staging` 环境没有发布密钥或变量，`production` 环境尚未
   建立。本主题不创建环境、不写入凭据，也不宣称 Archive 或 TestFlight 已可用。
+
+## 2026-08-13 同意策略强制切换
+
+- HLT-176 采用两阶段发布，避免直接收紧 Omer 导致仍在使用中的 Web 客户端中断：Home
+  PR #27（HOME-005）先在已认证聊天请求中发送当前策略版本，Vercel Preview 与
+  Production 均成功；随后 Omer PR #23（OMR-025）以普通权限合并并部署到 Production。
+- Omer 的移动聊天和端侧对话同步现在都要求当前策略版本；缺少或过期版本返回 400。
+  授权范围检查不再是可选路径，并分别发生在计费与模型调用前、数据库写入前。
+- Omer 的改动文件格式、TypeScript、32 项专项测试与完整测试均通过；完整结果为 469 项
+  通过、8 项数据库集成测试按默认配置跳过。Production 对两个匿名端点的烟测均返回 401，
+  证明认证边界仍优先失败关闭。
+- iOS 主线此前已发送当前策略版本。本次未读取身份令牌、浏览器凭据、健康数据、聊天正文
+  或数据库业务行，也未以真实账号尝试缺少版本的请求；该行为由已认证单元测试覆盖。
+- 这完成旧客户端强制门，不证明撤回后健康正文停止新增或真实账号云端删除；这两项继续
+  留在 US-201。TestFlight 按当前产品决定延期，不作为本主题的发布门槛。
 
 ## 2026-08-13 Omer 订阅权限映射安全
 

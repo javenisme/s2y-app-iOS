@@ -28,8 +28,8 @@ TestFlight 或真实 S2Y 设备已经通过验收。
 
 | Issue | 当前归属 | 未完成证据 |
 |---:|---|---|
-| #3 Firebase 生产连通性 | US-201 | iOS 登录与最小 Omer 聊天范围 grant/revoke 已由 H54 验证；H55 已部署聊天数据库与 AI 记忆的删除顺序和失败关闭保护，尚缺撤回后健康正文停止新增、真实账号删除及旧客户端收紧闭环 |
-| #7 TestFlight 外测 | US-204 | H56 已修复 Ubuntu 发布预检的隐私清单工具依赖；Archive/签名、TestFlight 安装、回滚和审核仍未完成 |
+| #3 Firebase 生产连通性 | US-201 | iOS 登录与最小 Omer 聊天范围 grant/revoke 已由 H54 验证；H55 已部署聊天数据库与 AI 记忆删除保护；H59 已强制当前同意策略版本，尚缺撤回后健康正文停止新增及真实账号删除 |
+| #7 TestFlight 外测 | US-204 | H56 已修复 Ubuntu 发布预检；当前按产品决定延期外测，Archive/合资格团队签名、TestFlight 安装、回滚和审核仍未完成 |
 
 ## 可关闭的旧 PR
 
