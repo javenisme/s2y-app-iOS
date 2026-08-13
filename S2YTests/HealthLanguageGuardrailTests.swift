@@ -32,4 +32,17 @@ struct HealthLanguageGuardrailTests {
         #expect(HealthInterpretationPolicy.userSelectedGoalBoundary.contains("does not choose"))
         #expect(HealthInterpretationPolicy.userSelectedGoalBoundary.contains("target you want"))
     }
+
+    @Test("A goal without a value does not create a suggested target")
+    func missingGoalValue() async throws {
+        let result = try await EnhancedQueryPlanner.run(intent: .goal(kind: .steps, target: nil))
+
+        guard case .textResponse(let response) = result else {
+            Issue.record("Expected a text response")
+            return
+        }
+        #expect(response.contains("include the value you want"))
+        #expect(!response.contains("Suggested Goal"))
+        #expect(!response.contains("10,000"))
+    }
 }

@@ -332,33 +332,24 @@ enum EnhancedQueryPlanner {
     }
     
     private static func generateGoalResponse(kind: HealthKitService.MetricKind, target: Double?) async throws -> HealthQueryProcessor.QueryResult {
+        guard let target else {
+            let title = metricTitle(kind: kind)
+            return .textResponse("To track a \(title) goal, include the value you want to use. \(HealthInterpretationPolicy.userSelectedGoalBoundary)")
+        }
+
         let trend = try await HealthKitService.shared.trend(kind: kind, days: 7, useCache: true)
         let current = trend.average
         let title = metricTitle(kind: kind)
         let unit = metricUnit(kind: kind)
-        
-        if let target = target {
-            let progress = (current / target) * 100
-            let response = """
-            \(title) Goal: \(String(format: "%.1f", target)) \(unit)
-            Current 7-day Average: \(String(format: "%.1f", current)) \(unit)
-            Progress: \(String(format: "%.1f", progress))%
-            
-            \(progress >= 100 ? "🎉 Congratulations! You've reached your goal!" : "💪 Keep going! You need \(String(format: "%.1f", target - current)) \(unit) more to reach your goal.")
-            """
-            return .textResponse(response)
-        } else {
-            let suggestedTarget = generateSuggestedTarget(for: kind, current: current)
-            let response = """
-            Based on your current \(title) data, recommended goal:
-            
-            Current 7-day Average: \(String(format: "%.1f", current)) \(unit)
-            Suggested Goal: \(String(format: "%.1f", suggestedTarget)) \(unit)
-            
-            This goal is both challenging and achievable. You can gradually improve and steadily reach your health goals!
-            """
-            return .textResponse(response)
-        }
+        let progress = (current / target) * 100
+        let response = """
+        \(title) Goal: \(String(format: "%.1f", target)) \(unit)
+        Current 7-day Average: \(String(format: "%.1f", current)) \(unit)
+        Descriptive Progress: \(String(format: "%.1f", progress))%
+
+        This compares the recorded average with the target you selected; it does not assess whether that target is medically appropriate.
+        """
+        return .textResponse(response)
     }
     
     // MARK: - Helper Methods
@@ -474,26 +465,6 @@ enum EnhancedQueryPlanner {
         • Consult doctor promptly for abnormal changes
         • Personal health plans should incorporate professional guidance
         """
-    }
-    
-    private static func generateSuggestedTarget(for kind: HealthKitService.MetricKind, current: Double) -> Double {
-        switch kind {
-        case .steps:
-            if current < 5000 { return 8000 }
-            else if current < 10000 { return 12000 }
-            else { return current * 1.1 }
-            
-        case .sleepDurationHours:
-            if current < 7 { return 8 }
-            else { return max(8, current) }
-            
-        case .activeEnergy:
-            if current < 200 { return 300 }
-            else { return current * 1.15 }
-            
-        default:
-            return current * 1.1
-        }
     }
     
     private static func metricTitle(kind: HealthKitService.MetricKind) -> String {
