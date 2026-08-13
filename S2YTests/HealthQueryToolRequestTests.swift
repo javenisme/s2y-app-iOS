@@ -80,4 +80,22 @@ final class HealthQueryToolRequestTests: XCTestCase {
             XCTAssertEqual(error as? HealthQueryToolRequestError, .windowOutOfRange(365))
         }
     }
+
+    func testNaturalLanguagePlannerProducesValidatedToolRequest() throws {
+        let intent = try XCTUnwrap(
+            QueryPlanner.parse("Compare my sleep over 30 days vs the previous period")
+        )
+
+        XCTAssertEqual(intent.operation, .comparePeriods)
+        XCTAssertEqual(intent.metric, .sleepDurationHours)
+        XCTAssertEqual(intent.windowDays, 30)
+    }
+
+    func testChartRequestUsesSameValidatedContract() {
+        XCTAssertEqual(
+            HealthChartRequest.parse("Show my step trend for 14 days"),
+            .trend(kind: .steps, days: 14)
+        )
+        XCTAssertNil(HealthChartRequest.parse("Show my step trend for 365 days"))
+    }
 }

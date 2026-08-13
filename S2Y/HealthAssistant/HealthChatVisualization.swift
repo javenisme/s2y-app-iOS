@@ -16,11 +16,11 @@ enum HealthChartRequest: Equatable, Sendable {
         guard let intent = QueryPlanner.parse(query) else {
             return nil
         }
-        switch intent {
-        case .trend(let kind, let days):
-            return .trend(kind: kind, days: days)
-        case .compare(let kind, let windowDays):
-            return .comparison(kind: kind, days: windowDays)
+        switch intent.operation {
+        case .trend:
+            return .trend(kind: intent.metric, days: intent.windowDays)
+        case .comparePeriods:
+            return .comparison(kind: intent.metric, days: intent.windowDays)
         }
     }
 }
