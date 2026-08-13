@@ -98,4 +98,30 @@ final class HealthQueryToolRequestTests: XCTestCase {
         )
         XCTAssertNil(HealthChartRequest.parse("Show my step trend for 365 days"))
     }
+
+    func testParserClassifiesUnsafeWindowInsteadOfSilentlyDefaulting() {
+        XCTAssertEqual(
+            QueryPlanner.parseResult("Show my step trend for 365 days"),
+            .invalid(.windowOutOfRange(365))
+        )
+        XCTAssertEqual(QueryPlanner.parseResult("Tell me a joke"), .noMatch)
+    }
+
+    func testProcessorReturnsSafeValidationMessageWithoutExecutingHealthKit() async throws {
+        let result = try await HealthQueryProcessor.processQuery("Show my sleep trend for 365 days")
+
+        guard case .textResponse(let message) = result else {
+            return XCTFail("Expected a validation response")
+        }
+        XCTAssertEqual(message, "Choose a time window from 1 to 90 days.")
+    }
+
+    func testMalformedToolOperationFailsClosedDuringDecoding() throws {
+        let data = try XCTUnwrap(
+            #"{"version":1,"operation":"diagnose","metric":"steps","windowDays":7}"#
+                .data(using: .utf8)
+        )
+
+        XCTAssertThrowsError(try JSONDecoder().decode(HealthQueryToolRequest.self, from: data))
+    }
 }

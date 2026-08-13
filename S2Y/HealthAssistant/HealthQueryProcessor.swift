@@ -33,8 +33,13 @@ enum HealthQueryProcessor {
     
     static func processQuery(_ query: String) async throws -> QueryResult {
         // Structured HealthKit operations always use the validated tool contract.
-        if let intent = QueryPlanner.parse(query) {
+        switch QueryPlanner.parseResult(query) {
+        case .valid(let intent):
             return try await processStructuredQuery(intent)
+        case .invalid(let error):
+            return .textResponse(error.localizedDescription)
+        case .noMatch:
+            break
         }
 
         // Broader summaries and guidance use the enhanced planner.

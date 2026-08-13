@@ -53,6 +53,7 @@ The [DocC documentation of the Spezi Template Application contains information o
 - Roadmap: [Docs/roadmap.md](Docs/roadmap.md)
 - Health Assistant Epics: [Docs/epics.md](Docs/epics.md)
 - AI Provider Boundaries: [Docs/ai-provider-architecture.md](Docs/ai-provider-architecture.md)
+- Health Query Tool Schema: [Docs/health-query-tool-schema.md](Docs/health-query-tool-schema.md)
 - TODO: [Docs/todo.md](Docs/todo.md)
 
 ## Contributing
