@@ -162,6 +162,29 @@ final class ClinicalDocumentStore: ObservableObject {
             }
     }
 
+    func remove(_ document: ClinicalDocument) throws {
+        guard documents.contains(where: { $0.id == document.id }) else {
+            return
+        }
+        let originalURL = storedFileURL(for: document)
+        let documentIndexURL = indexURL(for: document.id)
+        if fileManager.fileExists(atPath: originalURL.path) {
+            try fileManager.removeItem(at: originalURL)
+        }
+        if fileManager.fileExists(atPath: documentIndexURL.path) {
+            try fileManager.removeItem(at: documentIndexURL)
+        }
+        documents.removeAll { $0.id == document.id }
+        try persistManifest()
+    }
+
+    func clear() throws {
+        if fileManager.fileExists(atPath: rootURL.path) {
+            try fileManager.removeItem(at: rootURL)
+        }
+        documents = []
+    }
+
     private func mediaType(for url: URL) throws -> (type: ClinicalDocumentMediaType, fileExtension: String) {
         switch url.pathExtension.lowercased() {
         case "pdf":

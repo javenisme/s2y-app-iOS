@@ -63,6 +63,39 @@ final class ClinicalDocumentStoreTests: XCTestCase {
         XCTAssertTrue(store.documents.isEmpty)
     }
 
+    @MainActor
+    func testRemoveDeletesOriginalIndexAndManifestEntry() throws {
+        let fixture = try fixtureDirectory()
+        let source = fixture.appendingPathComponent("Care Plan.txt")
+        try Data("Hydration and sleep routine".utf8).write(to: source)
+        let library = fixture.appendingPathComponent("Library")
+        let store = ClinicalDocumentStore(rootURL: library)
+        let document = try store.importDocument(from: source)
+        try store.indexDocument(document)
+
+        try store.remove(document)
+
+        XCTAssertTrue(store.documents.isEmpty)
+        XCTAssertThrowsError(try store.fileURL(for: document))
+        XCTAssertTrue(ClinicalDocumentStore(rootURL: library).documents.isEmpty)
+        XCTAssertTrue(store.search(query: "hydration").isEmpty)
+    }
+
+    @MainActor
+    func testClearRemovesEntireProtectedLibrary() throws {
+        let fixture = try fixtureDirectory()
+        let source = fixture.appendingPathComponent("Notes.md")
+        try Data("Local only".utf8).write(to: source)
+        let library = fixture.appendingPathComponent("Library")
+        let store = ClinicalDocumentStore(rootURL: library)
+        _ = try store.importDocument(from: source)
+
+        try store.clear()
+
+        XCTAssertTrue(store.documents.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: library.path))
+    }
+
     private func fixtureDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("ClinicalDocumentStoreTests-\(UUID().uuidString)", isDirectory: true)

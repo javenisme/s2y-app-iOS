@@ -57,6 +57,11 @@ struct HealthAssistantSettingsView: View {
                 )
 
                 Toggle(
+                    "Share relevant imported document excerpts with Omer",
+                    isOn: consentBinding(for: .importedClinicalDocumentExcerpts)
+                )
+
+                Toggle(
                     "Back up completed check-ins to S2Y account",
                     isOn: consentBinding(for: .wellbeingCheckInCloudBackup)
                 )
@@ -83,6 +88,7 @@ struct HealthAssistantSettingsView: View {
                 Text(
                     "Each sharing choice is independent and can be withdrawn immediately. "
                         + "Clinical record summaries are never included under the general Health summary choice. "
+                        + "Imported document excerpts have their own sharing choice. "
                         + "Check-in account backup and Omer analysis are separate choices. "
                         + "On-device analysis stays on this iPhone unless conversation sync is enabled."
                 )
@@ -119,6 +125,12 @@ struct HealthAssistantSettingsView: View {
                     ClinicalRecordsSettingsView()
                 } label: {
                     Label("Clinical Record Summaries", systemImage: "cross.case")
+                }
+
+                NavigationLink {
+                    ClinicalDocumentLibraryView()
+                } label: {
+                    Label("Imported Clinical Documents", systemImage: "doc.text.magnifyingglass")
                 }
             } header: {
                 Text("Data")
