@@ -66,6 +66,7 @@ struct HealthAssistantView: View {
     @State private var pendingClarification: AssistantClarification?
     @State private var availableSuggestionMetrics: Set<HealthKitService.MetricKind> = []
     @State private var didLoadSuggestionAvailability = false
+    @State private var responseTask: Task<Void, Never>?
     @FocusState private var isInputFocused: Bool
     @AppStorage(StorageKeys.healthAssistantAIMode) private var aiModeRawValue = AssistantAIMode.onDevice.rawValue
 
@@ -133,8 +134,10 @@ struct HealthAssistantView: View {
             self.requestedConversationID = nil
         }
         .onChange(of: newChatRequestID) {
+            stopResponse()
             Task { await beginNewConversation() }
         }
+        .onDisappear(perform: stopResponse)
         .alert(item: $pendingToolApproval) { approval in
             Alert(
                 title: Text("Allow Omer action?"),
@@ -331,22 +334,26 @@ struct HealthAssistantView: View {
                     .submitLabel(.send)
                     .onSubmit {
                         guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isProcessing else { return }
-                        Task { await sendMessage() }
+                        startSending()
                     }
                     .accessibilityIdentifier("health-assistant-input")
                 
                 Button {
-                    Task { await sendMessage() }
+                    if isProcessing {
+                        stopResponse()
+                    } else {
+                        startSending()
+                    }
                 } label: {
-                    Image(systemName: "paperplane.fill")
+                    Image(systemName: isProcessing ? "stop.fill" : "paperplane.fill")
                         .foregroundColor(.white)
                         .frame(width: 36, height: 36)
-                        .background(inputText.isEmpty ? Color.gray : Color.blue)
+                        .background(isProcessing ? Color.red : (inputText.isEmpty ? Color.gray : Color.blue))
                         .clipShape(Circle())
-                        .accessibilityLabel("Send Message")
+                        .accessibilityLabel(isProcessing ? "Stop Response" : "Send Message")
                 }
-                .disabled(inputText.isEmpty || isProcessing)
-                .accessibilityIdentifier("health-assistant-send")
+                .disabled(!isProcessing && inputText.isEmpty)
+                .accessibilityIdentifier(isProcessing ? "health-assistant-stop" : "health-assistant-send")
             }
             .padding()
         }
@@ -407,7 +414,21 @@ struct HealthAssistantView: View {
     ) {
         pendingClarification = nil
         inputText = AssistantConversationPolicy.applying(option, to: clarification)
-        Task { await sendMessage() }
+        startSending()
+    }
+
+    @MainActor
+    private func startSending() {
+        guard responseTask == nil else { return }
+        responseTask = Task { @MainActor in
+            await sendMessage()
+            responseTask = nil
+        }
+    }
+
+    @MainActor
+    private func stopResponse() {
+        responseTask?.cancel()
     }
     
     private func initializeHealthKit() async {
@@ -509,6 +530,12 @@ struct HealthAssistantView: View {
             for: query,
             includeHealthContext: selectedAIMode == .onDevice
         )
+        guard !Task.isCancelled else {
+            updateAssistantMessage(id: assistantPlaceholder.id, content: "Response stopped.")
+            notice = AssistantNotice(message: "You stopped this response.", tone: .info)
+            isProcessing = false
+            return
+        }
         let chartAttachment = await HealthChatVisualizationLoader.load(for: query)
         updateAssistantAttachment(id: assistantPlaceholder.id, attachment: chartAttachment)
 
@@ -559,6 +586,13 @@ struct HealthAssistantView: View {
                 onHistoryChanged()
                 isProcessing = false
                 return
+            } catch is CancellationError {
+                if messages.first(where: { $0.id == assistantPlaceholder.id })?.content.isEmpty != false {
+                    updateAssistantMessage(id: assistantPlaceholder.id, content: "Response stopped.")
+                }
+                notice = AssistantNotice(message: "You stopped this response.", tone: .info)
+                isProcessing = false
+                return
             } catch {
                 logger.error("Apple on-device generation failed: \(error.localizedDescription)")
                 notice = AssistantNotice(
@@ -601,6 +635,11 @@ struct HealthAssistantView: View {
                     self.handleOmerEvent(event, assistantMessageID: assistantMessageID)
                 }
             }
+        } catch is CancellationError {
+            if messages.first(where: { $0.id == assistantMessageID })?.content.isEmpty != false {
+                updateAssistantMessage(id: assistantMessageID, content: "Response stopped.")
+            }
+            notice = AssistantNotice(message: "You stopped this response.", tone: .info)
         } catch let error as HealthSharingConsentFailure {
             updateAssistantMessage(
                 id: assistantMessageID,
