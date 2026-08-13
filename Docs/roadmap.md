@@ -5,7 +5,7 @@
 
 ## 当前基线
 
-- H01～H27、H30～H44、H47～H56 已合并或在当前主题完成；本地 GitHub backlog 已收口到明确证据，剩余开放工单只跟踪 Firebase 生产闭环与 TestFlight。付费订阅生产配置与购买验收、撤回后健康正文停止新增及真实账号删除验收、签名真机和真实设备仍未完成。
+- H01～H27、H30～H44、H47～H56、H59 已合并或在当前主题完成；本地 GitHub backlog 已收口到明确证据，剩余开放工单只跟踪 Firebase 生产闭环与延期的 TestFlight。付费订阅生产配置与购买验收、撤回后健康正文停止新增及真实账号删除验收、合资格团队签名真机和真实设备仍未完成。
 - 支持的 AI 只有用户显式选择的 Apple 端侧 AI 和 Omer 在线 AI。
 - 下载式 Phi/MLX 模型、模拟回答、固定人群阈值、自动健康目标和临床风险评分已退休。
 - 当前闭环是健康管理闭环，不是诊断或治疗闭环。
@@ -65,8 +65,9 @@ H56 已移除发布预检对 macOS `plutil` 的依赖，隐私清单现在由 Py
 和 macOS 使用相同规则校验；这只修复 CI 预检可移植性，不提供 Apple 签名凭据。
 
 当前已确认已配对且开启 Developer Mode 的 iPhone 16e（iOS 26.6）具备 Apple
-Intelligence 硬件资格，但 Debug 真机构建与签名 Archive 均已验证阻塞在 Xcode 账户
-凭据和 Verifiable Health Records profile 能力，详见
+Intelligence 硬件资格，Xcode 也已登录有效个人团队；但 Debug 真机构建与签名 Archive
+均已验证阻塞在个人团队不支持 HealthKit Access（Verifiable Health Records）、profile
+缺少该能力，详见
 [`release-validation.md`](release-validation.md)。不得通过删除临床记录 entitlement 绕过。
 
 Omer 最新 `main` 已部署到 Production；已认证的新消息、AI 回复、刷新后读取、Free
@@ -75,8 +76,10 @@ Omer 最新 `main` 已部署到 Production；已认证的新消息、AI 回复�
 长期离线后恢复当前状态。OMR-020～023 已增加账号页只读范围、统一撤回和缺失
 `UserConsent` 表的幂等修复迁移。H54 已由登录后的 iOS 模拟器发起最小聊天范围授权，
 使用同一 Firebase 身份回查 Omer 确认状态；撤销后空授权也得到确认，随后恢复用户选择的
-最小范围。为兼容已发布客户端，未携带策略版本的旧请求暂未强制；健康正文停止新增与
-真实账号云端删除证据仍待验收。H55 / OMR-024 已把移动端聊天删除补齐为先清理匹配的
+最小范围。H59 采用两阶段切换：Home PR #27 先发送当前策略版本并部署，随后 Omer
+PR #23 强制聊天与端侧同步必须携带该版本，旧请求在计费、模型访问和数据库写入前失败
+关闭；iOS 主线此前已携带该版本。健康正文停止新增与真实账号云端删除证据仍待验收。
+H55 / OMR-024 已把移动端聊天删除补齐为先清理匹配的
 Cognee AI 记忆、再删除数据库聊天；清理不完整时失败关闭并保留记录供重试。该路径已
 部署到 Production，但只完成匿名拒绝烟测，没有删除既有生产聊天。只读元数据检查仅确认表存在性，不读取
 业务行；付费订阅
