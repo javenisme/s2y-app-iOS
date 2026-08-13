@@ -1444,6 +1444,14 @@ final class OmerMobileChatModelsTests: XCTestCase {
             XCTAssertFalse(state.recoveryGuidance.contains("Using Omer instead"))
         }
         XCTAssertEqual(AppleFoundationModelAvailability.available.statusTitle, "Ready")
+        XCTAssertTrue(
+            AppleFoundationModelAvailability.unavailable(.appleIntelligenceNotEnabled)
+                .recoveryGuidance.contains("iPhone Settings")
+        )
+        XCTAssertTrue(
+            AppleFoundationModelAvailability.unavailable(.modelNotReady)
+                .recoveryGuidance.contains("power and Wi-Fi")
+        )
     }
 
     @MainActor
