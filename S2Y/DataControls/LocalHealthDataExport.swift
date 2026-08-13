@@ -66,7 +66,7 @@ enum LocalHealthDataExportService {
         )
     }
 
-    static func encodedData(for package: LocalHealthDataExportPackage) throws -> Data {
+    nonisolated static func encodedData(for package: LocalHealthDataExportPackage) throws -> Data {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]

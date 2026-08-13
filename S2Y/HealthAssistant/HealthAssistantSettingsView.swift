@@ -12,8 +12,6 @@ struct HealthAssistantSettingsView: View {
     let showsDismissButton: Bool
 
     @Environment(\.dismiss) private var dismiss
-    @State private var showingCacheClearedAlert = false
-    @State private var showingChatCacheClearedAlert = false
     @StateObject private var sharingConsentStore = HealthSharingConsentStore.shared
 
     init(showsDismissButton: Bool = false) {
@@ -92,6 +90,12 @@ struct HealthAssistantSettingsView: View {
 
             Section {
                 NavigationLink {
+                    LocalHealthDataControlsView()
+                } label: {
+                    Label("Data Controls", systemImage: "externaldrive.badge.checkmark")
+                }
+
+                NavigationLink {
                     WellbeingCheckInHistoryView()
                 } label: {
                     Label("Daily Check-in History", systemImage: "checkmark.circle")
@@ -102,22 +106,10 @@ struct HealthAssistantSettingsView: View {
                 } label: {
                     Label("Clinical Record Summaries", systemImage: "cross.case")
                 }
-
-                Button("Clear locally saved chat history", role: .destructive) {
-                    Task {
-                        await OmerChatService.shared.clearLocalChatCache()
-                        showingChatCacheClearedAlert = true
-                    }
-                }
-
-                Button("Clear Health data cache", role: .destructive) {
-                    HealthKitCache.shared.clearAll()
-                    showingCacheClearedAlert = true
-                }
             } header: {
                 Text("Data")
             } footer: {
-                Text("Manage clinical summaries separately. Cache actions never delete data from Apple Health.")
+                Text("Review, export, or delete S2Y's local copies. Apple Health and cloud data remain separate.")
             }
         }
         .navigationTitle("Health Assistant")
@@ -130,16 +122,6 @@ struct HealthAssistantSettingsView: View {
                     }
                 }
             }
-        }
-        .alert("Cache cleared", isPresented: $showingCacheClearedAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("Cached Health summaries were removed from this iPhone.")
-        }
-        .alert("Local chat history cleared", isPresented: $showingChatCacheClearedAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text("Locally saved chat copies were removed. This does not delete conversations already synced to your S2Y account.")
         }
     }
 
