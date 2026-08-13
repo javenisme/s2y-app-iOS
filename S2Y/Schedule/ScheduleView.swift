@@ -38,6 +38,13 @@ struct ScheduleView: View {
                 EventView(event)
             }
             .toolbar {
+                NavigationLink {
+                    WellbeingCheckInHistoryView()
+                } label: {
+                    Label("Check-in History", systemImage: "clock.arrow.circlepath")
+                }
+                .accessibilityIdentifier("schedule.check-in-history")
+
                 if account != nil {
                     AccountButton(isPresented: $presentingAccount)
                 }

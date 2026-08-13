@@ -20,6 +20,8 @@ struct EventView: View {
     @StateObject private var sharingConsentStore = HealthSharingConsentStore.shared
     
     @State private var viewState: ViewState = .idle
+    @State private var pendingCloudBackupResponse: ModelsR4.QuestionnaireResponse?
+    @State private var showingCloudBackupRecovery = false
     
     
     var body: some View {
@@ -43,7 +45,13 @@ struct EventView: View {
                         .wellbeingCheckInCloudBackup,
                         authorization: sharingConsentStore.authorization
                     ) {
-                        await standard.add(response: response, for: questionnaire)
+                        do {
+                            try await standard.add(response: response, for: questionnaire)
+                        } catch {
+                            pendingCloudBackupResponse = response
+                            showingCloudBackupRecovery = true
+                            return
+                        }
                     }
                     dismiss()
                 } catch {
@@ -51,11 +59,19 @@ struct EventView: View {
                 }
             }
             .viewStateAlert(state: $viewState)
-            .onChange(of: viewState) { oldViewState, newViewState in
-                guard case .error = oldViewState, newViewState == .idle else {
-                    return
+            .alert("Saved on this iPhone", isPresented: $showingCloudBackupRecovery) {
+                Button("Retry Cloud Backup") {
+                    retryPendingCloudBackup(for: questionnaire)
                 }
-                dismiss()
+                Button("Finish Without Cloud Backup", role: .cancel) {
+                    pendingCloudBackupResponse = nil
+                    dismiss()
+                }
+            } message: {
+                Text(
+                    "Your private local check-in is safe, but the optional account backup did not finish. "
+                        + "You can retry now or keep only the copy on this iPhone."
+                )
             }
         } else {
             NavigationStack {
@@ -76,5 +92,26 @@ struct EventView: View {
     
     init(_ event: Event) {
         self.event = event
+    }
+
+    private func retryPendingCloudBackup(for questionnaire: ModelsR4.Questionnaire) {
+        guard let response = pendingCloudBackupResponse else {
+            return
+        }
+        _Concurrency.Task { await retryCloudBackup(response, for: questionnaire) }
+    }
+
+    @MainActor
+    private func retryCloudBackup(
+        _ response: ModelsR4.QuestionnaireResponse,
+        for questionnaire: ModelsR4.Questionnaire
+    ) async {
+        do {
+            try await standard.add(response: response, for: questionnaire)
+            pendingCloudBackupResponse = nil
+            dismiss()
+        } catch {
+            showingCloudBackupRecovery = true
+        }
     }
 }

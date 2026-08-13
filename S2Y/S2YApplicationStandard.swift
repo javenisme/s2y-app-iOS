@@ -69,7 +69,7 @@ actor S2YApplicationStandard: Standard,
         response: ModelsR4.QuestionnaireResponse,
         for questionnaire: ModelsR4.Questionnaire,
         isolation: isolated (any Actor)? = #isolation
-    ) async {
+    ) async throws {
         let responseId = response.identifier?.value?.value?.string ?? UUID().uuidString
         let questionnaireId = questionnaire.id?.value?.string
         
@@ -78,18 +78,19 @@ actor S2YApplicationStandard: Standard,
             return
         }
         
+        let collection = if let questionnaireId = questionnaireId {
+            "QuestionnaireResponses_\(questionnaireId)"
+        } else {
+            "QuestionnaireResponses"
+        }
         do {
-            let collection = if let questionnaireId = questionnaireId {
-                "QuestionnaireResponses_\(questionnaireId)"
-            } else {
-                "QuestionnaireResponses"
-            }
             try await configuration.userDocumentReference
                 .collection(collection)
                 .document(responseId)
                 .setData(from: response)
         } catch {
             await logger.error("Could not store questionnaire response: \(error)")
+            throw error
         }
     }
     
