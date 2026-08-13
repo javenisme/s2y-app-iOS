@@ -30,19 +30,6 @@ struct HomeView: View {
             }
         }
 
-        var subtitle: String {
-            switch self {
-            case .healthAssistant:
-                return String(localized: "Chat, insights, and connected health tools")
-            case .schedule:
-                return String(localized: "Tasks, reminders, and care routines")
-            case .contact:
-                return String(localized: "Profile, sign-in, and personal details")
-            case .settings:
-                return String(localized: "Preferences, permissions, and support")
-            }
-        }
-
         var systemImage: String {
             switch self {
             case .healthAssistant:
@@ -56,18 +43,6 @@ struct HomeView: View {
             }
         }
 
-        var tint: Color {
-            switch self {
-            case .healthAssistant:
-                return .red
-            case .schedule:
-                return .indigo
-            case .contact:
-                return .teal
-            case .settings:
-                return .orange
-            }
-        }
     }
 
 
@@ -190,38 +165,36 @@ struct HomeView: View {
             drawerHeader
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    newChatButton
-
+                LazyVStack(alignment: .leading, spacing: 4) {
                     if let chatDeletionError {
                         Text(chatDeletionError)
                             .font(.footnote)
                             .foregroundStyle(.red)
-                            .padding(.horizontal, 24)
+                            .padding(.horizontal, 18)
+                            .padding(.bottom, 8)
                             .accessibilityIdentifier("drawer.chat-delete-error")
                     }
 
                     if drawerChatHistory.isEmpty {
                         Text("Recent chats")
-                            .font(.caption.weight(.semibold))
+                            .font(.footnote.weight(.medium))
                             .foregroundStyle(.secondary)
-                            .textCase(.uppercase)
-                            .padding(.horizontal, 24)
-                            .padding(.top, 12)
+                            .padding(.horizontal, 18)
+                            .padding(.top, 8)
 
                         Text(isRefreshingChatHistory ? "Loading conversations…" : "Your Omer and on-device chats will appear here.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 8)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 10)
                     } else {
                         ForEach(chatHistorySections) { section in
                             Text(section.title)
-                                .font(.caption.weight(.semibold))
+                                .font(.footnote.weight(.medium))
                                 .foregroundStyle(.secondary)
-                                .textCase(.uppercase)
-                                .padding(.horizontal, 24)
-                                .padding(.top, 12)
+                                .padding(.horizontal, 18)
+                                .padding(.top, 14)
+                                .padding(.bottom, 4)
 
                             ForEach(section.chats) { chat in
                                 drawerChatRow(chat)
@@ -230,71 +203,44 @@ struct HomeView: View {
                     }
 
                     Divider()
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
 
-                    Text("Navigate")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .textCase(.uppercase)
-                        .padding(.horizontal, 24)
-
-                    ForEach(Tabs.allCases, id: \.self) { tab in
+                    ForEach([Tabs.schedule, Tabs.settings], id: \.self) { tab in
                         drawerRow(for: tab)
                     }
                 }
-                .padding(.top, 10)
-                .padding(.bottom, 18)
+                .padding(.bottom, 12)
             }
+
+            drawerFooter
         }
         .frame(width: width, alignment: .leading)
         .accessibilityHidden(!isDrawerOpen)
-        .padding(.top, 20)
-        .padding(.bottom, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
         .background(
-            ZStack(alignment: .topLeading) {
-                LinearGradient(
-                    colors: [
-                        Color(uiColor: .secondarySystemBackground),
-                        Color(uiColor: .systemGroupedBackground)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                Circle()
-                    .fill(Color.red.opacity(0.08))
-                    .frame(width: 220, height: 220)
-                    .offset(x: -40, y: -60)
-            }
-            .ignoresSafeArea()
+            Color(uiColor: .secondarySystemBackground)
+                .ignoresSafeArea()
         )
     }
 
     private var drawerHeader: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.red.opacity(0.14))
-                    .frame(width: 52, height: 52)
-                    .overlay {
-                        Image(systemName: "heart.text.square.fill")
-                            .font(.title3)
-                            .foregroundStyle(.red)
-                            .accessibilityHidden(true)
-                    }
+        HStack(spacing: 10) {
+            Text("Chats")
+                .font(.headline.weight(.semibold))
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("S2Y")
-                        .font(.title2.weight(.semibold))
-                    Text("Personal health navigation")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+            Spacer()
+
+            if isRefreshingChatHistory {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Loading conversations")
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 28)
+        .padding(.horizontal, 18)
+        .padding(.top, 12)
+        .padding(.bottom, 14)
     }
 
     private var newChatButton: some View {
@@ -304,19 +250,56 @@ struct HomeView: View {
             newChatRequestID = UUID()
             closeDrawer()
         } label: {
-            Label("New chat", systemImage: "square.and.pencil")
-                .font(.headline)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 14)
+            drawerFooterLabel("New chat", systemImage: "square.and.pencil")
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("drawer.new-chat")
+    }
+
+    private var accountButton: some View {
+        Button {
+            selectedTab = .contact
+            closeDrawer()
+        } label: {
+            drawerFooterLabel("Account", systemImage: "person.crop.circle")
                 .background(
-                    Color(uiColor: .secondarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    selectedTab == .contact ? Color.primary.opacity(0.07) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                 )
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, 14)
-        .accessibilityIdentifier("drawer.new-chat")
+        .accessibilityValue(selectedTab == .contact ? "Selected" : "")
+        .accessibilityAddTraits(selectedTab == .contact ? .isSelected : [])
+        .accessibilityIdentifier("drawer.account")
+    }
+
+    private var drawerFooter: some View {
+        VStack(spacing: 2) {
+            Divider()
+                .padding(.bottom, 6)
+
+            newChatButton
+            accountButton
+        }
+        .padding(.horizontal, 10)
+        .padding(.top, 2)
+        .background(Color(uiColor: .secondarySystemBackground))
+    }
+
+    private func drawerFooterLabel(_ title: LocalizedStringKey, systemImage: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.body.weight(.medium))
+                .frame(width: 22)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+            Spacer()
+        }
+        .foregroundStyle(.primary)
+        .frame(minHeight: 46)
+        .padding(.horizontal, 10)
+        .contentShape(Rectangle())
     }
 
     private func drawerChatRow(_ chat: OmerChatSummary) -> some View {
@@ -326,14 +309,11 @@ struct HomeView: View {
                 requestedConversationID = chat.id
                 closeDrawer()
             } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "bubble.left")
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
+                HStack(spacing: 8) {
                     Text(chat.title)
                         .font(.subheadline)
                         .foregroundStyle(.primary)
-                        .lineLimit(2)
+                        .lineLimit(1)
                     Spacer(minLength: 8)
                 }
                 .contentShape(Rectangle())
@@ -353,9 +333,9 @@ struct HomeView: View {
             .accessibilityLabel("Conversation actions for \(chat.title)")
             .accessibilityIdentifier("drawer.chat-actions.\(chat.id.uuidString)")
         }
-        .padding(.leading, 20)
-        .padding(.trailing, 14)
-        .padding(.vertical, 4)
+        .padding(.leading, 18)
+        .padding(.trailing, 10)
+        .frame(minHeight: 44)
     }
 
     private func drawerRow(for tab: Tabs) -> some View {
@@ -363,43 +343,33 @@ struct HomeView: View {
             selectedTab = tab
             closeDrawer()
         } label: {
-            HStack(spacing: 14) {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(tab.tint.opacity(selectedTab == tab ? 0.18 : 0.1))
-                    .frame(width: 46, height: 46)
-                    .overlay {
-                        Image(systemName: tab.systemImage)
-                            .font(.title3)
-                            .foregroundStyle(tab.tint)
-                            .accessibilityHidden(true)
-                    }
+            HStack(spacing: 12) {
+                Image(systemName: tab.systemImage)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .frame(width: 22)
+                    .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(tab.title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text(tab.subtitle)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text(tab.title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
 
                 Spacer(minLength: 12)
 
                 if selectedTab == tab {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(tab.tint)
+                    Circle()
+                        .fill(Color.primary)
+                        .frame(width: 5, height: 5)
                         .accessibilityHidden(true)
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 10)
+            .frame(minHeight: 44)
             .background(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(
                         selectedTab == tab
-                            ? Color(uiColor: .secondarySystemGroupedBackground)
+                            ? Color.primary.opacity(0.07)
                             : Color.clear
                     )
             )
@@ -408,8 +378,8 @@ struct HomeView: View {
         .accessibilityLabel(tab.title)
         .accessibilityValue(selectedTab == tab ? "Selected" : "")
         .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
-        .accessibilityIdentifier(tab == .contact ? "drawer.account" : "drawer.\(tab.rawValue)")
-        .padding(.horizontal, 14)
+        .accessibilityIdentifier("drawer.\(tab.rawValue)")
+        .padding(.horizontal, 10)
     }
 
     private var drawerToggleButton: some View {

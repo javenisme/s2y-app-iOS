@@ -32,12 +32,15 @@ final class HealthAssistantChatUITests: XCTestCase {
         XCTAssertFalse(app.keyboards.firstMatch.waitForExistence(timeout: 1))
 
         app.openHomeDrawer()
-        XCTAssertTrue(app.buttons["drawer.new-chat"].waitForExistence(timeout: 5))
+        let newChat = app.buttons["drawer.new-chat"]
+        let account = app.buttons["drawer.account"]
+        XCTAssertTrue(newChat.waitForExistence(timeout: 5))
+        XCTAssertTrue(account.waitForExistence(timeout: 3))
+        XCTAssertTrue(newChat.isHittable)
+        XCTAssertTrue(account.isHittable)
+        XCTAssertLessThan(newChat.frame.minY, account.frame.minY)
         let expectedChatSectionLabels = ["Recent chats", "Today", "Yesterday", "Previous 7 days", "Earlier"]
         XCTAssertTrue(expectedChatSectionLabels.contains { app.staticTexts[$0].exists })
-        app.swipeUp()
-        app.swipeUp()
-        XCTAssertTrue(app.buttons["drawer.account"].waitForExistence(timeout: 3))
         XCTAssertEqual(app.buttons.matching(identifier: "drawer.account").count, 1)
     }
 
