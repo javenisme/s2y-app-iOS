@@ -444,7 +444,13 @@ struct HealthAssistantView: View {
         inputText = ""
         isInputFocused = false
         if let escalation = HealthSafetyTriage.evaluate(query) {
-            messages.append(ChatMessage(role: .assistant, content: escalation.userMessage))
+            messages.append(
+                ChatMessage(
+                    role: .assistant,
+                    content: escalation.userMessage,
+                    communicationKind: .urgentAction
+                )
+            )
             notice = AssistantNotice(
                 message: "This safety guidance was generated on this iPhone without contacting an AI provider.",
                 tone: .warning
@@ -589,7 +595,8 @@ struct HealthAssistantView: View {
             id: id,
             role: existingMessage.role,
             content: existingMessage.content + delta,
-            chartAttachment: existingMessage.chartAttachment
+            chartAttachment: existingMessage.chartAttachment,
+            communicationKind: existingMessage.communicationKind
         )
         streamTick += 1
     }
@@ -605,7 +612,8 @@ struct HealthAssistantView: View {
             id: id,
             role: existingMessage.role,
             content: content,
-            chartAttachment: existingMessage.chartAttachment
+            chartAttachment: existingMessage.chartAttachment,
+            communicationKind: existingMessage.communicationKind
         )
         streamTick += 1
     }
@@ -621,7 +629,8 @@ struct HealthAssistantView: View {
             id: id,
             role: existingMessage.role,
             content: existingMessage.content,
-            chartAttachment: attachment
+            chartAttachment: attachment,
+            communicationKind: .healthObservation
         )
         streamTick += 1
     }
@@ -757,6 +766,7 @@ struct ChatMessage: Identifiable, Sendable {
     let role: Role
     let content: String
     let chartAttachment: HealthChartAttachment?
+    let communicationKind: HealthCommunicationKind?
     
     enum Role {
         case user
@@ -767,12 +777,14 @@ struct ChatMessage: Identifiable, Sendable {
         id: UUID = UUID(),
         role: Role,
         content: String,
-        chartAttachment: HealthChartAttachment? = nil
+        chartAttachment: HealthChartAttachment? = nil,
+        communicationKind: HealthCommunicationKind? = nil
     ) {
         self.id = id
         self.role = role
         self.content = content
         self.chartAttachment = chartAttachment
+        self.communicationKind = communicationKind ?? (role == .assistant ? .wellnessGuidance : nil)
     }
 }
 
@@ -911,6 +923,15 @@ struct MessageBubble: View {
                     )
                     .foregroundColor(message.role == .user ? .white : .primary)
 
+                if let communicationKind = message.communicationKind {
+                    Label(communicationKind.title, systemImage: communicationKind.systemImage)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(communicationKind.tint)
+                    Text(communicationKind.disclosure)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
                 if let chartAttachment = message.chartAttachment {
                     VStack(alignment: .leading, spacing: 6) {
                         chart(attachment: chartAttachment)
@@ -991,6 +1012,24 @@ struct MessageBubble: View {
             .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
         case .paragraph:
             Text(block.content)
+        }
+    }
+}
+
+private extension HealthCommunicationKind {
+    var systemImage: String {
+        switch self {
+        case .healthObservation: "chart.xyaxis.line"
+        case .wellnessGuidance: "leaf"
+        case .urgentAction: "cross.case.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .healthObservation: .blue
+        case .wellnessGuidance: .green
+        case .urgentAction: .red
         }
     }
 }

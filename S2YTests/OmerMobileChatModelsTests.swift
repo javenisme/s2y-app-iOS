@@ -1032,6 +1032,21 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertFalse(metadata.contextUsed)
     }
 
+    func testHealthCommunicationLayersKeepObservationAndGuidanceDistinct() {
+        let observation = ChatMessage(
+            role: .assistant,
+            content: "Seven observed days",
+            communicationKind: .healthObservation
+        )
+        let generalGuidance = ChatMessage(role: .assistant, content: "Consider a consistent bedtime")
+        let userMessage = ChatMessage(role: .user, content: "How was my sleep?")
+
+        XCTAssertEqual(observation.communicationKind, .healthObservation)
+        XCTAssertEqual(generalGuidance.communicationKind, .wellnessGuidance)
+        XCTAssertNil(userMessage.communicationKind)
+        XCTAssertTrue(HealthCommunicationKind.wellnessGuidance.disclosure.contains("not diagnosis"))
+    }
+
     private func validatedWellnessSession() throws -> ValidatedWellnessSession {
         let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
         let deviceID = UUID()
