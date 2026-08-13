@@ -59,7 +59,33 @@ public struct ClinicalRecordSummary: Codable, Equatable, Identifiable, Sendable 
     public let displayName: String
     public let recordedAt: Date
     public let sourceName: String
-    public let fhirResourceIdentifier: String?
+    public let hasLinkedFHIRResource: Bool
+
+    public func recency(relativeTo referenceDate: Date = .now) -> ClinicalRecordRecency {
+        let age = max(0, referenceDate.timeIntervalSince(recordedAt))
+        if age <= 90 * 24 * 60 * 60 {
+            return .recent
+        }
+        if age <= 365 * 24 * 60 * 60 {
+            return .older
+        }
+        return .historical
+    }
+}
+
+public enum ClinicalRecordRecency: String, Codable, Sendable, Equatable {
+    case recent
+    case older
+    case historical
+}
+
+public struct ClinicalRecordIndexAssessment: Sendable, Equatable {
+    public let totalRecordCount: Int
+    public let sourceCount: Int
+    public let categoryCounts: [ClinicalRecordCategory: Int]
+    public let selectedCategoriesWithoutReadableRecords: Set<ClinicalRecordCategory>
+    public let newestRecordedAt: Date?
+    public let oldestRecordedAt: Date?
 }
 
 public struct ClinicalRecordIndex: Codable, Sendable, Equatable {
@@ -84,6 +110,19 @@ public struct ClinicalRecordIndex: Codable, Sendable, Equatable {
             .sorted { $0.recordedAt > $1.recordedAt }
             .filter { seenIDs.insert($0.id).inserted }
         self.records = Array(self.records.prefix(self.maximumRecordCount))
+    }
+
+    public var assessment: ClinicalRecordIndexAssessment {
+        let categoryCounts = Dictionary(grouping: records, by: \.category)
+            .mapValues(\.count)
+        return ClinicalRecordIndexAssessment(
+            totalRecordCount: records.count,
+            sourceCount: Set(records.map(\.sourceName)).count,
+            categoryCounts: categoryCounts,
+            selectedCategoriesWithoutReadableRecords: selectedCategories.subtracting(categoryCounts.keys),
+            newestRecordedAt: records.map(\.recordedAt).max(),
+            oldestRecordedAt: records.map(\.recordedAt).min()
+        )
     }
 }
 
@@ -181,7 +220,7 @@ extension HealthKitService {
                 displayName: record.displayName,
                 recordedAt: record.startDate,
                 sourceName: record.sourceRevision.source.name,
-                fhirResourceIdentifier: record.fhirResource?.identifier
+                hasLinkedFHIRResource: record.fhirResource != nil
             )
         }
     }

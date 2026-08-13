@@ -298,7 +298,7 @@ final class OmerMobileChatModelsTests: XCTestCase {
             displayName: "Example laboratory result",
             recordedAt: date,
             sourceName: "Example Health Provider",
-            fhirResourceIdentifier: "Observation/example"
+            hasLinkedFHIRResource: true
         )
 
         let data = try encoder.encode(summary)
@@ -317,7 +317,7 @@ final class OmerMobileChatModelsTests: XCTestCase {
             displayName: "Selected result",
             recordedAt: date,
             sourceName: "Provider A",
-            fhirResourceIdentifier: "Observation/selected"
+            hasLinkedFHIRResource: true
         )
         let olderDuplicate = ClinicalRecordSummary(
             id: selectedID,
@@ -325,7 +325,7 @@ final class OmerMobileChatModelsTests: XCTestCase {
             displayName: "Duplicate result",
             recordedAt: date.addingTimeInterval(-60),
             sourceName: "Provider A",
-            fhirResourceIdentifier: "Observation/selected"
+            hasLinkedFHIRResource: true
         )
         let unselected = ClinicalRecordSummary(
             id: UUID(),
@@ -333,7 +333,7 @@ final class OmerMobileChatModelsTests: XCTestCase {
             displayName: "Medication",
             recordedAt: date,
             sourceName: "Provider B",
-            fhirResourceIdentifier: "Medication/1"
+            hasLinkedFHIRResource: true
         )
 
         let index = ClinicalRecordIndex(
@@ -347,6 +347,44 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(index.maximumRecordCount, 1)
         let json = String(decoding: try encoder.encode(index), as: UTF8.self)
         XCTAssertFalse(json.contains("resourceType"))
+    }
+
+    func testClinicalRecordIndexReportsProvenanceCoverageAndRecency() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let recent = ClinicalRecordSummary(
+            id: UUID(),
+            category: .labResults,
+            displayName: "Recent result",
+            recordedAt: now.addingTimeInterval(-30 * 24 * 60 * 60),
+            sourceName: "Provider A",
+            hasLinkedFHIRResource: true
+        )
+        let historical = ClinicalRecordSummary(
+            id: UUID(),
+            category: .conditions,
+            displayName: "Historical condition",
+            recordedAt: now.addingTimeInterval(-400 * 24 * 60 * 60),
+            sourceName: "Provider B",
+            hasLinkedFHIRResource: false
+        )
+        let index = ClinicalRecordIndex(
+            records: [recent, historical],
+            selectedCategories: [.labResults, .conditions, .medications],
+            refreshedAt: now
+        )
+
+        XCTAssertEqual(recent.recency(relativeTo: now), .recent)
+        XCTAssertEqual(historical.recency(relativeTo: now), .historical)
+        XCTAssertEqual(index.assessment.totalRecordCount, 2)
+        XCTAssertEqual(index.assessment.sourceCount, 2)
+        XCTAssertEqual(index.assessment.categoryCounts[.labResults], 1)
+        XCTAssertEqual(index.assessment.selectedCategoriesWithoutReadableRecords, [.medications])
+        XCTAssertEqual(index.assessment.newestRecordedAt, recent.recordedAt)
+        XCTAssertEqual(index.assessment.oldestRecordedAt, historical.recordedAt)
+
+        let json = String(decoding: try encoder.encode(index), as: UTF8.self)
+        XCTAssertFalse(json.contains("Observation/"))
+        XCTAssertFalse(json.contains("FHIRResourceIdentifier"))
     }
 
     func testWearableMeasurementsNormalizeUnitsAndPreserveOrigin() throws {
