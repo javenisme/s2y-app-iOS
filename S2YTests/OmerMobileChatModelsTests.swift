@@ -25,6 +25,50 @@ final class OmerMobileChatModelsTests: XCTestCase {
         )
     }
 
+    func testHealthSharingCloudConfirmationIsCheckingWhileRequestRuns() {
+        let status = HealthSharingCloudConfirmation(
+            localAuthorization: HealthSharingAuthorization(grantedScopes: [.omerChatText]),
+            omerAuthorization: HealthSharingAuthorization(grantedScopes: [.omerChatText]),
+            isChecking: true
+        )
+
+        XCTAssertEqual(status, .checking)
+    }
+
+    func testHealthSharingCloudConfirmationConfirmsMatchingGrant() {
+        let authorization = HealthSharingAuthorization(grantedScopes: [.omerChatText])
+
+        let status = HealthSharingCloudConfirmation(
+            localAuthorization: authorization,
+            omerAuthorization: authorization,
+            isChecking: false
+        )
+
+        XCTAssertEqual(status, .confirmed)
+    }
+
+    func testHealthSharingCloudConfirmationConfirmsMatchingRevocation() {
+        let authorization = HealthSharingAuthorization()
+
+        let status = HealthSharingCloudConfirmation(
+            localAuthorization: authorization,
+            omerAuthorization: authorization,
+            isChecking: false
+        )
+
+        XCTAssertEqual(status, .confirmed)
+    }
+
+    func testHealthSharingCloudConfirmationDetectsMismatch() {
+        let status = HealthSharingCloudConfirmation(
+            localAuthorization: HealthSharingAuthorization(grantedScopes: [.omerChatText]),
+            omerAuthorization: HealthSharingAuthorization(),
+            isChecking: false
+        )
+
+        XCTAssertEqual(status, .pending)
+    }
+
     func testChatRequestMatchesFirebaseMobileAPIContract() throws {
         let requestID = try XCTUnwrap(UUID(uuidString: "11111111-1111-1111-1111-111111111111"))
         let conversationID = try XCTUnwrap(UUID(uuidString: "22222222-2222-2222-2222-222222222222"))

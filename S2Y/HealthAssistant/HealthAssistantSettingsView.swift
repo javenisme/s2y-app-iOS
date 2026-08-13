@@ -14,6 +14,9 @@ struct HealthAssistantSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var sharingConsentStore = HealthSharingConsentStore.shared
     @State private var consentSyncMessage: String?
+    @State private var omerAuthorization: HealthSharingAuthorization?
+    @State private var isCheckingOmerAuthorization = false
+    @State private var consentSyncRequestID = UUID()
 
     private var appleModelAvailability: AppleFoundationModelAvailability {
         AppleFoundationModelService.shared.availability
@@ -71,6 +74,18 @@ struct HealthAssistantSettingsView: View {
                     "Share recent check-in summaries with Omer",
                     isOn: consentBinding(for: .wellbeingCheckInSummary)
                 )
+
+                LabeledContent("Omer confirmation") {
+                    Label(cloudConfirmation.title, systemImage: cloudConfirmation.systemImage)
+                        .foregroundStyle(cloudConfirmation.color)
+                }
+                .accessibilityIdentifier("health-sharing-cloud-status")
+
+                Button("Refresh Omer confirmation", systemImage: "arrow.clockwise") {
+                    startConsentSynchronization()
+                }
+                .disabled(isCheckingOmerAuthorization)
+                .accessibilityIdentifier("health-sharing-cloud-refresh")
 
                 NavigationLink {
                     HealthSafetyActivityView()
@@ -156,6 +171,17 @@ struct HealthAssistantSettingsView: View {
                 }
             }
         }
+        .task {
+            startConsentSynchronization()
+        }
+    }
+
+    private var cloudConfirmation: HealthSharingCloudConfirmation {
+        HealthSharingCloudConfirmation(
+            localAuthorization: sharingConsentStore.authorization,
+            omerAuthorization: omerAuthorization,
+            isChecking: isCheckingOmerAuthorization
+        )
     }
 
     private func consentBinding(for scope: HealthSharingScope) -> Binding<Bool> {
@@ -168,15 +194,54 @@ struct HealthAssistantSettingsView: View {
             },
             set: { granted in
                 sharingConsentStore.set(scope, granted: granted)
-                consentSyncMessage = nil
-                Task {
-                    do {
-                        try await OmerChatService.shared.syncHealthSharingConsentReceipts()
-                    } catch {
-                        consentSyncMessage = "This choice is applied on this iPhone. Cloud confirmation is pending until Omer is reachable."
-                    }
-                }
+                startConsentSynchronization()
             }
         )
+    }
+
+    private func startConsentSynchronization() {
+        let requestID = UUID()
+        consentSyncRequestID = requestID
+        consentSyncMessage = nil
+        isCheckingOmerAuthorization = true
+        Task {
+            do {
+                try await OmerChatService.shared.syncHealthSharingConsentReceipts()
+                let authorization = try await OmerChatService.shared.fetchHealthSharingAuthorization()
+                guard consentSyncRequestID == requestID else { return }
+                omerAuthorization = authorization
+                isCheckingOmerAuthorization = false
+            } catch {
+                guard consentSyncRequestID == requestID else { return }
+                isCheckingOmerAuthorization = false
+                consentSyncMessage = "This choice is applied on this iPhone. Cloud confirmation is pending until Omer is reachable."
+            }
+        }
+    }
+}
+
+private extension HealthSharingCloudConfirmation {
+    var title: String {
+        switch self {
+        case .checking: "Checking"
+        case .confirmed: "Confirmed"
+        case .pending: "Pending"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .checking: "arrow.triangle.2.circlepath"
+        case .confirmed: "checkmark.seal.fill"
+        case .pending: "exclamationmark.circle"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .checking: .secondary
+        case .confirmed: .green
+        case .pending: .orange
+        }
     }
 }

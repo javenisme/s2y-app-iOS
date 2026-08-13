@@ -34,6 +34,26 @@ public struct HealthSharingAuthorization: Codable, Sendable, Equatable {
     }
 }
 
+enum HealthSharingCloudConfirmation: Sendable, Equatable {
+    case checking
+    case confirmed
+    case pending
+
+    init(
+        localAuthorization: HealthSharingAuthorization,
+        omerAuthorization: HealthSharingAuthorization?,
+        isChecking: Bool
+    ) {
+        if isChecking {
+            self = .checking
+        } else if omerAuthorization == localAuthorization {
+            self = .confirmed
+        } else {
+            self = .pending
+        }
+    }
+}
+
 public enum HealthSharingDecision: Sendable, Equatable {
     case allowed
     case denied(missingScopes: Set<HealthSharingScope>)
