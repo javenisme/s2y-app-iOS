@@ -198,6 +198,10 @@ actor OmerChatService {
         chatCache.details.first { $0.chat.id == id }
     }
 
+    func localExportSnapshot() -> OmerChatCacheSnapshot {
+        chatCache
+    }
+
     func selectChat(id: UUID) async throws {
         let serviceURL = try configuredServiceURL()
         await sessionStore.saveLastChatId(id.uuidString, sessionKey: sessionKey(for: serviceURL))

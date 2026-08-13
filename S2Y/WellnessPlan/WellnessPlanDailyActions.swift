@@ -96,6 +96,11 @@ final class WellnessActionRecordStore: ObservableObject {
         persist()
     }
 
+    func clear() {
+        records = []
+        defaults.removeObject(forKey: storageKey)
+    }
+
     private func persist() {
         guard let data = try? JSONEncoder().encode(records) else { return }
         defaults.set(data, forKey: storageKey)

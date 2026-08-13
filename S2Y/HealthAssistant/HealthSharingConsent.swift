@@ -180,6 +180,11 @@ final class HealthSharingConsentStore: ObservableObject {
         persist()
     }
 
+    func clear() {
+        ledger = HealthSharingConsentLedger()
+        defaults.removeObject(forKey: storageKey)
+    }
+
     private func persist() {
         guard let data = try? encoder.encode(ledger) else { return }
         defaults.set(data, forKey: storageKey)

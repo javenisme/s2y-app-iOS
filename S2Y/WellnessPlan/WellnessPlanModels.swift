@@ -200,6 +200,11 @@ final class WellnessPlanStore: ObservableObject {
         persist()
     }
 
+    func clear() {
+        plans = []
+        defaults.removeObject(forKey: storageKey)
+    }
+
     private func load() {
         guard let data = defaults.data(forKey: storageKey),
               let decoded = try? decoder.decode([WellnessPlan].self, from: data) else {

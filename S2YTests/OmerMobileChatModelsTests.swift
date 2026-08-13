@@ -1397,6 +1397,53 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertLessThanOrEqual(context.count, 500)
     }
 
+    func testLocalHealthDataInventoryIncludesEveryCategoryAndBoundsCounts() {
+        let snapshot = LocalHealthDataInventorySnapshot(counts: [
+            .wellbeingCheckIns: 3,
+            .safetyActivity: -1
+        ])
+
+        XCTAssertEqual(snapshot.items.count, LocalHealthDataCategory.allCases.count)
+        XCTAssertEqual(Set(snapshot.items.map(\.category)), Set(LocalHealthDataCategory.allCases))
+        XCTAssertEqual(snapshot.items.first { $0.category == .wellbeingCheckIns }?.itemCount, 3)
+        XCTAssertEqual(snapshot.items.first { $0.category == .safetyActivity }?.itemCount, 0)
+        XCTAssertTrue(snapshot.items.allSatisfy { !$0.storageDescription.isEmpty })
+    }
+
+    func testLocalHealthDataExportIsVersionedAndExcludesRawFHIRFields() throws {
+        let generatedAt = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let package = LocalHealthDataExportPackage(
+            generatedAt: generatedAt,
+            inventory: LocalHealthDataInventorySnapshot(generatedAt: generatedAt, counts: [:]),
+            localChatCache: OmerChatCacheSnapshot(chats: [], details: [])
+        )
+
+        let data = try LocalHealthDataExportService.encodedData(for: package)
+        let json = String(decoding: data, as: UTF8.self)
+
+        XCTAssertTrue(json.contains(#""formatVersion" : 1"#))
+        XCTAssertTrue(json.contains(#""generatedAt""#))
+        XCTAssertTrue(json.contains(#""localChatCache""#))
+        XCTAssertFalse(json.contains("fhirResourceIdentifier"))
+        XCTAssertFalse(json.contains("resourceType"))
+    }
+
+    @MainActor
+    func testClearingSharingReceiptsAlsoReturnsEveryScopeToDefaultDeny() {
+        let suiteName = "HealthSharingConsentStoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = HealthSharingConsentStore(defaults: defaults)
+        store.set(.omerChatText, granted: true)
+        store.set(.wellbeingCheckInCloudBackup, granted: true)
+
+        store.clear()
+
+        XCTAssertTrue(store.ledger.receipts.isEmpty)
+        XCTAssertTrue(store.authorization.grantedScopes.isEmpty)
+        XCTAssertNil(defaults.data(forKey: "healthSharingConsent.v1"))
+    }
+
     func testRevokingOnDeviceSyncDoesNotRevokeOmerQuestionConsent() {
         var ledger = HealthSharingConsentLedger()
         ledger.apply(.granted, scopes: [.omerChatText, .onDeviceConversationSync])

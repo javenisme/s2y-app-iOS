@@ -95,6 +95,11 @@ final class WellnessSessionAuditStore: ObservableObject {
         persist()
     }
 
+    func clear() {
+        log = WellnessSessionAuditLog()
+        defaults.removeObject(forKey: storageKey)
+    }
+
     private func persist() {
         guard let data = try? encoder.encode(log) else { return }
         defaults.set(data, forKey: storageKey)
