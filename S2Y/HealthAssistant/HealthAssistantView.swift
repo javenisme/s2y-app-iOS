@@ -130,11 +130,11 @@ struct HealthAssistantView: View {
         }
         .task(id: requestedConversationID) {
             guard let requestedConversationID else { return }
+            await stopAndWaitForResponse()
             await openConversation(id: requestedConversationID)
             self.requestedConversationID = nil
         }
         .onChange(of: newChatRequestID) {
-            stopResponse()
             Task { await beginNewConversation() }
         }
         .onDisappear(perform: stopResponse)
@@ -184,6 +184,7 @@ struct HealthAssistantView: View {
 
     @MainActor
     private func beginNewConversation() async {
+        await stopAndWaitForResponse()
         do {
             try await omerChatService.startNewChat()
             messages = []
@@ -430,6 +431,14 @@ struct HealthAssistantView: View {
     private func stopResponse() {
         responseTask?.cancel()
     }
+
+    @MainActor
+    private func stopAndWaitForResponse() async {
+        let activeResponse = responseTask
+        activeResponse?.cancel()
+        await activeResponse?.value
+        responseTask = nil
+    }
     
     private func initializeHealthKit() async {
         if isRunningInSimulator {
@@ -522,13 +531,14 @@ struct HealthAssistantView: View {
 
         isProcessing = true
         notice = nil
+        let requestedAIMode = selectedAIMode
 
         let assistantPlaceholder = ChatMessage(role: .assistant, content: "")
         messages.append(assistantPlaceholder)
 
         let healthContext = await OmerHealthContextBuilder.buildSummary(
             for: query,
-            includeHealthContext: selectedAIMode == .onDevice
+            includeHealthContext: requestedAIMode == .onDevice
         )
         guard !Task.isCancelled else {
             updateAssistantMessage(id: assistantPlaceholder.id, content: "Response stopped.")
@@ -539,7 +549,7 @@ struct HealthAssistantView: View {
         let chartAttachment = await HealthChatVisualizationLoader.load(for: query)
         updateAssistantAttachment(id: assistantPlaceholder.id, attachment: chartAttachment)
 
-        if selectedAIMode == .onDevice, appleModelService.availability.isAvailable {
+        if requestedAIMode == .onDevice, appleModelService.availability.isAvailable {
             let measurement = AssistantRequestMeasurement()
             do {
                 try await appleModelService.streamResponse(
@@ -623,7 +633,7 @@ struct HealthAssistantView: View {
                 isProcessing = false
                 return
             }
-        } else if selectedAIMode == .onDevice {
+        } else if requestedAIMode == .onDevice {
             notice = AssistantNotice(
                 message: appleModelService.availability.recoveryGuidance,
                 tone: .warning
