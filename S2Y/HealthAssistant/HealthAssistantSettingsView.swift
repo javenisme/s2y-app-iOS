@@ -51,6 +51,11 @@ struct HealthAssistantSettingsView: View {
                     isOn: consentBinding(for: .onDeviceConversationSync)
                 )
 
+                Toggle(
+                    "Share selected clinical record summaries",
+                    isOn: consentBinding(for: .clinicalRecordSummary)
+                )
+
                 NavigationLink {
                     HealthSafetyActivityView()
                 } label: {
@@ -61,6 +66,7 @@ struct HealthAssistantSettingsView: View {
             } footer: {
                 Text(
                     "Each sharing choice is independent and can be withdrawn immediately. "
+                        + "Clinical record summaries are never included under the general Health summary choice. "
                         + "On-device analysis stays on this iPhone unless conversation sync is enabled."
                 )
             }

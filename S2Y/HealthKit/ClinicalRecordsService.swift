@@ -126,6 +126,46 @@ public struct ClinicalRecordIndex: Codable, Sendable, Equatable {
     }
 }
 
+public enum ClinicalRecordContextBuilder {
+    public static func build(
+        from index: ClinicalRecordIndex?,
+        maximumRecordCount: Int = 10,
+        maximumCharacterCount: Int = 2_000
+    ) -> String? {
+        guard let index, !index.records.isEmpty else {
+            return nil
+        }
+        let recordLimit = max(1, maximumRecordCount)
+        let characterLimit = max(1, maximumCharacterCount)
+        var lines: [String] = []
+
+        for record in index.records.prefix(recordLimit) {
+            let line = [
+                "category=\(record.category.title)",
+                "name=\(sanitized(record.displayName, limit: 120))",
+                "date=\(record.recordedAt.formatted(.iso8601.year().month().day()))",
+                "source=\(sanitized(record.sourceName, limit: 80))"
+            ].joined(separator: "; ")
+            let candidate = (lines + [line]).joined(separator: "\n")
+            guard candidate.count <= characterLimit else {
+                break
+            }
+            lines.append(line)
+        }
+
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
+    }
+
+    private static func sanitized(_ value: String, limit: Int) -> String {
+        String(
+            value
+                .split(whereSeparator: \.isWhitespace)
+                .joined(separator: " ")
+                .prefix(limit)
+        )
+    }
+}
+
 @MainActor
 final class ClinicalRecordIndexStore: ObservableObject {
     static let shared = ClinicalRecordIndexStore()

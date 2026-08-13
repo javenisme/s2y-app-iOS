@@ -1195,6 +1195,7 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertTrue(HealthSharingConsentPolicy.permits(.omerChatText, authorization: authorization))
         XCTAssertFalse(HealthSharingConsentPolicy.permits(.relevantHealthSummary, authorization: authorization))
         XCTAssertFalse(HealthSharingConsentPolicy.permits(.onDeviceConversationSync, authorization: authorization))
+        XCTAssertFalse(HealthSharingConsentPolicy.permits(.clinicalRecordSummary, authorization: authorization))
         XCTAssertEqual(
             HealthSharingConsentPolicy.decision(
                 requestedScopes: [.omerChatText, .relevantHealthSummary],
@@ -1252,6 +1253,38 @@ final class OmerMobileChatModelsTests: XCTestCase {
                 HealthSharingConsentFailure(missingScopes: [.relevantHealthSummary])
             )
         }
+    }
+
+    func testClinicalRecordContextIsBoundedAndExcludesIdentifiers() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let records = (0..<3).map { offset in
+            ClinicalRecordSummary(
+                id: UUID(),
+                category: .labResults,
+                displayName: "Example result \(offset)\nwith whitespace",
+                recordedAt: now.addingTimeInterval(TimeInterval(-offset * 60)),
+                sourceName: "Example Provider",
+                hasLinkedFHIRResource: true
+            )
+        }
+        let index = ClinicalRecordIndex(
+            records: records,
+            selectedCategories: [.labResults],
+            refreshedAt: now
+        )
+
+        let context = try XCTUnwrap(ClinicalRecordContextBuilder.build(
+            from: index,
+            maximumRecordCount: 2,
+            maximumCharacterCount: 500
+        ))
+
+        XCTAssertEqual(context.components(separatedBy: "\n").count, 2)
+        XCTAssertTrue(context.contains("Example result 0 with whitespace"))
+        XCTAssertTrue(context.contains("source=Example Provider"))
+        XCTAssertFalse(context.contains(records[0].id.uuidString))
+        XCTAssertFalse(context.localizedCaseInsensitiveContains("fhir"))
+        XCTAssertLessThanOrEqual(context.count, 500)
     }
 
     func testRevokingOnDeviceSyncDoesNotRevokeOmerQuestionConsent() {
