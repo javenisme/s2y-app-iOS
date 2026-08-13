@@ -1073,6 +1073,29 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertTrue(log.events.isEmpty)
     }
 
+    func testHealthSharingConsentDefaultsToDenyForEveryScope() {
+        let authorization = HealthSharingAuthorization()
+
+        for scope in HealthSharingScope.allCases {
+            XCTAssertFalse(HealthSharingConsentPolicy.permits(scope, authorization: authorization))
+        }
+    }
+
+    func testHealthSharingScopesAreGrantedIndependently() {
+        let authorization = HealthSharingAuthorization(grantedScopes: [.omerChatText])
+
+        XCTAssertTrue(HealthSharingConsentPolicy.permits(.omerChatText, authorization: authorization))
+        XCTAssertFalse(HealthSharingConsentPolicy.permits(.relevantHealthSummary, authorization: authorization))
+        XCTAssertFalse(HealthSharingConsentPolicy.permits(.onDeviceConversationSync, authorization: authorization))
+        XCTAssertEqual(
+            HealthSharingConsentPolicy.decision(
+                requestedScopes: [.omerChatText, .relevantHealthSummary],
+                authorization: authorization
+            ),
+            .denied(missingScopes: [.relevantHealthSummary])
+        )
+    }
+
     private func validatedWellnessSession() throws -> ValidatedWellnessSession {
         let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
         let deviceID = UUID()
