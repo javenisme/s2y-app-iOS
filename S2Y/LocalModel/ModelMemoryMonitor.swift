@@ -13,7 +13,8 @@ import Darwin.Mach
 
 /// 模型内存监控器
 /// 负责监控设备内存状态，确保本地模型安全运行
-class ModelMemoryMonitor {
+@MainActor
+final class ModelMemoryMonitor {
     private let logger = Logger(subsystem: "S2Y", category: "MemoryMonitor")
     
     /// 检查是否有足够内存加载模型
@@ -75,25 +76,33 @@ class ModelMemoryMonitor {
     }
     
     /// 注册内存警告观察者
-    func registerMemoryWarningObserver(callback: @escaping () -> Void) {
+    func registerMemoryWarningObserver(callback: @escaping @MainActor @Sendable () -> Void) {
         NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
             object: nil,
             queue: .main
-        ) { _ in
-            self.logger.warning("Memory warning received from system")
-            callback()
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.logger.warning("Memory warning received from system")
+                callback()
+            }
         }
     }
     
     /// 监控内存使用情况
-    func startMemoryMonitoring(interval: TimeInterval = 30.0, callback: @escaping (MemoryStatus) -> Void) {
-        Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
-            let status = self.getCurrentMemoryStatus()
-            callback(status)
-            
-            if status.pressureLevel == .high || status.pressureLevel == .critical {
-                self.logger.warning("High memory pressure detected: \(status)")
+    func startMemoryMonitoring(
+        interval: TimeInterval = 30.0,
+        callback: @escaping @MainActor @Sendable (MemoryStatus) -> Void
+    ) {
+        Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                let status = self.getCurrentMemoryStatus()
+                callback(status)
+
+                if status.pressureLevel == .high || status.pressureLevel == .critical {
+                    self.logger.warning("High memory pressure detected: \(status)")
+                }
             }
         }
     }
