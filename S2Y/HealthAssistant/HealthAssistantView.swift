@@ -63,6 +63,7 @@ struct HealthAssistantView: View {
     @State private var showingSettings = false
     @State private var streamTick = 0
     @State private var pendingToolApproval: OmerToolApprovalPayload?
+    @State private var pendingClarification: AssistantClarification?
     @State private var availableSuggestionMetrics: Set<HealthKitService.MetricKind> = []
     @State private var didLoadSuggestionAvailability = false
     @FocusState private var isInputFocused: Bool
@@ -167,6 +168,7 @@ struct HealthAssistantView: View {
 
     @MainActor
     private func displayConversation(_ detail: OmerChatDetailResponse) {
+        pendingClarification = nil
         messages = detail.messages.compactMap { message in
             guard !message.content.isEmpty else { return nil }
             return ChatMessage(
@@ -183,6 +185,7 @@ struct HealthAssistantView: View {
             try await omerChatService.startNewChat()
             messages = []
             notice = nil
+            pendingClarification = nil
             onHistoryChanged()
         } catch {
             notice = AssistantNotice(message: "A new conversation could not be started. Please try again.", tone: .warning)
@@ -253,6 +256,10 @@ struct HealthAssistantView: View {
                     ForEach(messages) { message in
                         MessageBubble(message: message)
                             .id(message.id)
+                    }
+
+                    if let pendingClarification {
+                        clarificationOptions(for: pendingClarification)
                     }
                     
                     if isProcessing {
@@ -371,6 +378,37 @@ struct HealthAssistantView: View {
                 .fill(notice.tone.tint.opacity(0.12))
         )
     }
+
+    private func clarificationOptions(for clarification: AssistantClarification) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Choose an option")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ForEach(clarification.options) { option in
+                Button {
+                    applyClarification(option, to: clarification)
+                } label: {
+                    Label(option.title, systemImage: option.systemImage)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("health-assistant-clarification-\(option.id)")
+            }
+        }
+        .padding(14)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .accessibilityIdentifier("health-assistant-clarification-options")
+    }
+
+    private func applyClarification(
+        _ option: AssistantClarificationOption,
+        to clarification: AssistantClarification
+    ) {
+        pendingClarification = nil
+        inputText = AssistantConversationPolicy.applying(option, to: clarification)
+        Task { await sendMessage() }
+    }
     
     private func initializeHealthKit() async {
         if isRunningInSimulator {
@@ -415,12 +453,16 @@ struct HealthAssistantView: View {
             return
         }
 
+        let previousUserMessages = messages.compactMap { message in
+            message.role == .user ? message.content : nil
+        }
         let userMessage = ChatMessage(role: .user, content: trimmedInput)
         messages.append(userMessage)
 
-        let query = trimmedInput
+        var query = trimmedInput
         inputText = ""
         isInputFocused = false
+        pendingClarification = nil
         if let escalation = HealthSafetyTriage.evaluate(query) {
             HealthSafetyEventStore.shared.record(escalation)
             messages.append(
@@ -434,6 +476,25 @@ struct HealthAssistantView: View {
                 message: "This safety guidance was generated on this iPhone without contacting an AI provider.",
                 tone: .warning
             )
+            isProcessing = false
+            return
+        }
+
+        switch AssistantConversationPolicy.resolve(
+            query: query,
+            recentUserMessages: previousUserMessages
+        ) {
+        case .ready(let resolvedQuery):
+            query = resolvedQuery
+        case .needsClarification(let clarification):
+            messages.append(
+                ChatMessage(
+                    role: .assistant,
+                    content: clarification.prompt,
+                    communicationKind: .healthObservation
+                )
+            )
+            pendingClarification = clarification
             isProcessing = false
             return
         }
@@ -697,7 +758,7 @@ struct HealthQuickQuerySuggestion: Identifiable, Equatable, Sendable {
                 metricKind: .sleepDurationHours,
                 icon: "bed.double.fill",
                 title: "Sleep Quality",
-                query: "How has my sleep quality been recently?"
+                query: "How has my sleep quality been over the past 7 days?"
             ),
             HealthQuickQuerySuggestion(
                 id: "active-energy",
