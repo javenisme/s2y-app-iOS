@@ -331,9 +331,6 @@ public final class HealthKitService {
         }
         
         /// Get health assessment for a value
-        public func healthAssessment(for value: Double) -> String {
-            HealthMetricsDictionary.healthAssessment(value: value, for: self)
-        }
     }
 
     // Explicit aggregation control for generic quantity metrics

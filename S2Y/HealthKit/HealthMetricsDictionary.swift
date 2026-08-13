@@ -21,20 +21,6 @@ public struct HealthMetricsDictionary {
         public let description: String
         public let descriptionCN: String
         public let category: MetricCategory
-        public let normalRange: Range?
-        public let isHigherBetter: Bool
-        
-        public struct Range: Sendable, Codable {
-            public let min: Double
-            public let max: Double
-            public let unit: String
-            
-            public init(min: Double, max: Double, unit: String) {
-                self.min = min
-                self.max = max
-                self.unit = unit
-            }
-        }
         
         public init(
             identifier: String,
@@ -44,9 +30,7 @@ public struct HealthMetricsDictionary {
             unitCN: String,
             description: String,
             descriptionCN: String,
-            category: MetricCategory,
-            normalRange: Range? = nil,
-            isHigherBetter: Bool = true
+            category: MetricCategory
         ) {
             self.identifier = identifier
             self.displayName = displayName
@@ -56,8 +40,6 @@ public struct HealthMetricsDictionary {
             self.description = description
             self.descriptionCN = descriptionCN
             self.category = category
-            self.normalRange = normalRange
-            self.isHigherBetter = isHigherBetter
         }
     }
     
@@ -106,9 +88,7 @@ public struct HealthMetricsDictionary {
             unitCN: "步",
             description: "Number of steps taken throughout the day",
             descriptionCN: "一天中走的步数",
-            category: .activity,
-            normalRange: MetricInfo.Range(min: 8000, max: 12000, unit: "steps"),
-            isHigherBetter: true
+            category: .activity
         ),
         
         .heartRateAverage: MetricInfo(
@@ -119,9 +99,7 @@ public struct HealthMetricsDictionary {
             unitCN: "次/分",
             description: "Average heart rate throughout the day",
             descriptionCN: "一天中的平均心率",
-            category: .vitals,
-            normalRange: MetricInfo.Range(min: 60, max: 100, unit: "bpm"),
-            isHigherBetter: false
+            category: .vitals
         ),
         
         .restingHeartRate: MetricInfo(
@@ -132,9 +110,7 @@ public struct HealthMetricsDictionary {
             unitCN: "次/分",
             description: "Heart rate while at rest",
             descriptionCN: "静息时的心率",
-            category: .vitals,
-            normalRange: MetricInfo.Range(min: 50, max: 90, unit: "bpm"),
-            isHigherBetter: false
+            category: .vitals
         ),
         
         .activeEnergy: MetricInfo(
@@ -145,9 +121,7 @@ public struct HealthMetricsDictionary {
             unitCN: "千卡",
             description: "Calories burned through physical activity",
             descriptionCN: "通过体力活动消耗的卡路里",
-            category: .activity,
-            normalRange: MetricInfo.Range(min: 200, max: 800, unit: "kcal"),
-            isHigherBetter: true
+            category: .activity
         ),
         
         .bodyMass: MetricInfo(
@@ -158,8 +132,7 @@ public struct HealthMetricsDictionary {
             unitCN: "公斤",
             description: "Current body weight",
             descriptionCN: "当前体重",
-            category: .body,
-            isHigherBetter: false
+            category: .body
         ),
         
         .sleepDurationHours: MetricInfo(
@@ -170,9 +143,7 @@ public struct HealthMetricsDictionary {
             unitCN: "小时",
             description: "Total hours of sleep per night",
             descriptionCN: "每晚的总睡眠小时数",
-            category: .sleep,
-            normalRange: MetricInfo.Range(min: 7, max: 9, unit: "hours"),
-            isHigherBetter: true
+            category: .sleep
         ),
         
         // MARK: - Advanced Cardiac Metrics
@@ -185,9 +156,7 @@ public struct HealthMetricsDictionary {
             unitCN: "毫秒",
             description: "Standard deviation of heart rate intervals, indicating cardiac health",
             descriptionCN: "心率间期的标准差，反映心脏健康状况",
-            category: .cardiac,
-            normalRange: MetricInfo.Range(min: 20, max: 50, unit: "ms"),
-            isHigherBetter: true
+            category: .cardiac
         ),
         
         .heartRateRecovery: MetricInfo(
@@ -198,9 +167,7 @@ public struct HealthMetricsDictionary {
             unitCN: "次/分",
             description: "Heart rate decrease one minute after exercise ends",
             descriptionCN: "运动结束后一分钟内心率下降幅度",
-            category: .cardiac,
-            normalRange: MetricInfo.Range(min: 12, max: 25, unit: "bpm"),
-            isHigherBetter: true
+            category: .cardiac
         ),
         
         .vo2Max: MetricInfo(
@@ -211,9 +178,7 @@ public struct HealthMetricsDictionary {
             unitCN: "毫升/公斤/分钟",
             description: "Maximum oxygen consumption during exercise",
             descriptionCN: "运动时最大氧气消耗量",
-            category: .cardiac,
-            normalRange: MetricInfo.Range(min: 35, max: 55, unit: "ml/kg/min"),
-            isHigherBetter: true
+            category: .cardiac
         ),
         
         .walkingHeartRateAverage: MetricInfo(
@@ -224,9 +189,7 @@ public struct HealthMetricsDictionary {
             unitCN: "次/分",
             description: "Average heart rate during walking activities",
             descriptionCN: "步行活动时的平均心率",
-            category: .cardiac,
-            normalRange: MetricInfo.Range(min: 90, max: 130, unit: "bpm"),
-            isHigherBetter: false
+            category: .cardiac
         ),
         
         .oxygenSaturation: MetricInfo(
@@ -237,9 +200,7 @@ public struct HealthMetricsDictionary {
             unitCN: "%",
             description: "Percentage of oxygen in the blood",
             descriptionCN: "血液中氧气的百分比",
-            category: .vitals,
-            normalRange: MetricInfo.Range(min: 95, max: 100, unit: "%"),
-            isHigherBetter: true
+            category: .vitals
         ),
         
         // MARK: - Additional Vitals
@@ -252,9 +213,7 @@ public struct HealthMetricsDictionary {
             unitCN: "毫米汞柱",
             description: "Blood pressure when heart contracts",
             descriptionCN: "心脏收缩时的血压",
-            category: .vitals,
-            normalRange: MetricInfo.Range(min: 90, max: 120, unit: "mmHg"),
-            isHigherBetter: false
+            category: .vitals
         ),
         
         .bloodPressureDiastolic: MetricInfo(
@@ -265,9 +224,7 @@ public struct HealthMetricsDictionary {
             unitCN: "毫米汞柱",
             description: "Blood pressure when heart relaxes",
             descriptionCN: "心脏舒张时的血压",
-            category: .vitals,
-            normalRange: MetricInfo.Range(min: 60, max: 80, unit: "mmHg"),
-            isHigherBetter: false
+            category: .vitals
         ),
         
         .bodyTemperature: MetricInfo(
@@ -278,9 +235,7 @@ public struct HealthMetricsDictionary {
             unitCN: "摄氏度",
             description: "Core body temperature",
             descriptionCN: "核心体温",
-            category: .vitals,
-            normalRange: MetricInfo.Range(min: 36.1, max: 37.2, unit: "°C"),
-            isHigherBetter: false
+            category: .vitals
         ),
         
         .respiratoryRate: MetricInfo(
@@ -291,9 +246,7 @@ public struct HealthMetricsDictionary {
             unitCN: "次/分钟",
             description: "Number of breaths per minute",
             descriptionCN: "每分钟呼吸次数",
-            category: .vitals,
-            normalRange: MetricInfo.Range(min: 12, max: 20, unit: "breaths/min"),
-            isHigherBetter: false
+            category: .vitals
         )
     ]
     
@@ -337,35 +290,6 @@ public struct HealthMetricsDictionary {
             return info.descriptionCN
         } else {
             return info.description
-        }
-    }
-    
-    /// Check if a value is within normal range
-    public static func isNormalRange(value: Double, for kind: HealthKitService.MetricKind) -> Bool? {
-        guard let info = info(for: kind), let range = info.normalRange else { return nil }
-        return value >= range.min && value <= range.max
-    }
-    
-    /// Get health assessment for a value
-    public static func healthAssessment(value: Double, for kind: HealthKitService.MetricKind, locale: Locale = Locale.current) -> String {
-        guard let info = info(for: kind), let range = info.normalRange else {
-            return locale.identifier.hasPrefix("zh") ? "正常范围" : "Normal"
-        }
-        
-        if value >= range.min && value <= range.max {
-            return locale.identifier.hasPrefix("zh") ? "正常" : "Normal"
-        } else if value < range.min {
-            if info.isHigherBetter {
-                return locale.identifier.hasPrefix("zh") ? "偏低" : "Below Normal"
-            } else {
-                return locale.identifier.hasPrefix("zh") ? "优秀" : "Excellent"
-            }
-        } else {
-            if info.isHigherBetter {
-                return locale.identifier.hasPrefix("zh") ? "优秀" : "Excellent"
-            } else {
-                return locale.identifier.hasPrefix("zh") ? "偏高" : "Above Normal"
-            }
         }
     }
     
