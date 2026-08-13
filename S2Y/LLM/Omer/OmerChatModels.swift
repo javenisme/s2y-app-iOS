@@ -262,7 +262,7 @@ enum OmerChatServiceError: LocalizedError {
             return "Omer backend returned an invalid response."
         case .unauthorized:
             return "Omer session is unauthorized. Please refresh the session and try again."
-        case .api(let statusCode, let message):
+        case let .api(statusCode, message):
             return message ?? "Omer backend returned an error (\(statusCode))."
         case .firebaseUnavailable:
             return "Firebase authentication is not available in this app session."
