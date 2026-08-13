@@ -123,9 +123,19 @@ jobs:
           echo "buildnumber: ${{ inputs.buildnumber }}"
           echo "releasenotes: ${{ inputs.releasenotes }}"
           echo "firebaseprojectid: ${{ vars.FIREBASE_PROJECT_ID }}"
+  releaseconfiguration:
+    name: Validate Release Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Validate identifiers and production endpoints
+        run: Scripts/validate_release_configuration.sh
+      - name: Check public production endpoints
+        run: Scripts/check_public_production_endpoints.sh
   buildandtest:
     name: Build and Test
-    needs: determineenvironment
+    needs: [determineenvironment, releaseconfiguration]
     uses: ./.github/workflows/build-and-test.yml
     permissions:
       contents: read

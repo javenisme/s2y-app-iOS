@@ -17,8 +17,4 @@ enum FeatureFlags {
     static let disableFirebase = CommandLine.arguments.contains("--disableFirebase")
     /// Defines if the application should connect to the local firebase emulator.
     static let useFirebaseEmulator = CommandLine.arguments.contains("--useFirebaseEmulator")
-    /// Automatically sign in into a test account upon app launch.
-    ///
-    /// Requires ``disableFirebase`` to be `false`.
-    static let setupTestAccount = CommandLine.arguments.contains("--setupTestAccount")
 }
