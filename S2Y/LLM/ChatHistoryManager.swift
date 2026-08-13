@@ -342,26 +342,66 @@ public struct StoredConversation: Identifiable, Codable {
 }
 
 public struct StoredMessage: Identifiable, Codable {
-    public let id = UUID()
+    public let id: UUID
     public let role: MessageRole
     public let content: String
     public let timestamp: Date
     public let metadata: MessageMetadata?
+
+    public init(
+        id: UUID = UUID(),
+        role: MessageRole,
+        content: String,
+        timestamp: Date,
+        metadata: MessageMetadata?
+    ) {
+        self.id = id
+        self.role = role
+        self.content = content
+        self.timestamp = timestamp
+        self.metadata = metadata
+    }
 }
 
 public struct StoredInsight: Identifiable, Codable {
-    public let id = UUID()
+    public let id: UUID
     public let content: String
     public let type: String
     public let timestamp: Date
     public let confidence: Double
+
+    public init(
+        id: UUID = UUID(),
+        content: String,
+        type: String,
+        timestamp: Date,
+        confidence: Double
+    ) {
+        self.id = id
+        self.content = content
+        self.type = type
+        self.timestamp = timestamp
+        self.confidence = confidence
+    }
 }
 
 public struct FavoriteInsight: Identifiable, Codable {
-    public let id = UUID()
+    public let id: UUID
     public let insight: HealthInsight
     public let conversationId: UUID
     public let savedAt: Date
+
+    public init(
+        id: UUID = UUID(),
+        insight: HealthInsight,
+        conversationId: UUID,
+        savedAt: Date
+    ) {
+        self.id = id
+        self.insight = insight
+        self.conversationId = conversationId
+        self.savedAt = savedAt
+    }
 }
 
 public struct ChatStatistics {
