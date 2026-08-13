@@ -113,6 +113,7 @@ struct HomeView: View {
         }
         .task {
             await loadDrawerChatHistory()
+            await CrossDeviceSyncCoordinator.shared.start()
         }
         .onChange(of: isDrawerOpen) {
             guard isDrawerOpen else { return }
