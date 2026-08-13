@@ -73,6 +73,7 @@ final class LocalLLMServiceTests: XCTestCase {
         XCTAssertFalse(service.isGenerating)
         XCTAssertEqual(service.loadingProgress, 0.0)
         XCTAssertNil(service.lastError)
+        XCTAssertEqual(service.state, .idle)
     }
     
     // MARK: - System Prompt Tests
@@ -148,6 +149,45 @@ final class LocalLLMServiceTests: XCTestCase {
         // Just verify state is consistent
         XCTAssertNotNil(service)
     }
+
+#if targetEnvironment(simulator)
+    func testLoadModelRestoresUnloadedContainerFromMemoryCache() async throws {
+        try await service.loadModel(.tinyLlama)
+        await service.unloadModel()
+        var progress: [Double] = []
+
+        try await service.loadModel(.tinyLlama) { value in
+            progress.append(value)
+        }
+
+        XCTAssertTrue(service.isModelLoaded)
+        XCTAssertEqual(service.currentModel, .tinyLlama)
+        XCTAssertEqual(progress, [0.1, 1.0])
+        XCTAssertNil(service.lastError)
+        XCTAssertEqual(service.state, .ready(model: .tinyLlama))
+    }
+#endif
+
+    func testInsufficientMemoryProducesConsistentFailedStateWhenApplicable() async throws {
+        let availableRAM = service.getAvailableRAM()
+        guard availableRAM < LocalModelConfig.mistralNemo.minRAM else {
+            throw XCTSkip("Device has enough memory for the largest configured model")
+        }
+
+        do {
+            try await service.loadModel(.mistralNemo)
+            XCTFail("Expected insufficient memory")
+        } catch let error as LocalLLMError {
+            XCTAssertEqual(
+                error,
+                .insufficientMemory(required: LocalModelConfig.mistralNemo.minRAM, available: availableRAM)
+            )
+            XCTAssertEqual(service.state, .failed(error))
+            XCTAssertFalse(service.isModelLoaded)
+            XCTAssertNil(service.currentModel)
+            XCTAssertEqual(service.loadingProgress, 0)
+        }
+    }
     
     // MARK: - Unload Model Tests
     
@@ -166,6 +206,8 @@ final class LocalLLMServiceTests: XCTestCase {
         XCTAssertFalse(service.isModelLoaded)
         XCTAssertNil(service.currentModel)
         XCTAssertEqual(service.loadingProgress, 0.0)
+        XCTAssertNil(service.lastError)
+        XCTAssertEqual(service.state, .idle)
     }
     
     // MARK: - Generate Tests

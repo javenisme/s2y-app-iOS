@@ -14,6 +14,10 @@ struct HealthAssistantSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var sharingConsentStore = HealthSharingConsentStore.shared
 
+    private var appleModelAvailability: AppleFoundationModelAvailability {
+        AppleFoundationModelService.shared.availability
+    }
+
     init(showsDismissButton: Bool = false) {
         self.showsDismissButton = showsDismissButton
     }
@@ -23,14 +27,17 @@ struct HealthAssistantSettingsView: View {
             Section {
                 LabeledContent(
                     "On-device AI",
-                    value: AppleFoundationModelService.shared.availability.isAvailable ? "Available" : "Unavailable"
+                    value: appleModelAvailability.statusTitle
                 )
 
                 LabeledContent("AI provider", value: "Choose in chat")
             } header: {
                 Text("AI")
             } footer: {
-                Text("Choose On-device or Omer Online above the chat input. S2Y never changes providers without your selection.")
+                Text(
+                    appleModelAvailability.recoveryGuidance
+                        + " S2Y never changes providers without your selection."
+                )
             }
 
             Section {

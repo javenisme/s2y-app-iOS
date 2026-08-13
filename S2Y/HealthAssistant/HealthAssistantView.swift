@@ -521,21 +521,25 @@ struct HealthAssistantView: View {
                 return
             } catch {
                 logger.error("Apple on-device generation failed: \(error.localizedDescription)")
+                notice = AssistantNotice(
+                    message: "The on-device response stopped. Your question was not sent online. You can retry or manually choose Omer Online.",
+                    tone: .warning
+                )
                 updateAssistantMessage(
                     id: assistantPlaceholder.id,
-                    content: "On-device Apple AI could not finish this response: \(error.localizedDescription)"
+                    content: "On-device Apple AI could not finish this response. Your question stayed on this iPhone."
                 )
                 isProcessing = false
                 return
             }
         } else if selectedAIMode == .onDevice {
             notice = AssistantNotice(
-                message: appleModelService.availability.fallbackExplanation.replacingOccurrences(of: "Using Omer instead.", with: "Choose Omer Online to continue."),
+                message: appleModelService.availability.recoveryGuidance,
                 tone: .warning
             )
             updateAssistantMessage(
                 id: assistantPlaceholder.id,
-                content: "On-device Apple AI is not available. Choose Omer Online from the provider menu to send this request online."
+                content: "On-device Apple AI is not ready. Your question was not sent online. \(appleModelService.availability.recoveryGuidance)"
             )
             isProcessing = false
             return

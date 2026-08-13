@@ -55,7 +55,7 @@ public enum LocalModelConfig: String, CaseIterable, Codable, Identifiable, Senda
 // ============================================================
 
 /// Errors that can occur in LocalLLMService
-public enum LocalLLMError: Error, LocalizedError, Sendable {
+public enum LocalLLMError: Error, LocalizedError, Sendable, Equatable {
     case insufficientMemory(required: Int, available: Int)
     case modelNotLoaded
     case modelDownloadFailed(String)
@@ -79,6 +79,13 @@ public enum LocalLLMError: Error, LocalizedError, Sendable {
             return "Model not supported"
         }
     }
+}
+
+public enum LocalLLMServiceState: Sendable, Equatable {
+    case idle
+    case loading(progress: Double)
+    case ready(model: LocalModelConfig)
+    case failed(LocalLLMError)
 }
 
 // ============================================================
@@ -155,6 +162,13 @@ public struct MockLLMContainer: LLMModelContainer {
 /// This is the main interface for local LLM operations
 @MainActor
 public final class LocalLLMService: ObservableObject, @unchecked Sendable {
+    private final class CachedModelContainer: NSObject {
+        let container: any LLMModelContainer
+
+        init(_ container: any LLMModelContainer) {
+            self.container = container
+        }
+    }
     
     // MARK: - Published Properties
     
@@ -172,6 +186,19 @@ public final class LocalLLMService: ObservableObject, @unchecked Sendable {
     
     /// Error message if any
     @Published public private(set) var lastError: LocalLLMError?
+
+    public var state: LocalLLMServiceState {
+        if let lastError {
+            return .failed(lastError)
+        }
+        if isModelLoaded, let currentModel {
+            return .ready(model: currentModel)
+        }
+        if loadingProgress > 0 {
+            return .loading(progress: loadingProgress)
+        }
+        return .idle
+    }
     
     // MARK: - Private Properties
     
@@ -179,7 +206,7 @@ public final class LocalLLMService: ObservableObject, @unchecked Sendable {
     private var modelContainer: (any LLMModelContainer)?
     
     /// Memory cache for model containers
-    private let containerCache = NSCache<NSString, NSMutableArray>()
+    private let containerCache = NSCache<NSString, CachedModelContainer>()
     
     /// System prompt for health context
     private var systemPrompt: String = """
@@ -204,6 +231,8 @@ public final class LocalLLMService: ObservableObject, @unchecked Sendable {
         _ config: LocalModelConfig,
         progressHandler: ((Double) -> Void)? = nil
     ) async throws {
+        lastError = nil
+
         // Check if already loaded
         if isModelLoaded, currentModel == config {
             return
@@ -231,15 +260,14 @@ public final class LocalLLMService: ObservableObject, @unchecked Sendable {
         
         // Try to load model from cache
         let cacheKey = config.rawValue as NSString
-        if let cachedContainers = containerCache.object(forKey: cacheKey) {
-            modelContainer = cachedContainers.first as? any LLMModelContainer
-            if modelContainer != nil {
-                loadingProgress = 1.0
-                progressHandler?(1.0)
-                isModelLoaded = true
-                currentModel = config
-                return
-            }
+        if let cachedContainer = containerCache.object(forKey: cacheKey) {
+            modelContainer = cachedContainer.container
+            loadingProgress = 1.0
+            progressHandler?(1.0)
+            isModelLoaded = true
+            currentModel = config
+            lastError = nil
+            return
         }
         
         // Load model (placeholder - actual implementation depends on backend)
@@ -252,6 +280,7 @@ public final class LocalLLMService: ObservableObject, @unchecked Sendable {
             progressHandler?(0.9)
             
             modelContainer = container
+            containerCache.setObject(CachedModelContainer(container), forKey: cacheKey)
             currentModel = config
             isModelLoaded = true
             loadingProgress = 1.0
@@ -259,10 +288,18 @@ public final class LocalLLMService: ObservableObject, @unchecked Sendable {
             lastError = nil
             
         } catch let error as LocalLLMError {
+            modelContainer = nil
+            isModelLoaded = false
+            currentModel = nil
+            loadingProgress = 0
             lastError = error
             throw error
         } catch {
             let error = LocalLLMError.modelLoadFailed(error.localizedDescription)
+            modelContainer = nil
+            isModelLoaded = false
+            currentModel = nil
+            loadingProgress = 0
             lastError = error
             throw error
         }
@@ -274,6 +311,7 @@ public final class LocalLLMService: ObservableObject, @unchecked Sendable {
         isModelLoaded = false
         currentModel = nil
         loadingProgress = 0.0
+        lastError = nil
     }
     
     /// Generate a response using the loaded model
