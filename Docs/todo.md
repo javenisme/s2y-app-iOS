@@ -7,6 +7,7 @@
 - 完成证据与实施顺序：[`roadmap.md`](roadmap.md)
 - AI Provider 边界：[`ai-provider-architecture.md`](ai-provider-architecture.md)
 - 性能、取消与缓存边界：[`assistant-performance.md`](assistant-performance.md)
+- 可分享健康摘要边界：[`shareable-health-summary.md`](shareable-health-summary.md)
 - 心脏分析安全边界：[`cardiac-analysis-safety.md`](cardiac-analysis-safety.md)
 
 新增工作必须先分配唯一 HLT 编号，并遵守一个故事一个提交、一个主题一个 PR。
