@@ -86,6 +86,24 @@ final class HealthAggregationTests: XCTestCase {
         )
     }
 
+    func testTrendContextIncludesRobustAndSmoothedStatistics() {
+        let start = Date(timeIntervalSince1970: 0)
+        let trend = HealthKitService.Trend.summarize(
+            windowDays: 3,
+            points: [
+                .init(date: start, value: 6, isObserved: true),
+                .init(date: start.addingTimeInterval(86_400), value: 7, isObserved: true),
+                .init(date: start.addingTimeInterval(172_800), value: 8, isObserved: true)
+            ]
+        )
+
+        let context = HealthInterpretationPolicy.trendContext(trend, kind: .sleepDurationHours)
+
+        XCTAssertTrue(context.contains("Observed median: 7.0 hours"))
+        XCTAssertTrue(context.contains("middle 50%: 6.5 hours to 7.5 hours"))
+        XCTAssertTrue(context.contains("Latest 3-day moving average: 7.0 hours from 3/3 observed days"))
+    }
+
     private func date(_ value: String) -> Date? {
         ISO8601DateFormatter().date(from: value)
     }
