@@ -15,7 +15,9 @@ import SwiftUI
 struct EventView: View {
     private let event: Event
     
+    @Environment(S2YApplicationStandard.self) private var standard
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var sharingConsentStore = HealthSharingConsentStore.shared
     
     @State private var viewState: ViewState = .idle
     
@@ -37,6 +39,12 @@ struct EventView: View {
                     )
                     try WellbeingCheckInStore.shared.save(snapshot)
                     _ = try event.complete()
+                    if HealthSharingConsentPolicy.permits(
+                        .wellbeingCheckInCloudBackup,
+                        authorization: sharingConsentStore.authorization
+                    ) {
+                        await standard.add(response: response, for: questionnaire)
+                    }
                     dismiss()
                 } catch {
                     viewState = .error(AnyLocalizedError(error: error))

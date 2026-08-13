@@ -59,6 +59,15 @@ actor OmerChatService {
                 uniquingKeysWith: { _, clinical in clinical }
             )
         }
+        if HealthSharingConsentPolicy.permits(.wellbeingCheckInSummary, authorization: authorization),
+           let checkInSummary = await WellbeingCheckInContextBuilder.build(
+               from: WellbeingCheckInStore.shared.snapshots
+           ) {
+            healthContext = (healthContext ?? [:]).merging(
+                ["recentWellbeingCheckIns": checkInSummary],
+                uniquingKeysWith: { _, checkIn in checkIn }
+            )
+        }
         let body = OmerMobileChatRequest(
             requestId: requestID,
             conversationId: conversationID,

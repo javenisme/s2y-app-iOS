@@ -149,3 +149,47 @@ public enum WellbeingCheckInSnapshotError: LocalizedError, Sendable, Equatable {
         "The completed wellbeing check-in could not be summarized."
     }
 }
+
+public enum WellbeingCheckInContextBuilder {
+    public static func build(
+        from snapshots: [WellbeingCheckInSnapshot],
+        maximumSnapshotCount: Int = 3,
+        maximumCharacterCount: Int = 1_200
+    ) -> String? {
+        let snapshotLimit = max(1, maximumSnapshotCount)
+        let characterLimit = max(1, maximumCharacterCount)
+        var lines: [String] = []
+
+        for snapshot in snapshots
+            .sorted(by: { $0.recordedAt > $1.recordedAt })
+            .prefix(snapshotLimit) {
+            var fields = [
+                "date=\(snapshot.recordedAt.formatted(.iso8601.year().month().day()))"
+            ]
+            append("overall", snapshot.overallWellbeing, to: &fields)
+            append("energy", snapshot.energyLevel, to: &fields)
+            append("sleep", snapshot.sleepQuality, to: &fields)
+            append("stress", snapshot.stressLevel, to: &fields)
+            append("mood", snapshot.mood, to: &fields)
+            if !snapshot.reportedSymptoms.isEmpty {
+                fields.append("symptoms=\(snapshot.reportedSymptoms.joined(separator: ","))")
+            }
+            append("goal", snapshot.goalFocus, to: &fields)
+
+            let line = fields.joined(separator: "; ")
+            let candidate = (lines + [line]).joined(separator: "\n")
+            guard candidate.count <= characterLimit else {
+                break
+            }
+            lines.append(line)
+        }
+
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
+    }
+
+    private static func append(_ label: String, _ value: String?, to fields: inout [String]) {
+        if let value {
+            fields.append("\(label)=\(value)")
+        }
+    }
+}

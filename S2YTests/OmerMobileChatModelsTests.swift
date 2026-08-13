@@ -1196,6 +1196,8 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertFalse(HealthSharingConsentPolicy.permits(.relevantHealthSummary, authorization: authorization))
         XCTAssertFalse(HealthSharingConsentPolicy.permits(.onDeviceConversationSync, authorization: authorization))
         XCTAssertFalse(HealthSharingConsentPolicy.permits(.clinicalRecordSummary, authorization: authorization))
+        XCTAssertFalse(HealthSharingConsentPolicy.permits(.wellbeingCheckInCloudBackup, authorization: authorization))
+        XCTAssertFalse(HealthSharingConsentPolicy.permits(.wellbeingCheckInSummary, authorization: authorization))
         XCTAssertEqual(
             HealthSharingConsentPolicy.decision(
                 requestedScopes: [.omerChatText, .relevantHealthSummary],
@@ -1356,6 +1358,43 @@ final class OmerMobileChatModelsTests: XCTestCase {
 
         XCTAssertTrue(store.snapshots.isEmpty)
         XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
+    }
+
+    func testWellbeingCheckInOutboundPurposesAreIndependent() {
+        let authorization = HealthSharingAuthorization(grantedScopes: [.wellbeingCheckInCloudBackup])
+
+        XCTAssertTrue(
+            HealthSharingConsentPolicy.permits(.wellbeingCheckInCloudBackup, authorization: authorization)
+        )
+        XCTAssertFalse(HealthSharingConsentPolicy.permits(.wellbeingCheckInSummary, authorization: authorization))
+        XCTAssertFalse(HealthSharingConsentPolicy.permits(.omerChatText, authorization: authorization))
+    }
+
+    func testWellbeingCheckInContextIsBoundedAndExcludesLocalIdentifiers() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let snapshots = (0..<4).map { offset in
+            WellbeingCheckInSnapshot(
+                id: UUID(),
+                recordedAt: now.addingTimeInterval(TimeInterval(-offset * 24 * 60 * 60)),
+                questionnaireIdentifier: "PrivateQuestionnaireIdentifier",
+                overallWellbeing: "good",
+                sleepQuality: "fair",
+                reportedSymptoms: ["fatigue"]
+            )
+        }
+
+        let context = try XCTUnwrap(WellbeingCheckInContextBuilder.build(
+            from: snapshots,
+            maximumSnapshotCount: 2,
+            maximumCharacterCount: 500
+        ))
+
+        XCTAssertEqual(context.components(separatedBy: "\n").count, 2)
+        XCTAssertTrue(context.contains("overall=good"))
+        XCTAssertTrue(context.contains("symptoms=fatigue"))
+        XCTAssertFalse(context.contains("PrivateQuestionnaireIdentifier"))
+        XCTAssertFalse(context.contains(snapshots[0].id.uuidString))
+        XCTAssertLessThanOrEqual(context.count, 500)
     }
 
     func testRevokingOnDeviceSyncDoesNotRevokeOmerQuestionConsent() {

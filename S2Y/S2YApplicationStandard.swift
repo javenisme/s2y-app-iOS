@@ -74,8 +74,7 @@ actor S2YApplicationStandard: Standard,
         let questionnaireId = questionnaire.id?.value?.string
         
         if FeatureFlags.disableFirebase {
-            let jsonRepresentation = (try? String(data: JSONEncoder().encode(response), encoding: .utf8)) ?? ""
-            await logger.debug("Received questionnaire response \(jsonRepresentation) for questionnaire: \(questionnaireId ?? "unkown")")
+            await logger.debug("Skipped questionnaire account backup for: \(questionnaireId ?? "unknown")")
             return
         }
         

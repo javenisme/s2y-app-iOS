@@ -19,7 +19,6 @@ final class WellbeingCheckInStore: ObservableObject {
     private let fileURL: URL
     private let maximumSnapshotCount: Int
     private let encoder = JSONEncoder()
-    private let decoder = JSONDecoder()
 
     init(
         fileManager: FileManager = .default,
@@ -33,7 +32,7 @@ final class WellbeingCheckInStore: ObservableObject {
             .appendingPathComponent("WellbeingCheckIns", isDirectory: true)
             .appendingPathComponent("snapshots.json")
         self.snapshots = (try? Data(contentsOf: self.fileURL))
-            .flatMap { try? decoder.decode([WellbeingCheckInSnapshot].self, from: $0) }
+            .flatMap { try? JSONDecoder().decode([WellbeingCheckInSnapshot].self, from: $0) }
             ?? []
     }
 

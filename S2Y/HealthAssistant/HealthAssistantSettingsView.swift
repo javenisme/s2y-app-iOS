@@ -56,6 +56,16 @@ struct HealthAssistantSettingsView: View {
                     isOn: consentBinding(for: .clinicalRecordSummary)
                 )
 
+                Toggle(
+                    "Back up completed check-ins to S2Y account",
+                    isOn: consentBinding(for: .wellbeingCheckInCloudBackup)
+                )
+
+                Toggle(
+                    "Share recent check-in summaries with Omer",
+                    isOn: consentBinding(for: .wellbeingCheckInSummary)
+                )
+
                 NavigationLink {
                     HealthSafetyActivityView()
                 } label: {
@@ -67,6 +77,7 @@ struct HealthAssistantSettingsView: View {
                 Text(
                     "Each sharing choice is independent and can be withdrawn immediately. "
                         + "Clinical record summaries are never included under the general Health summary choice. "
+                        + "Check-in account backup and Omer analysis are separate choices. "
                         + "On-device analysis stays on this iPhone unless conversation sync is enabled."
                 )
             }
