@@ -559,14 +559,31 @@ struct HealthAssistantView: View {
         isProcessing = true
         notice = nil
         let requestedAIMode = selectedAIMode
+        let sharingAuthorization = HealthSharingConsentStore.shared.authorization
+        let localDocumentContext = ClinicalDocumentContextBuilder.build(for: query)
+        let documentContext = ClinicalDocumentSharingPolicy.context(
+            localDocumentContext,
+            for: requestedAIMode,
+            authorization: sharingAuthorization
+        )
 
-        let assistantPlaceholder = ChatMessage(role: .assistant, content: "")
+        let assistantPlaceholder = ChatMessage(
+            role: .assistant,
+            content: "",
+            documentCitations: documentContext?.citations ?? []
+        )
         messages.append(assistantPlaceholder)
 
-        let healthContext = await OmerHealthContextBuilder.buildSummary(
+        var healthContext = await OmerHealthContextBuilder.buildSummary(
             for: query,
             includeHealthContext: requestedAIMode == .onDevice
         )
+        if requestedAIMode == .onDevice, let documentContext {
+            healthContext = (healthContext ?? [:]).merging(
+                ["userImportedClinicalDocumentExcerpts": documentContext.prompt],
+                uniquingKeysWith: { _, imported in imported }
+            )
+        }
         guard !Task.isCancelled else {
             updateAssistantMessage(id: assistantPlaceholder.id, content: "Response stopped.")
             notice = AssistantNotice(message: "You stopped this response.", tone: .info)
@@ -604,7 +621,12 @@ struct HealthAssistantView: View {
                         )
                     }
 
-                    if HealthSharingConsentPolicy.permits(.onDeviceConversationSync, authorization: authorization) {
+                    let permitsDocumentDerivedSync = ClinicalDocumentSharingPolicy.permitsConversationSync(
+                        using: documentContext,
+                        authorization: authorization
+                    )
+                    if HealthSharingConsentPolicy.permits(.onDeviceConversationSync, authorization: authorization),
+                       permitsDocumentDerivedSync {
                         do {
                             _ = try await omerChatService.syncOnDeviceExchange(
                                 userMessageID: userMessage.id,
@@ -620,6 +642,12 @@ struct HealthAssistantView: View {
                                 tone: .warning
                             )
                         }
+                    } else if documentContext != nil,
+                              HealthSharingConsentPolicy.permits(.onDeviceConversationSync, authorization: authorization) {
+                        notice = AssistantNotice(
+                            message: "This document-based answer stays on this iPhone until imported document sharing is allowed.",
+                            tone: .info
+                        )
                     }
                 }
                 await AssistantPerformanceMonitor.shared.record(measurement.event(
@@ -673,14 +701,22 @@ struct HealthAssistantView: View {
             return
         }
 
-        await sendWithOmer(query, assistantMessageID: assistantPlaceholder.id)
+        await sendWithOmer(
+            query,
+            assistantMessageID: assistantPlaceholder.id,
+            documentContext: documentContext?.prompt
+        )
         onHistoryChanged()
         isProcessing = false
     }
 
-    private func sendWithOmer(_ query: String, assistantMessageID: UUID) async {
+    private func sendWithOmer(
+        _ query: String,
+        assistantMessageID: UUID,
+        documentContext: String?
+    ) async {
         let measurement = AssistantRequestMeasurement()
-        let usedHealthContext = HealthSharingConsentPolicy.permits(
+        let usedHealthContext = documentContext != nil || HealthSharingConsentPolicy.permits(
             .relevantHealthSummary,
             authorization: HealthSharingConsentStore.shared.authorization
         )
@@ -688,7 +724,8 @@ struct HealthAssistantView: View {
             try await omerChatService.sendMessage(
                 message: query,
                 authorization: HealthSharingConsentStore.shared.authorization,
-                includeHealthContext: true
+                includeHealthContext: true,
+                importedDocumentContext: documentContext
             ) { event in
                 Task { @MainActor in
                     self.handleOmerEvent(event, assistantMessageID: assistantMessageID)
@@ -785,7 +822,8 @@ struct HealthAssistantView: View {
             role: existingMessage.role,
             content: existingMessage.content + delta,
             chartAttachment: existingMessage.chartAttachment,
-            communicationKind: existingMessage.communicationKind
+            communicationKind: existingMessage.communicationKind,
+            documentCitations: existingMessage.documentCitations
         )
         streamTick += 1
     }
@@ -802,7 +840,8 @@ struct HealthAssistantView: View {
             role: existingMessage.role,
             content: content,
             chartAttachment: existingMessage.chartAttachment,
-            communicationKind: existingMessage.communicationKind
+            communicationKind: existingMessage.communicationKind,
+            documentCitations: existingMessage.documentCitations
         )
         streamTick += 1
     }
@@ -819,7 +858,8 @@ struct HealthAssistantView: View {
             role: existingMessage.role,
             content: existingMessage.content,
             chartAttachment: attachment,
-            communicationKind: .healthObservation
+            communicationKind: .healthObservation,
+            documentCitations: existingMessage.documentCitations
         )
         streamTick += 1
     }
@@ -956,6 +996,7 @@ struct ChatMessage: Identifiable, Sendable {
     let content: String
     let chartAttachment: HealthChartAttachment?
     let communicationKind: HealthCommunicationKind?
+    let documentCitations: [ClinicalDocumentCitation]
     
     enum Role {
         case user
@@ -967,13 +1008,15 @@ struct ChatMessage: Identifiable, Sendable {
         role: Role,
         content: String,
         chartAttachment: HealthChartAttachment? = nil,
-        communicationKind: HealthCommunicationKind? = nil
+        communicationKind: HealthCommunicationKind? = nil,
+        documentCitations: [ClinicalDocumentCitation] = []
     ) {
         self.id = id
         self.role = role
         self.content = content
         self.chartAttachment = chartAttachment
         self.communicationKind = communicationKind ?? (role == .assistant ? .wellnessGuidance : nil)
+        self.documentCitations = documentCitations
     }
 }
 
@@ -1092,6 +1135,7 @@ struct MessageBubble: View {
     let message: ChatMessage
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var showsDocumentSources = false
     
     var body: some View {
         HStack {
@@ -1131,6 +1175,29 @@ struct MessageBubble: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
+                }
+
+                if !message.documentCitations.isEmpty {
+                    DisclosureGroup(
+                        "Imported document sources (\(message.documentCitations.count))",
+                        isExpanded: $showsDocumentSources
+                    ) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(message.documentCitations) { citation in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("[\(citation.marker)] \(citation.documentName) · \(citation.locator)")
+                                        .font(.caption.weight(.semibold))
+                                    Text(citation.excerpt)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .textSelection(.enabled)
+                                }
+                            }
+                        }
+                        .padding(.top, 6)
+                    }
+                    .font(.caption)
+                    .accessibilityHint("Shows the local excerpts used for this answer")
                 }
             }
             .accessibilityElement(children: .contain)

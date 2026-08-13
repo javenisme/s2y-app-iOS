@@ -157,7 +157,7 @@ final class AppleFoundationModelService {
         User request:
         \(message)
 
-        Health summary from this device:
+        Context selected on this device:
         \(summary)
         """
     }
@@ -174,6 +174,8 @@ private extension AppleFoundationModelService {
         let session = LanguageModelSession(instructions: """
             You are S2Y Health Assistant, a concise and supportive wellness assistant.
             Answer in the user's language. Use device health summaries only when provided.
+            When imported document excerpts contain markers such as [D1], cite those markers
+            and do not claim the document says anything beyond the supplied excerpts.
             Clearly distinguish observations from medical conclusions. Never diagnose,
             prescribe, or claim certainty. Encourage professional care for concerning or
             persistent symptoms, and advise emergency services for urgent warning signs.

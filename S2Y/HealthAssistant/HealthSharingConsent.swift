@@ -18,6 +18,8 @@ public enum HealthSharingScope: String, Codable, Sendable, CaseIterable, Hashabl
     case onDeviceConversationSync
     /// A bounded set of selected clinical record summary fields.
     case clinicalRecordSummary
+    /// Bounded excerpts retrieved from documents the user imported on this iPhone.
+    case importedClinicalDocumentExcerpts
     /// A completed questionnaire response stored in the user's S2Y account.
     case wellbeingCheckInCloudBackup
     /// A bounded set of recent wellbeing check-in summary fields.
@@ -54,6 +56,7 @@ private extension HealthSharingScope {
         case .relevantHealthSummary: "relevant Health summary"
         case .onDeviceConversationSync: "on-device conversation sync"
         case .clinicalRecordSummary: "selected clinical record summaries"
+        case .importedClinicalDocumentExcerpts: "relevant imported document excerpts"
         case .wellbeingCheckInCloudBackup: "wellbeing check-in account backup"
         case .wellbeingCheckInSummary: "recent wellbeing check-in summaries"
         }
@@ -62,7 +65,7 @@ private extension HealthSharingScope {
 
 /// Default-deny policy for every payload that can leave the iPhone.
 public enum HealthSharingConsentPolicy {
-    public static let currentVersion = "2026-08-12"
+    public static let currentVersion = "2026-08-13"
 
     public static func decision(
         requestedScopes: Set<HealthSharingScope>,
