@@ -43,11 +43,11 @@ public enum HealthPermissionGroup: String, CaseIterable, Identifiable, Sendable 
 
     public var title: String {
         switch self {
-        case .activity: "Activity"
-        case .sleep: "Sleep"
-        case .heart: "Heart & Fitness"
-        case .vitals: "Vitals"
-        case .body: "Body Measurements"
+        case .activity: String(localized: "Activity")
+        case .sleep: String(localized: "Sleep")
+        case .heart: String(localized: "Heart & Fitness")
+        case .vitals: String(localized: "Vitals")
+        case .body: String(localized: "Body Measurements")
         }
     }
 

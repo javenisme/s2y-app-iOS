@@ -20,26 +20,26 @@ struct HomeView: View {
         var title: String {
             switch self {
             case .healthAssistant:
-                return "Health Assistant"
+                return String(localized: "Health Assistant")
             case .schedule:
-                return "Schedule"
+                return String(localized: "Schedule")
             case .contact:
-                return "Account"
+                return String(localized: "Account")
             case .settings:
-                return "Settings"
+                return String(localized: "Settings")
             }
         }
 
         var subtitle: String {
             switch self {
             case .healthAssistant:
-                return "Chat, insights, and connected health tools"
+                return String(localized: "Chat, insights, and connected health tools")
             case .schedule:
-                return "Tasks, reminders, and care routines"
+                return String(localized: "Tasks, reminders, and care routines")
             case .contact:
-                return "Profile, sign-in, and personal details"
+                return String(localized: "Profile, sign-in, and personal details")
             case .settings:
-                return "Preferences, permissions, and support"
+                return String(localized: "Preferences, permissions, and support")
             }
         }
 

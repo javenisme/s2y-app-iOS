@@ -862,29 +862,29 @@ struct HealthQuickQuerySuggestion: Identifiable, Equatable, Sendable {
                 id: "steps",
                 metricKind: .steps,
                 icon: "figure.walk",
-                title: "Step Trends",
-                query: "How have my step counts trended over the past 7 days?"
+                title: String(localized: "Step Trends"),
+                query: String(localized: "How have my step counts trended over the past 7 days?")
             ),
             HealthQuickQuerySuggestion(
                 id: "heart-rate",
                 metricKind: .heartRateAverage,
                 icon: "heart.fill",
-                title: "Heart Rate",
-                query: "Compare my average heart rate this week versus last week."
+                title: String(localized: "Heart Rate"),
+                query: String(localized: "Compare my average heart rate this week versus last week.")
             ),
             HealthQuickQuerySuggestion(
                 id: "sleep",
                 metricKind: .sleepDurationHours,
                 icon: "bed.double.fill",
-                title: "Sleep Quality",
-                query: "How has my sleep quality been over the past 7 days?"
+                title: String(localized: "Sleep Quality"),
+                query: String(localized: "How has my sleep quality been over the past 7 days?")
             ),
             HealthQuickQuerySuggestion(
                 id: "active-energy",
                 metricKind: .activeEnergy,
                 icon: "flame.fill",
-                title: "Active Energy",
-                query: "How has my active energy changed over the past 30 days?"
+                title: String(localized: "Active Energy"),
+                query: String(localized: "How has my active energy changed over the past 30 days?")
             )
         ]
 
