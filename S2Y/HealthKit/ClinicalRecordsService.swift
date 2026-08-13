@@ -8,6 +8,7 @@
 
 import Foundation
 import HealthKit
+import SwiftUI
 
 public enum ClinicalRecordCategory: String, CaseIterable, Identifiable, Sendable {
     case allergies
@@ -59,6 +60,74 @@ public struct ClinicalRecordSummary: Codable, Equatable, Identifiable, Sendable 
     public let recordedAt: Date
     public let sourceName: String
     public let fhirResourceIdentifier: String?
+}
+
+public struct ClinicalRecordIndex: Codable, Sendable, Equatable {
+    public private(set) var records: [ClinicalRecordSummary]
+    public let selectedCategories: Set<ClinicalRecordCategory>
+    public let refreshedAt: Date
+    public let maximumRecordCount: Int
+
+    public init(
+        records: [ClinicalRecordSummary],
+        selectedCategories: Set<ClinicalRecordCategory>,
+        refreshedAt: Date = .now,
+        maximumRecordCount: Int = 200
+    ) {
+        self.maximumRecordCount = max(1, maximumRecordCount)
+        self.selectedCategories = selectedCategories
+        self.refreshedAt = refreshedAt
+
+        var seenIDs = Set<UUID>()
+        self.records = records
+            .filter { selectedCategories.contains($0.category) }
+            .sorted { $0.recordedAt > $1.recordedAt }
+            .filter { seenIDs.insert($0.id).inserted }
+        self.records = Array(self.records.prefix(self.maximumRecordCount))
+    }
+}
+
+@MainActor
+final class ClinicalRecordIndexStore: ObservableObject {
+    static let shared = ClinicalRecordIndexStore()
+
+    @Published private(set) var index: ClinicalRecordIndex?
+
+    private let fileManager: FileManager
+    private let fileURL: URL
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+
+    init(fileManager: FileManager = .default, fileURL: URL? = nil) {
+        self.fileManager = fileManager
+        let supportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        self.fileURL = fileURL ?? supportDirectory
+            .appendingPathComponent("ClinicalRecords", isDirectory: true)
+            .appendingPathComponent("summary-index.json")
+        self.index = (try? Data(contentsOf: self.fileURL))
+            .flatMap { try? decoder.decode(ClinicalRecordIndex.self, from: $0) }
+    }
+
+    func replace(with index: ClinicalRecordIndex) throws {
+        let directory = fileURL.deletingLastPathComponent()
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        var resourceValues = URLResourceValues()
+        resourceValues.isExcludedFromBackup = true
+        var mutableDirectory = directory
+        try? mutableDirectory.setResourceValues(resourceValues)
+        try encoder.encode(index).write(
+            to: fileURL,
+            options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication]
+        )
+        self.index = index
+    }
+
+    func clear() throws {
+        if fileManager.fileExists(atPath: fileURL.path) {
+            try fileManager.removeItem(at: fileURL)
+        }
+        index = nil
+    }
 }
 
 extension ClinicalRecordCategory: Codable {}

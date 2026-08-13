@@ -308,6 +308,47 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("resourceType"))
     }
 
+    func testClinicalRecordIndexFiltersDeduplicatesAndBoundsSummaries() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let selectedID = UUID()
+        let selected = ClinicalRecordSummary(
+            id: selectedID,
+            category: .labResults,
+            displayName: "Selected result",
+            recordedAt: date,
+            sourceName: "Provider A",
+            fhirResourceIdentifier: "Observation/selected"
+        )
+        let olderDuplicate = ClinicalRecordSummary(
+            id: selectedID,
+            category: .labResults,
+            displayName: "Duplicate result",
+            recordedAt: date.addingTimeInterval(-60),
+            sourceName: "Provider A",
+            fhirResourceIdentifier: "Observation/selected"
+        )
+        let unselected = ClinicalRecordSummary(
+            id: UUID(),
+            category: .medications,
+            displayName: "Medication",
+            recordedAt: date,
+            sourceName: "Provider B",
+            fhirResourceIdentifier: "Medication/1"
+        )
+
+        let index = ClinicalRecordIndex(
+            records: [olderDuplicate, selected, unselected],
+            selectedCategories: [.labResults],
+            refreshedAt: date,
+            maximumRecordCount: 1
+        )
+
+        XCTAssertEqual(index.records, [selected])
+        XCTAssertEqual(index.maximumRecordCount, 1)
+        let json = String(decoding: try encoder.encode(index), as: UTF8.self)
+        XCTAssertFalse(json.contains("resourceType"))
+    }
+
     func testWearableMeasurementsNormalizeUnitsAndPreserveOrigin() throws {
         let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
         let input = WearableMeasurementInput(
