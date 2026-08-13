@@ -68,4 +68,32 @@ final class AssistantPerformanceMetricsTests: XCTestCase {
         XCTAssertEqual(event.totalMilliseconds, 500)
         XCTAssertEqual(event.outcome, .cancelled)
     }
+
+    func testSummarySeparatesProvidersAndUsesNearestRankP95() {
+        let appleEvents = (1...20).map { sample in
+            AssistantPerformanceEvent(
+                provider: .appleOnDevice,
+                outcome: .completed,
+                firstResponseMilliseconds: sample * 10,
+                totalMilliseconds: sample * 100,
+                usedHealthContext: true
+            )
+        }
+        let ignoredFailure = AssistantPerformanceEvent(
+            provider: .appleOnDevice,
+            outcome: .failed,
+            firstResponseMilliseconds: 99_999,
+            totalMilliseconds: 99_999,
+            usedHealthContext: false
+        )
+
+        let summary = AssistantPerformanceSummary.make(
+            provider: .appleOnDevice,
+            events: appleEvents + [ignoredFailure]
+        )
+
+        XCTAssertEqual(summary.completedSamples, 20)
+        XCTAssertEqual(summary.firstResponseP95Milliseconds, 190)
+        XCTAssertEqual(summary.totalP95Milliseconds, 1_900)
+    }
 }

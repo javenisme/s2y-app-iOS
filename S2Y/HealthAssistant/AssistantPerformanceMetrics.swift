@@ -8,7 +8,7 @@
 import Foundation
 import OSLog
 
-enum AssistantPerformanceProvider: String, Codable, Sendable {
+enum AssistantPerformanceProvider: String, Codable, CaseIterable, Sendable {
     case appleOnDevice = "apple-on-device"
     case omerOnline = "omer-online"
 }
@@ -25,6 +25,33 @@ struct AssistantPerformanceEvent: Codable, Equatable, Sendable {
     let firstResponseMilliseconds: Int?
     let totalMilliseconds: Int
     let usedHealthContext: Bool
+}
+
+struct AssistantPerformanceSummary: Equatable, Sendable {
+    let provider: AssistantPerformanceProvider
+    let completedSamples: Int
+    let firstResponseP95Milliseconds: Int?
+    let totalP95Milliseconds: Int?
+
+    static func make(
+        provider: AssistantPerformanceProvider,
+        events: [AssistantPerformanceEvent]
+    ) -> AssistantPerformanceSummary {
+        let completed = events.filter { $0.provider == provider && $0.outcome == .completed }
+        return AssistantPerformanceSummary(
+            provider: provider,
+            completedSamples: completed.count,
+            firstResponseP95Milliseconds: percentile95(completed.compactMap(\.firstResponseMilliseconds)),
+            totalP95Milliseconds: percentile95(completed.map(\.totalMilliseconds))
+        )
+    }
+
+    private static func percentile95(_ values: [Int]) -> Int? {
+        guard !values.isEmpty else { return nil }
+        let sorted = values.sorted()
+        let nearestRank = Int(ceil(Double(sorted.count) * 0.95))
+        return sorted[max(0, nearestRank - 1)]
+    }
 }
 
 /// A privacy-minimized, process-local performance trail. It deliberately excludes
@@ -46,6 +73,12 @@ actor AssistantPerformanceMonitor {
 
     func snapshot() -> [AssistantPerformanceEvent] {
         recentEvents
+    }
+
+    func summaries() -> [AssistantPerformanceSummary] {
+        AssistantPerformanceProvider.allCases.map { provider in
+            AssistantPerformanceSummary.make(provider: provider, events: recentEvents)
+        }
     }
 
     func clear() {
