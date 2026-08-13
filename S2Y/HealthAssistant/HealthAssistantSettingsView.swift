@@ -97,6 +97,12 @@ struct HealthAssistantSettingsView: View {
 
             Section {
                 NavigationLink {
+                    HealthSummaryExportView()
+                } label: {
+                    Label("Health Summary PDF", systemImage: "doc.richtext")
+                }
+
+                NavigationLink {
                     LocalHealthDataControlsView()
                 } label: {
                     Label("Data Controls", systemImage: "externaldrive.badge.checkmark")
