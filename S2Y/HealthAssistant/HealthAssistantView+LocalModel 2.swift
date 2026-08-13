@@ -5,7 +5,7 @@ extension HealthAssistantView {
     @MainActor
     final class LocalModelBridge: ObservableObject {
         @Published private(set) var isReady = false
-        @Published private(set) var lastError: Error?
+        @Published private(set) var lastError: (any Error)?
         
         private let orchestrator = LLMOrchestrator.shared
         
