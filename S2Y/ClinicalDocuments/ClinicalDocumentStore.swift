@@ -30,6 +30,26 @@ final class ClinicalDocumentStore: ObservableObject {
             ?? []
     }
 
+    private static func searchTerms(in query: String) -> [String] {
+        let ignored = Set([
+            "about", "after", "before", "could", "from", "have", "that", "the",
+            "this", "what", "when", "where", "which", "with", "would"
+        ])
+        let normalizedQuery = normalized(query)
+        var terms = normalizedQuery
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init)
+            .filter { $0.count >= 2 && !ignored.contains($0) }
+        if normalizedQuery.count >= 2 {
+            terms.append(normalizedQuery)
+        }
+        return Array(Set(terms)).sorted()
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+
     @discardableResult
     func importDocument(from sourceURL: URL, at date: Date = .now) throws -> ClinicalDocument {
         let media = try mediaType(for: sourceURL)
@@ -85,6 +105,63 @@ final class ClinicalDocumentStore: ObservableObject {
         return url
     }
 
+    @discardableResult
+    func indexDocument(_ document: ClinicalDocument, at date: Date = .now) throws -> ClinicalDocumentIndex {
+        let data = try Data(contentsOf: fileURL(for: document), options: .mappedIfSafe)
+        let index = try ClinicalDocumentIndexer.makeIndex(for: document, data: data, at: date)
+        try encoder.encode(index).write(
+            to: indexURL(for: document.id),
+            options: [.atomic, .completeFileProtection]
+        )
+        return index
+    }
+
+    func search(query: String, maximumResults: Int = 4) -> [ClinicalDocumentCitation] {
+        let terms = Self.searchTerms(in: query)
+        guard !terms.isEmpty, maximumResults > 0 else {
+            return []
+        }
+        let ranked = documents.flatMap { document -> [RankedClinicalDocumentChunk] in
+            guard let data = try? Data(contentsOf: indexURL(for: document.id)),
+                  let index = try? JSONDecoder().decode(ClinicalDocumentIndex.self, from: data),
+                  index.schemaVersion == ClinicalDocumentIndexer.schemaVersion,
+                  index.documentID == document.id else {
+                return []
+            }
+            return index.chunks.compactMap { chunk in
+                let normalized = Self.normalized(chunk.text)
+                let score = terms.reduce(0) { partial, term in
+                    partial + (normalized.contains(term) ? 1 : 0)
+                }
+                return score > 0
+                    ? RankedClinicalDocumentChunk(document: document, chunk: chunk, score: score)
+                    : nil
+            }
+        }
+        return ranked
+            .sorted { lhs, rhs in
+                if lhs.score != rhs.score {
+                    return lhs.score > rhs.score
+                }
+                if lhs.document.importedAt != rhs.document.importedAt {
+                    return lhs.document.importedAt > rhs.document.importedAt
+                }
+                return lhs.chunk.id < rhs.chunk.id
+            }
+            .prefix(maximumResults)
+            .enumerated()
+            .map { offset, item in
+                ClinicalDocumentCitation(
+                    id: item.chunk.id,
+                    marker: "D\(offset + 1)",
+                    documentID: item.document.id,
+                    documentName: item.document.displayName,
+                    locator: item.chunk.pageNumber.map { "page \($0)" } ?? "section \(item.chunk.sectionNumber)",
+                    excerpt: String(item.chunk.text.prefix(700))
+                )
+            }
+    }
+
     private func mediaType(for url: URL) throws -> (type: ClinicalDocumentMediaType, fileExtension: String) {
         switch url.pathExtension.lowercased() {
         case "pdf":
@@ -116,6 +193,10 @@ final class ClinicalDocumentStore: ObservableObject {
 
     private func storedFileURL(for document: ClinicalDocument) -> URL {
         rootURL.appendingPathComponent("\(document.id.uuidString.lowercased()).\(document.fileExtension)")
+    }
+
+    private func indexURL(for documentID: UUID) -> URL {
+        rootURL.appendingPathComponent("\(documentID.uuidString.lowercased()).index.json")
     }
 
     private func persistManifest() throws {
