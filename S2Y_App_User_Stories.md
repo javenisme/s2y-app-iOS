@@ -164,6 +164,8 @@
 ### US-204：发布渠道验收
 
 - Archive/签名、TestFlight、隐私清单、崩溃监控、App Store 元数据与回滚流程通过。
+- 仓库证据：H34（HLT-138～141）已提供增量静态质量、应用隐私清单、发布预检和脱敏验收记录。
+- 外部缺口：签名 Archive 当前受 Xcode 账户凭据及 Verifiable Health Records profile 能力阻塞；TestFlight 安装、崩溃监控、元数据、回滚和审核尚未验收，不能标记完成。
 
 ## 非当前范围
 

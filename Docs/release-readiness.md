@@ -19,6 +19,8 @@ without printing credential values that:
   `us.s2y.s2y-ios`;
 - the Firebase iOS plist and Firebase CLI default use `s2y-mobile-app`;
 - Info.plist and the Omer service fallback use `https://chat.s2y.us`;
+- the application privacy manifest declares reviewed account, health and user-content data,
+  required-reason APIs, and no tracking;
 - retired `chat-bak.s2y.us` and embedded test-account material do not remain in
   executable/configuration paths.
 

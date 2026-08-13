@@ -13,6 +13,7 @@ REPOSITORY_ROOT="$(cd "${SCRIPT_DIRECTORY}/.." && pwd)"
 EXPECTED_BUNDLE_ID="us.s2y.s2y-ios"
 EXPECTED_FIREBASE_PROJECT="s2y-mobile-app"
 EXPECTED_OMER_URL="https://chat.s2y.us"
+PRIVACY_MANIFEST="${REPOSITORY_ROOT}/S2Y/Supporting Files/PrivacyInfo.xcprivacy"
 
 fail() {
     echo "Release configuration invalid: $1" >&2
@@ -67,6 +68,36 @@ source_omer_url="$(
 [[ "${source_omer_url}" == "${EXPECTED_OMER_URL}" ]] \
     || fail "Omer service fallback is not the approved production endpoint."
 
+if ! plutil -lint "${PRIVACY_MANIFEST}" >/dev/null; then
+    fail "application privacy manifest is missing or invalid."
+fi
+
+if ! plutil -convert json -o - "${PRIVACY_MANIFEST}" | ruby -r json -e '
+    manifest = JSON.parse(STDIN.read)
+    abort unless manifest["NSPrivacyTracking"] == false
+    abort unless manifest["NSPrivacyTrackingDomains"] == []
+
+    expected_data = %w[
+      NSPrivacyCollectedDataTypeEmailAddress
+      NSPrivacyCollectedDataTypeHealth
+      NSPrivacyCollectedDataTypeName
+      NSPrivacyCollectedDataTypeOtherUserContent
+      NSPrivacyCollectedDataTypeUserID
+    ].sort
+    collected = manifest.fetch("NSPrivacyCollectedDataTypes")
+    abort unless collected.map { |item| item["NSPrivacyCollectedDataType"] }.sort == expected_data
+    abort unless collected.all? { |item| item["NSPrivacyCollectedDataTypeTracking"] == false }
+    abort unless collected.all? { |item| item["NSPrivacyCollectedDataTypeLinked"] == true }
+
+    reasons = manifest.fetch("NSPrivacyAccessedAPITypes").to_h do |item|
+      [item["NSPrivacyAccessedAPIType"], item["NSPrivacyAccessedAPITypeReasons"]]
+    end
+    abort unless reasons["NSPrivacyAccessedAPICategoryUserDefaults"] == ["CA92.1"]
+    abort unless reasons["NSPrivacyAccessedAPICategorySystemBootTime"] == ["35F9.1"]
+'; then
+    fail "application privacy manifest does not match the reviewed data and API declarations."
+fi
+
 if grep -R -n -E --exclude-dir=BrandAssets \
     'chat-bak\.s2y\.us|StanfordRocks|setupTestAccount' \
     "${REPOSITORY_ROOT}/S2Y" \
@@ -80,3 +111,4 @@ echo "Release configuration validated without printing credentials."
 echo "Bundle: ${EXPECTED_BUNDLE_ID}"
 echo "Firebase project: ${EXPECTED_FIREBASE_PROJECT}"
 echo "Omer endpoint: ${EXPECTED_OMER_URL}"
+echo "Privacy manifest: validated"
