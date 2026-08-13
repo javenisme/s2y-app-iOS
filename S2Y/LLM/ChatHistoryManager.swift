@@ -5,6 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+import CryptoKit
 import Foundation
 import OSLog
 
@@ -361,6 +362,23 @@ public struct StoredMessage: Identifiable, Codable {
         self.timestamp = timestamp
         self.metadata = metadata
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, role, content, timestamp, metadata
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        role = try container.decode(MessageRole.self, forKey: .role)
+        content = try container.decode(String.self, forKey: .content)
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        metadata = try container.decodeIfPresent(MessageMetadata.self, forKey: .metadata)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id)
+            ?? LegacyChatHistoryIdentifier.make(
+                namespace: "message",
+                components: [role.rawValue, content, timestamp.timeIntervalSince1970.description]
+            )
+    }
 }
 
 public struct StoredInsight: Identifiable, Codable {
@@ -383,6 +401,23 @@ public struct StoredInsight: Identifiable, Codable {
         self.timestamp = timestamp
         self.confidence = confidence
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, content, type, timestamp, confidence
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        content = try container.decode(String.self, forKey: .content)
+        type = try container.decode(String.self, forKey: .type)
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        confidence = try container.decode(Double.self, forKey: .confidence)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id)
+            ?? LegacyChatHistoryIdentifier.make(
+                namespace: "insight",
+                components: [content, type, timestamp.timeIntervalSince1970.description]
+            )
+    }
 }
 
 public struct FavoriteInsight: Identifiable, Codable {
@@ -401,6 +436,37 @@ public struct FavoriteInsight: Identifiable, Codable {
         self.insight = insight
         self.conversationId = conversationId
         self.savedAt = savedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, insight, conversationId, savedAt
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        insight = try container.decode(HealthInsight.self, forKey: .insight)
+        conversationId = try container.decode(UUID.self, forKey: .conversationId)
+        savedAt = try container.decode(Date.self, forKey: .savedAt)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id)
+            ?? LegacyChatHistoryIdentifier.make(
+                namespace: "favorite",
+                components: [conversationId.uuidString, insight.title, savedAt.timeIntervalSince1970.description]
+            )
+    }
+}
+
+private enum LegacyChatHistoryIdentifier {
+    static func make(namespace: String, components: [String]) -> UUID {
+        let digest = SHA256.hash(data: Data(([namespace] + components).joined(separator: "\u{1F}").utf8))
+        var bytes = Array(digest.prefix(16))
+        bytes[6] = (bytes[6] & 0x0F) | 0x50
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
     }
 }
 
