@@ -1,3 +1,11 @@
+# 历史方案（已归档，请勿作为实现依据）
+
+本文记录 2026-02-26 的探索方案，其中下载式本地模型、自动隐私路由和旧 Agent
+选择器已被 H17 的真实 Provider 边界取代。当前实现只支持用户显式选择 Apple
+Foundation Models 或 Omer；产品状态与下一步以
+[`S2Y_App_User_Stories.md`](S2Y_App_User_Stories.md)、[`Docs/epics.md`](Docs/epics.md)
+和 [`Docs/roadmap.md`](Docs/roadmap.md) 为准。
+
 # S2Y Personal Health Assistant - 改造计划
 
 > 基于 Orchestrator Design Pattern (S2Y K)

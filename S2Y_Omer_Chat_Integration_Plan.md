@@ -1,3 +1,10 @@
+# 历史集成计划（配置界面部分已失效）
+
+本文保留早期集成背景，但用户填写 Omer Base URL 和选择 Auth Mode 的设计已废弃。
+生产客户端使用固定的受控 Omer 入口和 Firebase 身份边界；不得重新添加用户可编辑
+Base URL/Auth Mode。当前状态以 [`Docs/ai-provider-architecture.md`](Docs/ai-provider-architecture.md)
+和 [`S2Y_App_User_Stories.md`](S2Y_App_User_Stories.md) 为准。
+
 # S2Y App 接入 s2y-omer 聊天能力计划
 
 > 版本: v0.1

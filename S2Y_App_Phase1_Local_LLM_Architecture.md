@@ -1,3 +1,9 @@
+# 历史方案（已归档，请勿实现）
+
+本文的 MLX/Phi 下载架构已由 H17（HLT-065～070）正式退休。当前端侧路径是
+Apple Foundation Models，不下载第三方模型，也不在不可用时生成模拟回答。请以
+[`Docs/ai-provider-architecture.md`](Docs/ai-provider-architecture.md) 为准。
+
 # S2Y Health App - Phase 1: 基础架构详细设计
 
 > 版本: v1.0
