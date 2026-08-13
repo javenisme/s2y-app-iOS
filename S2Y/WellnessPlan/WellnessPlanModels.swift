@@ -9,7 +9,7 @@
 import Foundation
 
 public struct WellnessGoal: Codable, Identifiable, Sendable, Equatable {
-    public enum Direction: String, Codable, Sendable {
+    public enum Direction: String, Codable, Sendable, CaseIterable {
         case increase
         case decrease
         case maintain
@@ -22,6 +22,7 @@ public struct WellnessGoal: Codable, Identifiable, Sendable, Equatable {
     public var targetValue: Double?
     public var targetUnit: String
     public var reviewDate: Date
+    public var confirmedAt: Date?
 
     public init(
         id: UUID = UUID(),
@@ -29,7 +30,8 @@ public struct WellnessGoal: Codable, Identifiable, Sendable, Equatable {
         direction: Direction,
         targetValue: Double?,
         targetUnit: String,
-        reviewDate: Date
+        reviewDate: Date,
+        confirmedAt: Date? = nil
     ) {
         self.id = id
         self.metricKind = metricKind
@@ -37,6 +39,24 @@ public struct WellnessGoal: Codable, Identifiable, Sendable, Equatable {
         self.targetValue = targetValue
         self.targetUnit = targetUnit
         self.reviewDate = reviewDate
+        self.confirmedAt = confirmedAt
+    }
+
+    public static func userSelected(
+        metricKind: HealthKitService.MetricKind,
+        direction: Direction,
+        targetValue: Double?,
+        reviewDate: Date,
+        confirmedAt: Date = .now
+    ) -> WellnessGoal {
+        WellnessGoal(
+            metricKind: metricKind,
+            direction: direction,
+            targetValue: targetValue,
+            targetUnit: metricKind.unit,
+            reviewDate: reviewDate,
+            confirmedAt: confirmedAt
+        )
     }
 }
 
@@ -56,6 +76,7 @@ public struct WellnessAction: Codable, Identifiable, Sendable, Equatable {
     public var daysPerWeek: Int
     public var estimatedMinutes: Int
     public var isOptional: Bool
+    public var confirmedAt: Date?
 
     public init(
         id: UUID = UUID(),
@@ -64,7 +85,8 @@ public struct WellnessAction: Codable, Identifiable, Sendable, Equatable {
         category: Category,
         daysPerWeek: Int,
         estimatedMinutes: Int,
-        isOptional: Bool = false
+        isOptional: Bool = false,
+        confirmedAt: Date? = nil
     ) {
         self.id = id
         self.title = title
@@ -73,6 +95,13 @@ public struct WellnessAction: Codable, Identifiable, Sendable, Equatable {
         self.daysPerWeek = min(7, max(1, daysPerWeek))
         self.estimatedMinutes = max(1, estimatedMinutes)
         self.isOptional = isOptional
+        self.confirmedAt = confirmedAt
+    }
+
+    public func confirmed(at date: Date = .now) -> WellnessAction {
+        var copy = self
+        copy.confirmedAt = date
+        return copy
     }
 }
 
@@ -129,6 +158,9 @@ public struct WellnessPlan: Codable, Identifiable, Sendable, Equatable {
 public enum WellnessPlanTransitionError: Error, Equatable {
     case invalidTransition
     case emptyPlan
+    case unconfirmedGoal
+    case unconfirmedAction
+    case invalidGoal
 }
 
 public enum WellnessPlanLifecycle {
@@ -139,6 +171,19 @@ public enum WellnessPlanLifecycle {
     ) throws -> WellnessPlan {
         if status == .active, plan.goals.isEmpty || plan.actions.isEmpty {
             throw WellnessPlanTransitionError.emptyPlan
+        }
+        if status == .active, plan.goals.contains(where: { $0.confirmedAt == nil }) {
+            throw WellnessPlanTransitionError.unconfirmedGoal
+        }
+        if status == .active, plan.actions.contains(where: { $0.confirmedAt == nil }) {
+            throw WellnessPlanTransitionError.unconfirmedAction
+        }
+        if status == .active, plan.goals.contains(where: { goal in
+            goal.targetUnit != goal.metricKind.unit
+                || goal.targetValue.map { !$0.isFinite || $0 <= 0 } == true
+                || goal.confirmedAt.map { goal.reviewDate < $0 } == true
+        }) {
+            throw WellnessPlanTransitionError.invalidGoal
         }
         let allowed: Set<WellnessPlan.Status>
         switch plan.status {

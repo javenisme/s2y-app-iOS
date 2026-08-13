@@ -111,6 +111,11 @@ struct WellnessPlanSettingsView: View {
     @StateObject private var planStore = WellnessPlanStore.shared
     @StateObject private var recordStore = WellnessActionRecordStore.shared
     @State private var isCreatingDraft = false
+    @State private var isAddingGoal = false
+    @State private var goalMetric: HealthKitService.MetricKind = .steps
+    @State private var goalDirection: WellnessGoal.Direction = .consistency
+    @State private var goalTargetText = ""
+    @State private var goalReviewDate = Calendar.current.date(byAdding: .day, value: 14, to: .now) ?? .now
     @State private var errorMessage: String?
 
     var body: some View {
@@ -159,6 +164,9 @@ struct WellnessPlanSettingsView: View {
         } message: {
             Text(errorMessage ?? "")
         }
+        .sheet(isPresented: $isAddingGoal) {
+            goalEditor
+        }
     }
 
     @ViewBuilder
@@ -169,20 +177,60 @@ struct WellnessPlanSettingsView: View {
                 Text(plan.summary).font(.caption).foregroundStyle(.secondary)
                 LabeledContent("Status", value: plan.status.rawValue.capitalized)
             }
+            if plan.goals.isEmpty {
+                Text("No personal goal selected yet.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(plan.goals) { goal in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(goal.metricKind.displayName)
+                            .font(.subheadline.weight(.semibold))
+                        Text(goalDescription(goal))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .onDelete { offsets in
+                    removeGoals(at: offsets, from: plan)
+                }
+            }
+            if plan.status == .draft {
+                Button {
+                    prepareGoalEditor()
+                } label: {
+                    Label("Add my goal", systemImage: "plus.circle")
+                }
+            }
             ForEach(plan.actions) { action in
                 VStack(alignment: .leading, spacing: 3) {
                     Text(action.title).font(.subheadline.weight(.semibold))
                     Text(action.detail).font(.caption).foregroundStyle(.secondary)
                     Text("\(action.daysPerWeek) days/week · about \(action.estimatedMinutes) min")
                         .font(.caption2).foregroundStyle(.tertiary)
+                    if plan.status == .draft {
+                        Button(action.confirmedAt == nil ? "Include this action" : "Included") {
+                            toggleActionConfirmation(action, in: plan)
+                        }
+                        .font(.caption)
+                    }
                 }
+            }
+            .onDelete { offsets in
+                removeActions(at: offsets, from: plan)
             }
             if plan.status == .draft {
                 Button("Review complete — activate plan") {
                     do {
                         planStore.save(try WellnessPlanLifecycle.transition(plan, to: .active))
+                    } catch WellnessPlanTransitionError.unconfirmedGoal {
+                        errorMessage = "Review and confirm every personal goal before activation."
+                    } catch WellnessPlanTransitionError.invalidGoal {
+                        errorMessage = "A goal has an invalid value, unit, or review date. Edit it before activation."
+                    } catch WellnessPlanTransitionError.unconfirmedAction {
+                        errorMessage = "Choose which suggested actions to include before activation."
                     } catch {
-                        errorMessage = "This draft needs at least one personal goal and one action before activation."
+                        errorMessage = "Add at least one personal goal and keep at least one optional action before activation."
                     }
                 }
             } else if plan.status == .active {
@@ -251,5 +299,126 @@ struct WellnessPlanSettingsView: View {
             return
         }
         planStore.save(WellnessPlanDraftBuilder.build(from: report).plan)
+    }
+
+    private var goalEditor: some View {
+        NavigationStack {
+            Form {
+                Picker("Metric", selection: $goalMetric) {
+                    ForEach(HealthKitService.MetricKind.allCases, id: \.self) { metric in
+                        Text(metric.displayName).tag(metric)
+                    }
+                }
+                Picker("Direction", selection: $goalDirection) {
+                    ForEach(WellnessGoal.Direction.allCases, id: \.self) { direction in
+                        Text(directionLabel(direction)).tag(direction)
+                    }
+                }
+                TextField("Optional numeric target", text: $goalTargetText)
+                    .keyboardType(.decimalPad)
+                Text("Unit: \(goalMetric.unit)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                DatePicker(
+                    "Review date",
+                    selection: $goalReviewDate,
+                    in: Date.now...,
+                    displayedComponents: .date
+                )
+                Section {
+                    Text("This is the target you chose. S2Y records progress but does not assess whether the target is medically appropriate.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("My Goal")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { isAddingGoal = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") { addGoal() }
+                        .disabled(!isGoalTargetValid)
+                }
+            }
+        }
+    }
+
+    private var parsedGoalTarget: Double? {
+        let trimmed = goalTargetText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return Double(trimmed)
+    }
+
+    private var isGoalTargetValid: Bool {
+        let trimmed = goalTargetText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || parsedGoalTarget.map { $0.isFinite && $0 > 0 } == true
+    }
+
+    private func prepareGoalEditor() {
+        goalMetric = .steps
+        goalDirection = .consistency
+        goalTargetText = ""
+        goalReviewDate = Calendar.current.date(byAdding: .day, value: 14, to: .now) ?? .now
+        isAddingGoal = true
+    }
+
+    private func addGoal() {
+        guard var plan = planStore.currentPlan, plan.status == .draft, isGoalTargetValid else { return }
+        let goal = WellnessGoal.userSelected(
+            metricKind: goalMetric,
+            direction: goalDirection,
+            targetValue: parsedGoalTarget,
+            reviewDate: goalReviewDate
+        )
+        plan.goals.removeAll { $0.metricKind == goalMetric }
+        plan.goals.append(goal)
+        plan.updatedAt = .now
+        planStore.save(plan)
+        isAddingGoal = false
+    }
+
+    private func removeGoals(at offsets: IndexSet, from plan: WellnessPlan) {
+        guard plan.status == .draft else { return }
+        var updated = plan
+        updated.goals = updated.goals.enumerated().compactMap { index, goal in
+            offsets.contains(index) ? nil : goal
+        }
+        updated.updatedAt = .now
+        planStore.save(updated)
+    }
+
+    private func toggleActionConfirmation(_ action: WellnessAction, in plan: WellnessPlan) {
+        guard plan.status == .draft,
+              let index = plan.actions.firstIndex(where: { $0.id == action.id }) else { return }
+        var updated = plan
+        updated.actions[index].confirmedAt = action.confirmedAt == nil ? .now : nil
+        updated.updatedAt = .now
+        planStore.save(updated)
+    }
+
+    private func removeActions(at offsets: IndexSet, from plan: WellnessPlan) {
+        guard plan.status == .draft else { return }
+        var updated = plan
+        updated.actions = updated.actions.enumerated().compactMap { index, action in
+            offsets.contains(index) ? nil : action
+        }
+        updated.updatedAt = .now
+        planStore.save(updated)
+    }
+
+    private func goalDescription(_ goal: WellnessGoal) -> String {
+        let target = goal.targetValue.map { goal.metricKind.formatValue($0) } ?? "no numeric target"
+        return "\(directionLabel(goal.direction)) · \(target) · review \(goal.reviewDate.formatted(date: .abbreviated, time: .omitted))"
+    }
+
+    private func directionLabel(_ direction: WellnessGoal.Direction) -> String {
+        switch direction {
+        case .increase: "Increase"
+        case .decrease: "Decrease"
+        case .maintain: "Maintain"
+        case .consistency: "Consistency"
+        }
     }
 }

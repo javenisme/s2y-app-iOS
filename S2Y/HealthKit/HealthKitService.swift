@@ -330,7 +330,6 @@ public final class HealthKitService {
             HealthMetricsDictionary.formatValue(value, for: self)
         }
         
-        /// Get health assessment for a value
     }
 
     // Explicit aggregation control for generic quantity metrics

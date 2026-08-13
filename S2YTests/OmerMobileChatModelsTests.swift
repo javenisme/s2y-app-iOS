@@ -725,12 +725,12 @@ final class OmerMobileChatModelsTests: XCTestCase {
 
     func testWellnessPlanRequiresExplicitValidActivation() throws {
         let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
-        let goal = WellnessGoal(
+        let goal = WellnessGoal.userSelected(
             metricKind: .sleepDurationHours,
             direction: .consistency,
             targetValue: nil,
-            targetUnit: "hours",
-            reviewDate: date.addingTimeInterval(14 * 86_400)
+            reviewDate: date.addingTimeInterval(14 * 86_400),
+            confirmedAt: date
         )
         let action = WellnessAction(
             title: "Keep a regular wind-down time",
@@ -738,7 +738,7 @@ final class OmerMobileChatModelsTests: XCTestCase {
             category: .sleepRoutine,
             daysPerWeek: 5,
             estimatedMinutes: 20
-        )
+        ).confirmed(at: date)
         let draft = WellnessPlan(
             title: "Sleep consistency",
             summary: "A user-controlled wellness plan.",
@@ -772,7 +772,84 @@ final class OmerMobileChatModelsTests: XCTestCase {
         }
     }
 
-    func testWellnessDraftUsesPersonalBaselineAndRequiresConfirmation() throws {
+    func testUnconfirmedWellnessGoalCannotActivate() {
+        let goal = WellnessGoal(
+            metricKind: .steps,
+            direction: .consistency,
+            targetValue: nil,
+            targetUnit: "steps",
+            reviewDate: .now.addingTimeInterval(86_400)
+        )
+        let plan = WellnessPlan(
+            title: "Unconfirmed",
+            summary: "Requires an explicit user choice",
+            origin: .assistantDraft,
+            goals: [goal],
+            actions: [WellnessAction(
+                title: "Check in",
+                detail: "Optional reflection",
+                category: .checkIn,
+                daysPerWeek: 1,
+                estimatedMinutes: 1
+            )]
+        )
+
+        XCTAssertThrowsError(try WellnessPlanLifecycle.transition(plan, to: .active)) { error in
+            XCTAssertEqual(error as? WellnessPlanTransitionError, .unconfirmedGoal)
+        }
+    }
+
+    func testUnconfirmedWellnessActionCannotActivate() {
+        let date = Date.now
+        let plan = WellnessPlan(
+            title: "Unconfirmed action",
+            summary: "Requires explicit inclusion",
+            origin: .assistantDraft,
+            goals: [.userSelected(
+                metricKind: .steps,
+                direction: .consistency,
+                targetValue: nil,
+                reviewDate: date.addingTimeInterval(86_400),
+                confirmedAt: date
+            )],
+            actions: [WellnessAction(
+                title: "Movement break",
+                detail: "Optional activity",
+                category: .movement,
+                daysPerWeek: 1,
+                estimatedMinutes: 5
+            )]
+        )
+
+        XCTAssertThrowsError(try WellnessPlanLifecycle.transition(plan, to: .active)) { error in
+            XCTAssertEqual(error as? WellnessPlanTransitionError, .unconfirmedAction)
+        }
+    }
+
+    func testLegacyWellnessItemsDecodeAsUnconfirmed() throws {
+        let goal = WellnessGoal.userSelected(
+            metricKind: .steps,
+            direction: .maintain,
+            targetValue: 5_000,
+            reviewDate: .now.addingTimeInterval(86_400)
+        )
+        let action = WellnessAction(
+            title: "Walk",
+            detail: "Optional movement",
+            category: .movement,
+            daysPerWeek: 2,
+            estimatedMinutes: 5,
+            confirmedAt: .now
+        )
+
+        let legacyGoal = try removingKey("confirmedAt", from: JSONEncoder().encode(goal))
+        let legacyAction = try removingKey("confirmedAt", from: JSONEncoder().encode(action))
+
+        XCTAssertNil(try JSONDecoder().decode(WellnessGoal.self, from: legacyGoal).confirmedAt)
+        XCTAssertNil(try JSONDecoder().decode(WellnessAction.self, from: legacyAction).confirmedAt)
+    }
+
+    func testWellnessDraftUsesPersonalBaselineWithoutChoosingGoal() throws {
         let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
         let report = PersonalHealthInsightReport(
             windowDays: 30,
@@ -794,8 +871,10 @@ final class OmerMobileChatModelsTests: XCTestCase {
 
         XCTAssertEqual(draft.plan.status, .draft)
         XCTAssertEqual(draft.plan.origin, .assistantDraft)
-        XCTAssertEqual(draft.plan.goals.first?.targetValue, 6.5)
+        XCTAssertTrue(draft.plan.goals.isEmpty)
+        XCTAssertEqual(draft.plan.actions.first?.category, .sleepRoutine)
         XCTAssertTrue(draft.rationale.first?.contains("your own earlier baseline") == true)
+        XCTAssertTrue(draft.limitations.contains { $0.contains("does not choose a personal target") })
         XCTAssertTrue(draft.limitations.contains { $0.contains("until you confirm") })
     }
 
@@ -817,12 +896,12 @@ final class OmerMobileChatModelsTests: XCTestCase {
 
     func testOnlyActiveWellnessPlansProduceDailyActions() throws {
         let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
-        let goal = WellnessGoal(
+        let goal = WellnessGoal.userSelected(
             metricKind: .steps,
             direction: .maintain,
             targetValue: 6_000,
-            targetUnit: "steps",
-            reviewDate: date
+            reviewDate: date,
+            confirmedAt: date
         )
         let action = WellnessAction(
             title: "Movement break",
@@ -830,7 +909,7 @@ final class OmerMobileChatModelsTests: XCTestCase {
             category: .movement,
             daysPerWeek: 7,
             estimatedMinutes: 10
-        )
+        ).confirmed(at: date)
         let draft = WellnessPlan(
             title: "Plan",
             summary: "Draft",
@@ -854,13 +933,13 @@ final class OmerMobileChatModelsTests: XCTestCase {
             category: .checkIn,
             daysPerWeek: 7,
             estimatedMinutes: 2
-        )
-        let goal = WellnessGoal(
+        ).confirmed(at: end)
+        let goal = WellnessGoal.userSelected(
             metricKind: .sleepDurationHours,
             direction: .consistency,
             targetValue: nil,
-            targetUnit: "hours",
-            reviewDate: end
+            reviewDate: end,
+            confirmedAt: end
         )
         let draft = WellnessPlan(
             title: "Plan",
@@ -1600,6 +1679,12 @@ final class OmerMobileChatModelsTests: XCTestCase {
             healthMetricsDiscussed: [],
             insights: []
         )
+    }
+
+    private func removingKey(_ key: String, from data: Data) throws -> Data {
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        object.removeValue(forKey: key)
+        return try JSONSerialization.data(withJSONObject: object)
     }
 
     private func validatedWellnessSession() throws -> ValidatedWellnessSession {
