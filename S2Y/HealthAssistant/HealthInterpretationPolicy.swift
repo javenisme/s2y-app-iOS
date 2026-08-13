@@ -35,6 +35,33 @@ enum HealthCommunicationKind: String, Codable, Sendable, Equatable {
 
 enum HealthInterpretationPolicy {
     static let wellnessBoundary = "Health trends are wellness information, not a diagnosis or treatment recommendation."
+    static let optionalActionBoundary = "Any next step is optional general wellness guidance; choose what fits your preferences and circumstances."
+    static let userSelectedGoalBoundary = "S2Y does not choose a personal health target for you. Tell me the target you want to track."
+
+    static func descriptiveDirection(changeRate: Double) -> String {
+        if changeRate >= 0.05 {
+            return "higher than the start of the observed period"
+        }
+        if changeRate <= -0.05 {
+            return "lower than the start of the observed period"
+        }
+        return "similar to the start of the observed period"
+    }
+
+    static func optionalWellnessActions(for kind: HealthKitService.MetricKind) -> String {
+        let choices: String
+        switch kind {
+        case .steps, .activeEnergy:
+            choices = "If you want to explore this trend, you could review which daily routines coincided with it or choose an activity you enjoy."
+        case .sleepDurationHours:
+            choices = "If you want to explore this trend, you could review bedtime consistency and factors that affected rest."
+        case .heartRateAverage, .restingHeartRate, .heartRateVariability, .heartRateRecovery, .walkingHeartRateAverage:
+            choices = "If you want to explore this trend, you could review its timing alongside activity, sleep, and how you felt."
+        default:
+            choices = "If you want to explore this trend, you could review the surrounding routine and how you felt."
+        }
+        return "\(choices) \(optionalActionBoundary)"
+    }
 
     static func trendContext(
         _ trend: HealthKitService.Trend,
