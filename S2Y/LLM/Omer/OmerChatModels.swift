@@ -83,6 +83,14 @@ struct OmerHealthSharingConsentReceiptRequest: Encodable {
     }
 }
 
+struct OmerHealthSharingAuthorizationResponse: Decodable, Equatable, Sendable {
+    let grantedScopes: [String]
+
+    var recognizedGrantedScopes: Set<HealthSharingScope> {
+        Set(grantedScopes.compactMap(HealthSharingScope.init(rawValue:)))
+    }
+}
+
 struct OmerLocalChatSyncResponse: Decodable {
     let requestId: UUID
     let conversationId: UUID
