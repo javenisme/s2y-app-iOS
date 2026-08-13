@@ -1212,9 +1212,9 @@ struct MessageBubble: View {
     @ViewBuilder
     private func chart(attachment: HealthChartAttachment) -> some View {
         switch attachment {
-        case .trend(let trend, let kind):
+        case let .trend(trend, kind):
             HealthTrendChart(trend: trend, metricKind: kind)
-        case .comparison(let comparison, let kind):
+        case let .comparison(comparison, kind):
             HealthComparisonChart(comparison: comparison, metricKind: kind)
         case .personalInsights(let report):
             PersonalHealthInsightCard(report: report)

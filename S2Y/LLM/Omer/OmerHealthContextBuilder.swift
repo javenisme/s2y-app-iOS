@@ -50,9 +50,9 @@ enum OmerHealthContextBuilder {
         switch result {
         case .textResponse(let text):
             return text
-        case .trend(let trend, let kind):
+        case let .trend(trend, kind):
             return HealthInterpretationPolicy.trendContext(trend, kind: kind)
-        case .comparison(let comparison, let kind):
+        case let .comparison(comparison, kind):
             return HealthInterpretationPolicy.comparisonContext(comparison, kind: kind)
         case .insights(let insights):
             return insights.map { insight in

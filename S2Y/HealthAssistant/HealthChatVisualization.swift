@@ -43,11 +43,11 @@ enum HealthChatVisualizationLoader {
         }
         do {
             switch request {
-            case .trend(let kind, let days):
+            case let .trend(kind, days):
                 let trend = try await HealthKitService.shared.trend(kind: kind, days: days)
                 guard trend.dataQuality != .unavailable else { return nil }
                 return .trend(trend, kind)
-            case .comparison(let kind, let days):
+            case let .comparison(kind, days):
                 let comparison = try await HealthKitService.shared.compare(kind: kind, windowDays: days)
                 guard comparison.dataQuality != .unavailable else { return nil }
                 return .comparison(comparison, kind)
