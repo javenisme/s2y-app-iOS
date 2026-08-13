@@ -5,8 +5,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-import XCTest
 @testable import S2Y
+import XCTest
 
 final class AssistantConversationPolicyTests: XCTestCase {
     func testSpecificMetricAndTimeframeProceedWithoutClarification() {
@@ -20,7 +20,8 @@ final class AssistantConversationPolicyTests: XCTestCase {
         guard case .needsClarification(let clarification) = AssistantConversationPolicy.resolve(
             query: "How is my health data?"
         ) else {
-            return XCTFail("Expected metric clarification")
+            XCTFail("Expected metric clarification")
+            return
         }
 
         XCTAssertEqual(clarification.kind, .metric)
@@ -31,7 +32,8 @@ final class AssistantConversationPolicyTests: XCTestCase {
         guard case .needsClarification(let clarification) = AssistantConversationPolicy.resolve(
             query: "How has my sleep been recently?"
         ) else {
-            return XCTFail("Expected timeframe clarification")
+            XCTFail("Expected timeframe clarification")
+            return
         }
 
         XCTAssertEqual(clarification.kind, .timeframe)
@@ -42,7 +44,8 @@ final class AssistantConversationPolicyTests: XCTestCase {
         guard case .needsClarification(let clarification) = AssistantConversationPolicy.resolve(
             query: "How is my activity?"
         ) else {
-            return XCTFail("Expected metric clarification")
+            XCTFail("Expected metric clarification")
+            return
         }
         let steps = try XCTUnwrap(clarification.options.first)
 
@@ -69,7 +72,8 @@ final class AssistantConversationPolicyTests: XCTestCase {
         guard case .needsClarification(let clarification) = AssistantConversationPolicy.resolve(
             query: "What about last month?"
         ) else {
-            return XCTFail("Expected metric clarification")
+            XCTFail("Expected metric clarification")
+            return
         }
 
         XCTAssertEqual(clarification.kind, .metric)
@@ -88,7 +92,8 @@ final class AssistantConversationPolicyTests: XCTestCase {
     func testCuratedQuickQueriesNeverRequireClarification() {
         for suggestion in HealthQuickQuerySuggestion.catalog {
             guard case .ready = AssistantConversationPolicy.resolve(query: suggestion.query) else {
-                return XCTFail("Quick query unexpectedly requires clarification: \(suggestion.id)")
+                XCTFail("Quick query unexpectedly requires clarification: \(suggestion.id)")
+                return
             }
         }
     }

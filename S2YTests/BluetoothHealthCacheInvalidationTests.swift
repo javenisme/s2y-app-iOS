@@ -5,8 +5,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-import XCTest
 @testable import S2Y
+import XCTest
 
 final class BluetoothHealthCacheInvalidationTests: XCTestCase {
     func testPulseOximeterInvalidatesOnlyMetricsPresentInPayload() {

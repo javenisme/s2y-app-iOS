@@ -6,9 +6,9 @@
 // SPDX-License-Identifier: MIT
 //
 
-import Testing
 import Foundation
 @testable import S2Y
+import Testing
 
 struct HealthLanguageGuardrailTests {
     @Test("Trend direction stays descriptive")

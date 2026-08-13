@@ -7,6 +7,8 @@
 #
 
 # The whitelist_rules configuration also includes rules that are enabled by default to provide a good overview of all rules.
+baseline: .swiftlint-baseline.json
+
 only_rules:
   # All Images that provide context should have an accessibility label. Purely decorative images can be hidden from accessibility.
   - accessibility_label_for_image
