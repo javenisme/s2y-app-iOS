@@ -332,68 +332,34 @@ enum EnhancedQueryPlanner {
     }
     
     private static func generateGoalResponse(kind: HealthKitService.MetricKind, target: Double?) async throws -> HealthQueryProcessor.QueryResult {
+        guard let target else {
+            let title = metricTitle(kind: kind)
+            return .textResponse("To track a \(title) goal, include the value you want to use. \(HealthInterpretationPolicy.userSelectedGoalBoundary)")
+        }
+
         let trend = try await HealthKitService.shared.trend(kind: kind, days: 7, useCache: true)
         let current = trend.average
         let title = metricTitle(kind: kind)
         let unit = metricUnit(kind: kind)
-        
-        if let target = target {
-            let progress = (current / target) * 100
-            let response = """
-            \(title) Goal: \(String(format: "%.1f", target)) \(unit)
-            Current 7-day Average: \(String(format: "%.1f", current)) \(unit)
-            Progress: \(String(format: "%.1f", progress))%
-            
-            \(progress >= 100 ? "🎉 Congratulations! You've reached your goal!" : "💪 Keep going! You need \(String(format: "%.1f", target - current)) \(unit) more to reach your goal.")
-            """
-            return .textResponse(response)
-        } else {
-            let suggestedTarget = generateSuggestedTarget(for: kind, current: current)
-            let response = """
-            Based on your current \(title) data, recommended goal:
-            
-            Current 7-day Average: \(String(format: "%.1f", current)) \(unit)
-            Suggested Goal: \(String(format: "%.1f", suggestedTarget)) \(unit)
-            
-            This goal is both challenging and achievable. You can gradually improve and steadily reach your health goals!
-            """
-            return .textResponse(response)
-        }
+        let progress = (current / target) * 100
+        let response = """
+        \(title) Goal: \(String(format: "%.1f", target)) \(unit)
+        Current 7-day Average: \(String(format: "%.1f", current)) \(unit)
+        Descriptive Progress: \(String(format: "%.1f", progress))%
+
+        This compares the recorded average with the target you selected; it does not assess whether that target is medically appropriate.
+        """
+        return .textResponse(response)
     }
     
     // MARK: - Helper Methods
     
-    private static func formatSummary(kind: HealthKitService.MetricKind, trend: HealthKitService.Trend, days: Int) -> String {
-        let title = metricTitle(kind: kind)
-        let unit = metricUnit(kind: kind)
-        let avg = String(format: "%.1f", trend.average)
-        let change = trend.changeRate >= 0 ? "Increase" : "Decrease"
-        let changePercent = String(format: "%.1f", abs(trend.changeRate * 100))
-        
+    static func formatSummary(kind: HealthKitService.MetricKind, trend: HealthKitService.Trend, days: Int) -> String {
         return """
-        \(title) - \(days) Day Summary
-        
-        Average: \(avg) \(unit)
-        Trend: \(change) \(changePercent)%
-        Data Points: \(trend.points.count)
-        
-        \(generateBriefAnalysis(for: kind, trend: trend))
+        \(metricTitle(kind: kind)) - \(days) Day Observation
+
+        \(HealthInterpretationPolicy.trendContext(trend, kind: kind))
         """
-    }
-    
-    private static func generateBriefAnalysis(for kind: HealthKitService.MetricKind, trend: HealthKitService.Trend) -> String {
-        switch kind {
-        case .steps:
-            return trend.average >= 8000 ? "Good activity level, maintain current habits." : "Consider increasing daily activity."
-        case .heartRateAverage:
-            return "Heart rate data is normal, continue monitoring changes."
-        case .sleepDurationHours:
-            return trend.average >= 7 ? "Sufficient sleep duration." : "Consider ensuring adequate sleep time."
-        case .activeEnergy:
-            return trend.average >= 300 ? "Good active energy expenditure." : "Consider increasing exercise intensity."
-        default:
-            return "Good data recording, continue monitoring."
-        }
     }
     
     private static func generateInsightForMetric(
@@ -401,15 +367,16 @@ enum EnhancedQueryPlanner {
         trend: HealthKitService.Trend,
         comparison: HealthKitService.Comparison
     ) -> HealthQueryProcessor.HealthInsight? {
-        // This would be the same logic as in HealthQueryProcessor
-        // For brevity, I'll use a simplified version
         let title = metricTitle(kind: kind)
-        let insight = "Your \(title) has shown \(trend.changeRate >= 0 ? "an increase" : "a decrease") over the past 7 days"
+        let insight = [
+            HealthInterpretationPolicy.trendContext(trend, kind: kind),
+            HealthInterpretationPolicy.comparisonContext(comparison, kind: kind)
+        ].joined(separator: "\n\n")
         
         return HealthQueryProcessor.HealthInsight(
-            title: "\(title)分析",
+            title: "\(title) Observation",
             insight: insight,
-            recommendation: "Continue maintaining good health habits.",
+            recommendation: HealthInterpretationPolicy.optionalWellnessActions(for: kind),
             icon: metricIcon(kind: kind),
             color: "blue",
             severity: .info
@@ -418,9 +385,9 @@ enum EnhancedQueryPlanner {
     
     private static func generateFallbackInsight() -> HealthQueryProcessor.HealthInsight {
         return HealthQueryProcessor.HealthInsight(
-            title: "Health Reminder",
-            insight: "Maintaining good lifestyle habits is important for health.",
-            recommendation: "Regularly review your health data and monitor changes in your physical condition.",
+            title: "Health Data Unavailable",
+            insight: "There is not enough readable data to describe these trends. \(HealthInterpretationPolicy.wellnessBoundary)",
+            recommendation: nil,
             icon: "heart.circle",
             color: "blue",
             severity: .info
@@ -428,72 +395,23 @@ enum EnhancedQueryPlanner {
     }
     
     private static func generateRecommendationForMetric(_ kind: HealthKitService.MetricKind, trend: HealthKitService.Trend) -> String {
-        let title = metricTitle(kind: kind)
-        
-        switch kind {
-        case .steps:
-            if trend.average < 5000 {
-                return "Suggestions to increase daily walking:\n• Take stairs instead of elevators\n• Take a 20-30 minute walk after meals\n• Try walking or cycling to work\n• Set daily step goals and gradually increase them"
-            } else {
-                return "Your step count performance is good! Keep it up:\n• Maintain your current activity level\n• Try new types of exercise for variety\n• Invite friends to walk together for motivation"
-            }
-            
-        case .sleepDurationHours:
-            if trend.average < 7 {
-                return "Suggestions to improve sleep quality:\n• Establish regular sleep schedule\n• Avoid electronic devices 1 hour before bed\n• Keep bedroom temperature comfortable (18-22°C)\n• Avoid heavy meals or caffeinated drinks before bedtime"
-            } else {
-                return "Your sleep duration is excellent! Maintain with:\n• Keep regular sleep schedule\n• Focus on sleep quality, not just duration\n• Establish a relaxing bedtime routine"
-            }
-            
-        default:
-            return "Based on your \(title) data, continue maintaining good health habits and regularly monitor changes. If you have concerns, please consult a healthcare professional."
-        }
+        [
+            HealthInterpretationPolicy.trendContext(trend, kind: kind),
+            HealthInterpretationPolicy.optionalWellnessActions(for: kind)
+        ].joined(separator: "\n\n")
     }
     
-    private static func generateGeneralHealthRecommendations() -> String {
+    static func generateGeneralHealthRecommendations() -> String {
         return """
-        💪 Comprehensive Health Recommendations
-        
-        🚶‍♂️ Daily Activity
-        • At least 10,000 steps daily
-        • 150 minutes of moderate-intensity exercise weekly
-        
-        😴 Sleep Quality
-        • 7-9 hours of adequate sleep nightly
-        • Maintain regular sleep schedule
-        
-        ❤️ Cardiovascular Health
-        • Regularly monitor heart rate changes
-        • Moderate aerobic exercise
-        
-        📊 Data Monitoring
-        • Develop habit of recording health data
-        • Regularly review and analyze trends
-        
-        ⚕️ Professional Advice
-        • Consult doctor promptly for abnormal changes
-        • Personal health plans should incorporate professional guidance
+        General Wellness Options
+
+        • Review which routines coincided with the trends you see.
+        • Choose activity and rest routines that fit your preferences and circumstances.
+        • Treat gaps in HealthKit coverage as uncertainty, not as a health conclusion.
+
+        \(HealthInterpretationPolicy.optionalActionBoundary)
+        \(HealthInterpretationPolicy.wellnessBoundary)
         """
-    }
-    
-    private static func generateSuggestedTarget(for kind: HealthKitService.MetricKind, current: Double) -> Double {
-        switch kind {
-        case .steps:
-            if current < 5000 { return 8000 }
-            else if current < 10000 { return 12000 }
-            else { return current * 1.1 }
-            
-        case .sleepDurationHours:
-            if current < 7 { return 8 }
-            else { return max(8, current) }
-            
-        case .activeEnergy:
-            if current < 200 { return 300 }
-            else { return current * 1.15 }
-            
-        default:
-            return current * 1.1
-        }
     }
     
     private static func metricTitle(kind: HealthKitService.MetricKind) -> String {
