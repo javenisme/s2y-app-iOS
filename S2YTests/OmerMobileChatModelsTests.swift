@@ -785,4 +785,249 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(review.unrecordedCount, 6)
         XCTAssertEqual(review.adjustment, .considerSimplifying)
     }
+
+    func testWellnessDeviceTrustPolicyFailsClosedForUnknownIdentity() throws {
+        let identity = WellnessDeviceIdentity(
+            deviceID: UUID(),
+            productIdentifier: "unknown-device",
+            firmwareVersion: "1.0.0",
+            protocolVersion: 1,
+            reportedCapabilities: [.relaxationSession, .immediateStop],
+            manufacturerSignatureValidated: true
+        )
+        let policy = WellnessDeviceTrustPolicy(
+            supportedProductIdentifiers: ["s2y-wellness-reference"],
+            supportedProtocolVersions: 1 ... 1
+        )
+
+        XCTAssertThrowsError(try policy.verify(identity)) { error in
+            XCTAssertEqual(error as? WellnessDeviceTrustFailure, .unsupportedProduct)
+        }
+    }
+
+    func testWellnessDeviceTrustPolicyRequiresImmediateStopCapability() throws {
+        let identity = WellnessDeviceIdentity(
+            deviceID: UUID(),
+            productIdentifier: "s2y-wellness-reference",
+            firmwareVersion: "1.0.0",
+            protocolVersion: 1,
+            reportedCapabilities: [.relaxationSession],
+            manufacturerSignatureValidated: true
+        )
+        let policy = WellnessDeviceTrustPolicy(
+            supportedProductIdentifiers: ["s2y-wellness-reference"],
+            supportedProtocolVersions: 1 ... 1
+        )
+
+        XCTAssertThrowsError(try policy.verify(identity)) { error in
+            XCTAssertEqual(error as? WellnessDeviceTrustFailure, .missingImmediateStop)
+        }
+    }
+
+    func testWellnessDeviceTrustPolicyNarrowsReportedCapabilities() throws {
+        let identity = WellnessDeviceIdentity(
+            deviceID: UUID(),
+            productIdentifier: "s2y-wellness-reference",
+            firmwareVersion: "1.0.0",
+            protocolVersion: 1,
+            reportedCapabilities: [.relaxationSession, .levelAdjustment, .immediateStop],
+            manufacturerSignatureValidated: true
+        )
+        let policy = WellnessDeviceTrustPolicy(
+            supportedProductIdentifiers: ["s2y-wellness-reference"],
+            supportedProtocolVersions: 1 ... 1,
+            allowedCapabilities: [.relaxationSession, .immediateStop]
+        )
+
+        let verified = try policy.verify(identity)
+        XCTAssertEqual(verified.allowedCapabilities, [.relaxationSession, .immediateStop])
+    }
+
+    func testWellnessSessionPolicyRejectsAssistantDraftOutsideLocalLimits() throws {
+        let deviceID = UUID()
+        let device = verifiedWellnessDevice(id: deviceID)
+        let request = WellnessSessionRequest(
+            deviceID: deviceID,
+            purpose: .relaxation,
+            durationMinutes: 45,
+            comfortLevel: 2,
+            origin: .assistantDraft
+        )
+
+        XCTAssertThrowsError(
+            try WellnessSessionSafetyPolicy().validate(request, for: device, lastSessionEndedAt: nil)
+        ) { error in
+            XCTAssertEqual(error as? WellnessSessionValidationFailure, .durationOutOfRange)
+        }
+    }
+
+    func testWellnessSessionPolicyEnforcesCooldown() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
+        let deviceID = UUID()
+        let device = verifiedWellnessDevice(id: deviceID)
+        let request = WellnessSessionRequest(
+            deviceID: deviceID,
+            purpose: .windDown,
+            durationMinutes: 10,
+            comfortLevel: 1,
+            origin: .userCreated
+        )
+        let lastEnd = now.addingTimeInterval(-30 * 60)
+
+        XCTAssertThrowsError(
+            try WellnessSessionSafetyPolicy().validate(
+                request,
+                for: device,
+                lastSessionEndedAt: lastEnd,
+                now: now
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? WellnessSessionValidationFailure,
+                .cooldownActive(until: lastEnd.addingTimeInterval(60 * 60))
+            )
+        }
+    }
+
+    func testWellnessSessionPolicyProducesShortLivedValidation() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
+        let deviceID = UUID()
+        let device = verifiedWellnessDevice(id: deviceID)
+        let request = WellnessSessionRequest(
+            deviceID: deviceID,
+            purpose: .mindfulBreak,
+            durationMinutes: 10,
+            comfortLevel: 2,
+            origin: .assistantDraft
+        )
+
+        let validated = try WellnessSessionSafetyPolicy().validate(
+            request,
+            for: device,
+            lastSessionEndedAt: now.addingTimeInterval(-2 * 60 * 60),
+            now: now
+        )
+        XCTAssertEqual(validated.expiresAt, now.addingTimeInterval(5 * 60))
+        XCTAssertEqual(validated.request.origin, .assistantDraft)
+    }
+
+    func testWellnessSessionCannotStartWithoutMatchingUserConfirmation() throws {
+        let validated = try validatedWellnessSession()
+        var controller = WellnessSessionController()
+        let confirmation = controller.prepare(validated, now: validated.validatedAt)
+
+        XCTAssertThrowsError(
+            try controller.confirm(confirmationID: UUID(), now: validated.validatedAt)
+        ) { error in
+            XCTAssertEqual(error as? WellnessSessionControlFailure, .confirmationMismatch)
+        }
+        XCTAssertEqual(controller.state, .awaitingConfirmation(confirmation))
+    }
+
+    func testWellnessSessionConfirmationExpires() throws {
+        let validated = try validatedWellnessSession()
+        var controller = WellnessSessionController()
+        let confirmation = controller.prepare(validated, now: validated.validatedAt)
+
+        XCTAssertThrowsError(
+            try controller.confirm(
+                confirmationID: confirmation.id,
+                now: validated.expiresAt.addingTimeInterval(1)
+            )
+        ) { error in
+            XCTAssertEqual(error as? WellnessSessionControlFailure, .confirmationExpired)
+        }
+    }
+
+    func testActiveWellnessSessionCanAlwaysStopLocally() throws {
+        let validated = try validatedWellnessSession()
+        var controller = WellnessSessionController()
+        let confirmation = controller.prepare(validated, now: validated.validatedAt)
+        _ = try controller.confirm(
+            confirmationID: confirmation.id,
+            now: validated.validatedAt.addingTimeInterval(1)
+        )
+        let stopTime = validated.validatedAt.addingTimeInterval(30)
+
+        let stopped = try controller.stopImmediately(reason: .safetyStop, now: stopTime)
+
+        XCTAssertEqual(stopped.reason, .safetyStop)
+        XCTAssertEqual(stopped.stoppedAt, stopTime)
+        XCTAssertEqual(controller.state, .stopped(stopped))
+    }
+
+    func testWellnessSessionAuditRecordsUserVisibleFieldsWithoutHardwarePayload() throws {
+        let validated = try validatedWellnessSession()
+        let active = ActiveWellnessSession(
+            session: validated,
+            confirmedAt: validated.validatedAt,
+            scheduledEndAt: validated.validatedAt.addingTimeInterval(600)
+        )
+        var log = WellnessSessionAuditLog()
+        log.begin(active)
+        let stopped = StoppedWellnessSession(
+            request: validated.request,
+            stoppedAt: validated.validatedAt.addingTimeInterval(120),
+            reason: .userStopped
+        )
+        log.finish(stopped)
+
+        let record = try XCTUnwrap(log.records.first)
+        XCTAssertEqual(record.stopReason, .userStopped)
+        XCTAssertEqual(record.endedAt, stopped.stoppedAt)
+
+        let json = String(decoding: try encoder.encode(log), as: UTF8.self)
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("amplitude"))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("frequency"))
+        XCTAssertFalse(json.localizedCaseInsensitiveContains("treatment"))
+    }
+
+    func testWellnessSessionAuditLogCapsLocalHistory() throws {
+        let validated = try validatedWellnessSession()
+        let active = ActiveWellnessSession(
+            session: validated,
+            confirmedAt: validated.validatedAt,
+            scheduledEndAt: validated.validatedAt.addingTimeInterval(600)
+        )
+        var log = WellnessSessionAuditLog(maximumRecordCount: 2)
+
+        log.begin(active)
+        log.begin(active)
+        log.begin(active)
+
+        XCTAssertEqual(log.records.count, 2)
+    }
+
+    private func validatedWellnessSession() throws -> ValidatedWellnessSession {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
+        let deviceID = UUID()
+        let request = WellnessSessionRequest(
+            deviceID: deviceID,
+            purpose: .relaxation,
+            durationMinutes: 10,
+            comfortLevel: 1,
+            origin: .assistantDraft
+        )
+        return try WellnessSessionSafetyPolicy().validate(
+            request,
+            for: verifiedWellnessDevice(id: deviceID),
+            lastSessionEndedAt: nil,
+            now: now
+        )
+    }
+
+    private func verifiedWellnessDevice(id: UUID) -> VerifiedWellnessDevice {
+        let identity = WellnessDeviceIdentity(
+            deviceID: id,
+            productIdentifier: "s2y-wellness-reference",
+            firmwareVersion: "1.0.0",
+            protocolVersion: 1,
+            reportedCapabilities: [.relaxationSession, .sessionTimer, .immediateStop],
+            manufacturerSignatureValidated: true
+        )
+        return VerifiedWellnessDevice(
+            identity: identity,
+            allowedCapabilities: identity.reportedCapabilities
+        )
+    }
 }
