@@ -51,27 +51,6 @@ enum HealthAssistantError: Error, LocalizedError {
     }
 }
 
-private enum AssistantAIMode: String, CaseIterable, Identifiable {
-    case onDevice
-    case omer
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .onDevice: "On-device"
-        case .omer: "Omer Online"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .onDevice: "apple.intelligence"
-        case .omer: "icloud"
-        }
-    }
-}
-
 struct HealthAssistantView: View {
     @Environment(\.homeDrawerProgress) private var homeDrawerProgress
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -329,7 +308,7 @@ struct HealthAssistantView: View {
                 .accessibilityLabel("AI provider")
                 .accessibilityIdentifier("health-assistant-ai-mode")
                 Spacer()
-                Text(selectedAIMode == .onDevice ? "Runs on this iPhone" : "Uses Omer online")
+                Text(selectedAIMode.dataBoundaryDescription)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -574,7 +553,7 @@ struct HealthAssistantView: View {
             )
             updateAssistantMessage(
                 id: assistantMessageID,
-                content: "Sorry, neither on-device AI nor Omer is available right now: \(error.localizedDescription)"
+                content: "Omer Online is unavailable right now: \(error.localizedDescription)"
             )
         }
     }

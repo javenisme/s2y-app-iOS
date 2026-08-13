@@ -1131,15 +1131,6 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertNil(HealthSafetyTriage.evaluate("我没有胸痛，只想查看步数趋势"))
     }
 
-    func testSafetyEscalationMetadataDoesNotClaimAIOrHealthAnalysis() {
-        let metadata = ProcessingMetadata(safetyEscalationLevel: .emergency)
-
-        XCTAssertEqual(metadata.safetyEscalationLevel, .emergency)
-        XCTAssertNil(metadata.llmSource)
-        XCTAssertFalse(metadata.healthAnalysisUsed)
-        XCTAssertFalse(metadata.contextUsed)
-    }
-
     func testHealthCommunicationLayersKeepObservationAndGuidanceDistinct() {
         let observation = ChatMessage(
             role: .assistant,

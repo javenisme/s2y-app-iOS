@@ -48,9 +48,12 @@ The [DocC documentation of the Spezi Template Application contains information o
 
 ## Project Documents
 
-- Project Summary: [docs/PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md)
-- Product Requirements (PRD): [docs/PRD.md](docs/PRD.md)
-- TODO Roadmap: [docs/TODO.md](docs/TODO.md)
+- Architecture: [Docs/architecture.md](Docs/architecture.md)
+- Product Requirements: [Docs/requirements.md](Docs/requirements.md)
+- Roadmap: [Docs/roadmap.md](Docs/roadmap.md)
+- Health Assistant Epics: [Docs/epics.md](Docs/epics.md)
+- AI Provider Boundaries: [Docs/ai-provider-architecture.md](Docs/ai-provider-architecture.md)
+- TODO: [Docs/todo.md](Docs/todo.md)
 
 ## Contributing
 

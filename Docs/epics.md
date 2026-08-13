@@ -9,11 +9,11 @@
   - 趋势图、区间对比图、解释性注释
 - 里程碑：A1（基础采样+缓存）、A2（多指标对比）、A3（异常/缺失值处理）
 
-## Epic B：对话式查询（LLM Orchestrator + Query Planner）
+## Epic B：对话式查询（AI Provider Boundary + Query Planner）
 - 目标：用户自然语言 → 结构化意图 → 工具调用 → 可视化与解释
 - 成果物：
   - Planner（意图+参数）与工具 Schema（聚合/窗口/阈值）
-  - 提示模板与函数调用协议；结果校验与回退
+  - 提示模板与函数调用协议；结果校验；用户显式选择 Apple 端侧或 Omer 在线
 - 里程碑：B1（通用问答）、B2（健康工具调用）、B3（跨指标洞察）
 
 ## Epic C：Insight & Goals（洞察与微目标）
