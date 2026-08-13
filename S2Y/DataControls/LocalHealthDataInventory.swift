@@ -11,6 +11,7 @@ import Foundation
 public enum LocalHealthDataCategory: String, CaseIterable, Codable, Sendable, Identifiable {
     case chatCopies
     case clinicalSummaries
+    case importedClinicalDocuments
     case wellbeingCheckIns
     case wellbeingPlans
     case wellbeingActionRecords
@@ -25,6 +26,7 @@ public enum LocalHealthDataCategory: String, CaseIterable, Codable, Sendable, Id
         switch self {
         case .chatCopies: "Local chat copies"
         case .clinicalSummaries: "Clinical record summaries"
+        case .importedClinicalDocuments: "Imported clinical documents"
         case .wellbeingCheckIns: "Daily wellbeing check-ins"
         case .wellbeingPlans: "Wellbeing plans"
         case .wellbeingActionRecords: "Plan action history"
@@ -78,6 +80,7 @@ enum LocalHealthDataInventory {
         return LocalHealthDataInventorySnapshot(generatedAt: date, counts: [
             .chatCopies: chatCount,
             .clinicalSummaries: ClinicalRecordIndexStore.shared.index?.records.count ?? 0,
+            .importedClinicalDocuments: ClinicalDocumentStore.shared.documents.count,
             .wellbeingCheckIns: WellbeingCheckInStore.shared.snapshots.count,
             .wellbeingPlans: WellnessPlanStore.shared.plans.count,
             .wellbeingActionRecords: WellnessActionRecordStore.shared.records.count,

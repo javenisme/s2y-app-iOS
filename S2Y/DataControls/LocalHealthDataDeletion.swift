@@ -16,6 +16,8 @@ enum LocalHealthDataDeletionService {
             await OmerChatService.shared.clearLocalChatCache()
         case .clinicalSummaries:
             try ClinicalRecordIndexStore.shared.clear()
+        case .importedClinicalDocuments:
+            try ClinicalDocumentStore.shared.clear()
         case .wellbeingCheckIns:
             try WellbeingCheckInStore.shared.clear()
         case .wellbeingPlans:

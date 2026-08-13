@@ -36,6 +36,7 @@ actor OmerChatService {
         message: String,
         authorization: HealthSharingAuthorization,
         includeHealthContext: Bool,
+        importedDocumentContext: String?,
         onEvent: @escaping @Sendable (OmerChatStreamEvent) -> Void
     ) async throws {
         try HealthSharingConsentPolicy.require([.omerChatText], authorization: authorization)
@@ -57,6 +58,16 @@ actor OmerChatService {
             healthContext = (healthContext ?? [:]).merging(
                 ["selectedClinicalRecordSummaries": clinicalSummary],
                 uniquingKeysWith: { _, clinical in clinical }
+            )
+        }
+        if let importedDocumentContext, !importedDocumentContext.isEmpty {
+            try HealthSharingConsentPolicy.require(
+                [.importedClinicalDocumentExcerpts],
+                authorization: authorization
+            )
+            healthContext = (healthContext ?? [:]).merging(
+                ["userImportedClinicalDocumentExcerpts": String(importedDocumentContext.prefix(4_000))],
+                uniquingKeysWith: { _, imported in imported }
             )
         }
         if HealthSharingConsentPolicy.permits(.wellbeingCheckInSummary, authorization: authorization),
