@@ -61,9 +61,9 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
 - OMR-017 完整测试为 449 项通过、8 项按默认配置跳过；OMR-018 为 450 项通过、8 项
   跳过。两次 TypeScript、格式检查与 Production build 均通过。
 - iOS HLT-150 已把本地版本化回执按时间顺序同步至 Omer，请求携带策略版本；设置撤回
-  本地立即生效，云确认失败会保留回执供重试。模拟器 `build-for-testing` 成功，完整
-  SwiftLint 基线检查通过。图形模拟器测试启动仍停在“等待 worker 建立”，因此专项测试
-  仅确认已编译进测试包，不能记录为已运行通过。
+  本地立即生效，云确认失败会保留回执供重试。模拟器 `build-for-testing` 与完整
+  SwiftLint 基线检查通过；后续 H42 使用独立无头模拟器解决图形会话的 worker 阻塞，
+  H40 四项专项测试与完整 `S2YTests` 均已实际运行通过。
 - 尚未使用生产测试账号读取数据库或执行逐范围 grant/revoke；本节不证明生产数据库
   状态变化、云端历史删除或旧客户端强制门，US-201 继续保持外部验收状态。
 
@@ -79,6 +79,22 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
 - 只读配置检查确认 Vercel Production 尚无 `STRIPE_SECRET_KEY`、订阅 Webhook 密钥及
   Basic/Pro 月付和年付四个价格映射；本地 Stripe 密钥认证也已失效。因此未读取 Stripe
   产品、价格或 Webhook，未创建外部资源，生产 Checkout/升级/降级仍未验收。
+
+## 2026-08-13 隔离模拟器运行验收
+
+- 新建并启动一个临时 iOS 26.2、iPhone 16e 无头模拟器，避开已有图形模拟器会话导致的
+  “waiting for workers to materialize”。该临时设备不使用真机数据、Apple 账户或生产凭据。
+- H40 四项契约测试全部运行通过：在线聊天请求策略版本、端侧会话同步策略版本、Omer
+  同意回执编码、统一撤回回执；共 4 项、0 失败。
+- 完整 `S2YTests` 实际运行通过：157 项 XCTest 与 6 项 Swift Testing，共 163 项、
+  0 失败。结果不再只是 `build-for-testing` 编译证据。
+- Debug 模拟器 App 安装并启动成功；等待初始化后进入 S2Y Health Assistant onboarding。
+  该 smoke check 证明应用可启动，不证明 Firebase 登录、HealthKit 真机数据或 Apple
+  Foundation Models 端侧推理。
+- 测试启动日志仍显示模拟器没有 Keychain entitlement、通知后台模式及 Spezi 调度声明；
+  测试未因此失败。这些属于模拟器/应用配置提示，不可当作真机签名或推送验收通过。
+- PR #69、#70 的 SwiftLint 与 REUSE 检查成功；依赖自托管执行器的 Build、CodeQL、
+  Periphery、DocC 和链接检查仍处于 queued，未将排队状态记录为通过或代码失败。
 
 ## 2026-08-13 Omer 健康管理安全验证
 
