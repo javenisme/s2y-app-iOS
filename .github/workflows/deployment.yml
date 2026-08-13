@@ -129,6 +129,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Test privacy manifest validation
+        run: python3 -m unittest discover -s Scripts/tests -p 'test_*.py' -v
       - name: Validate identifiers and production endpoints
         run: Scripts/validate_release_configuration.sh
       - name: Check public production endpoints

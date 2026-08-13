@@ -18,6 +18,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  releaseconfiguration:
+    name: Release Configuration
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Test privacy manifest validation
+        run: python3 -m unittest discover -s Scripts/tests -p 'test_*.py' -v
+      - name: Validate release configuration
+        run: Scripts/validate_release_configuration.sh
   reuse_action:
     name: REUSE Compliance Check
     uses: StanfordBDHG/.github/.github/workflows/reuse.yml@v2
