@@ -1328,6 +1328,36 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(snapshot.reportedSymptoms.count, 8)
     }
 
+    @MainActor
+    func testWellbeingCheckInStorePersistsBoundsAndClearsSnapshots() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let fileURL = directory.appendingPathComponent("snapshots.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let now = Date()
+        let store = WellbeingCheckInStore(fileURL: fileURL, maximumSnapshotCount: 2)
+
+        for offset in 0..<3 {
+            try store.save(WellbeingCheckInSnapshot(
+                recordedAt: now.addingTimeInterval(TimeInterval(offset)),
+                questionnaireIdentifier: "DailyHealth",
+                overallWellbeing: "good"
+            ))
+        }
+
+        XCTAssertEqual(store.snapshots.count, 2)
+        XCTAssertEqual(store.snapshots.first?.recordedAt, now.addingTimeInterval(2))
+        XCTAssertEqual(
+            WellbeingCheckInStore(fileURL: fileURL, maximumSnapshotCount: 2).snapshots,
+            store.snapshots
+        )
+
+        try store.clear()
+
+        XCTAssertTrue(store.snapshots.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
+    }
+
     func testRevokingOnDeviceSyncDoesNotRevokeOmerQuestionConsent() {
         var ledger = HealthSharingConsentLedger()
         ledger.apply(.granted, scopes: [.omerChatText, .onDeviceConversationSync])

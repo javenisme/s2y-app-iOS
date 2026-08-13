@@ -15,7 +15,6 @@ import SwiftUI
 struct EventView: View {
     private let event: Event
     
-    @Environment(S2YApplicationStandard.self) private var standard
     @Environment(\.dismiss) private var dismiss
     
     @State private var viewState: ViewState = .idle
@@ -30,8 +29,14 @@ struct EventView: View {
                 }
                 
                 do {
+                    let data = try JSONEncoder().encode(response)
+                    let questionnaireID = questionnaire.id?.value?.string ?? "unknown-questionnaire"
+                    let snapshot = try WellbeingCheckInSnapshotBuilder.build(
+                        responseData: data,
+                        questionnaireIdentifier: questionnaireID
+                    )
+                    try WellbeingCheckInStore.shared.save(snapshot)
                     _ = try event.complete()
-                    await standard.add(response: response, for: questionnaire)
                     dismiss()
                 } catch {
                     viewState = .error(AnyLocalizedError(error: error))
