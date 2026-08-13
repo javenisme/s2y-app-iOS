@@ -454,4 +454,164 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertTrue(context.contains("Coverage is limited"))
         XCTAssertTrue(context.contains("not a diagnosis or treatment recommendation"))
     }
+
+    func testLongitudinalDatasetAlignsObservedValuesWithoutZeroImputation() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let start = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-01T12:00:00Z"))
+        let dayTwo = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: start))
+        let dataset = LongitudinalHealthAligner.align(
+            series: [
+                .steps: [
+                    .init(date: start, value: 4_000),
+                    .init(date: dayTwo, value: 0, isObserved: false)
+                ],
+                .sleepDurationHours: [
+                    .init(date: dayTwo, value: 7.5)
+                ]
+            ],
+            expectedDays: 7,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(dataset.days.count, 2)
+        XCTAssertEqual(dataset.values(for: .steps).map(\.value), [4_000])
+        XCTAssertEqual(dataset.values(for: .sleepDurationHours).map(\.value), [7.5])
+        XCTAssertTrue(dataset.pairedValues(.steps, .sleepDurationHours).isEmpty)
+        XCTAssertEqual(dataset.coverage.first(where: { $0.metricKind == .steps })?.observedDays, 1)
+    }
+
+    func testLongitudinalDatasetAveragesDuplicateSamplesWithinDay() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let morning = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-01T08:00:00Z"))
+        let evening = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-01T20:00:00Z"))
+        let dataset = LongitudinalHealthAligner.align(
+            series: [
+                .heartRateAverage: [
+                    .init(date: morning, value: 60),
+                    .init(date: evening, value: 80)
+                ]
+            ],
+            expectedDays: 1,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(dataset.values(for: .heartRateAverage).map(\.value), [70])
+        XCTAssertEqual(dataset.coverage.first?.dataQuality, .complete)
+    }
+
+    func testPersonalBaselineRequiresFourteenObservedDays() {
+        let baseline = PersonalHealthBaselineAnalyzer.baseline(
+            for: .restingHeartRate,
+            values: Array(repeating: 60, count: 13)
+        )
+
+        XCTAssertEqual(baseline.availability, .insufficientData)
+        XCTAssertNil(baseline.baselineMedian)
+    }
+
+    func testPersonalDeviationUsesRobustIndividualBaseline() {
+        let baselineValues = [58, 59, 60, 61, 62, 58, 59, 60, 61, 62, 59, 60, 61, 60]
+            .map(Double.init)
+
+        let deviation = PersonalHealthBaselineAnalyzer.deviation(
+            baselineValues: baselineValues,
+            currentValues: [72, 73, 74],
+            metricKind: .restingHeartRate
+        )
+
+        XCTAssertEqual(deviation.baselineMedian, 60)
+        XCTAssertEqual(deviation.currentMedian, 73)
+        XCTAssertEqual(deviation.direction, .higher)
+        XCTAssertEqual(deviation.baselineObservedDays, 14)
+    }
+
+    func testPersonalDeviationIsUndeterminedWithTooFewCurrentDays() {
+        let deviation = PersonalHealthBaselineAnalyzer.deviation(
+            baselineValues: Array(repeating: 7.5, count: 14),
+            currentValues: [5.5, 6],
+            metricKind: .sleepDurationHours
+        )
+
+        XCTAssertEqual(deviation.direction, .undetermined)
+        XCTAssertNil(deviation.robustDistance)
+    }
+
+    func testDescriptiveRelationshipUsesOnlyPairedDaysAndRejectsCausality() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let start = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-01T12:00:00Z"))
+        var steps: [HealthKitService.DailyMetric] = []
+        var sleep: [HealthKitService.DailyMetric] = []
+        for offset in 0..<7 {
+            let date = try XCTUnwrap(calendar.date(byAdding: .day, value: offset, to: start))
+            steps.append(.init(date: date, value: Double(offset + 1) * 1_000))
+            sleep.append(.init(date: date, value: Double(offset + 1)))
+        }
+        let dataset = LongitudinalHealthAligner.align(
+            series: [.steps: steps, .sleepDurationHours: sleep],
+            expectedDays: 7,
+            calendar: calendar
+        )
+
+        let relationship = DescriptiveHealthRelationshipAnalyzer.analyze(
+            dataset: dataset,
+            first: .steps,
+            second: .sleepDurationHours
+        )
+
+        XCTAssertEqual(relationship.pairedDays, 7)
+        XCTAssertEqual(relationship.direction, .movesTogether)
+        XCTAssertEqual(relationship.strength, .strong)
+        XCTAssertTrue(relationship.explanation.contains("not evidence that one caused the other"))
+    }
+
+    func testDescriptiveRelationshipRequiresSevenPairedDays() throws {
+        let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-01T12:00:00Z"))
+        let dataset = LongitudinalHealthAligner.align(
+            series: [
+                .steps: [.init(date: date, value: 5_000)],
+                .sleepDurationHours: [.init(date: date, value: 7)]
+            ],
+            expectedDays: 30
+        )
+
+        let relationship = DescriptiveHealthRelationshipAnalyzer.analyze(
+            dataset: dataset,
+            first: .steps,
+            second: .sleepDurationHours
+        )
+
+        XCTAssertEqual(relationship.availability, .insufficientData)
+        XCTAssertNil(relationship.coefficient)
+    }
+
+    func testPersonalInsightReportRetainsCoverageAndTraceability() throws {
+        let calendar = Calendar(identifier: .gregorian)
+        let start = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-07-01T12:00:00Z"))
+        var steps: [HealthKitService.DailyMetric] = []
+        var sleep: [HealthKitService.DailyMetric] = []
+        for offset in 0..<30 {
+            let date = try XCTUnwrap(calendar.date(byAdding: .day, value: offset, to: start))
+            steps.append(.init(date: date, value: offset < 23 ? 5_000 : 8_000))
+            sleep.append(.init(date: date, value: offset < 23 ? 7 : 8))
+        }
+        let dataset = LongitudinalHealthAligner.align(
+            series: [.steps: steps, .sleepDurationHours: sleep],
+            expectedDays: 30,
+            calendar: calendar
+        )
+
+        let report = PersonalHealthInsightBuilder.build(dataset: dataset, generatedAt: start)
+
+        XCTAssertEqual(report.coverage.count, 2)
+        XCTAssertEqual(report.coverage.first(where: { $0.metricKind == .steps })?.observedDays, 30)
+        XCTAssertEqual(report.deviations.first(where: { $0.metricKind == .steps })?.direction, .higher)
+        XCTAssertEqual(report.relationships.first?.pairedDays, 30)
+        XCTAssertTrue(report.hasUsableInsight)
+    }
+
+    func testPersonalInsightIntentIsExplicit() {
+        XCTAssertTrue(PersonalHealthInsightLoader.matches("Show patterns in my health data"))
+        XCTAssertTrue(PersonalHealthInsightLoader.matches("我的健康数据有什么关联"))
+        XCTAssertFalse(PersonalHealthInsightLoader.matches("How many steps today?"))
+    }
 }

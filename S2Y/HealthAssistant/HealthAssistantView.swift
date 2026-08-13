@@ -925,6 +925,8 @@ struct MessageBubble: View {
             HealthTrendChart(trend: trend, metricKind: kind)
         case .comparison(let comparison, let kind):
             HealthComparisonChart(comparison: comparison, metricKind: kind)
+        case .personalInsights(let report):
+            PersonalHealthInsightCard(report: report)
         }
     }
 

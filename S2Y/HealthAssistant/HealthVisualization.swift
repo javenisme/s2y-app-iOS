@@ -231,6 +231,79 @@ private struct HealthDataQualityBadge: View {
     }
 }
 
+struct PersonalHealthInsightCard: View {
+    let report: PersonalHealthInsightReport
+
+    private var notableDeviations: [PersonalMetricDeviation] {
+        report.deviations.filter { $0.direction != .undetermined }
+    }
+
+    private var availableRelationships: [DescriptiveHealthRelationship] {
+        report.relationships.filter { $0.availability == .available }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("Your recent patterns", systemImage: "sparkles")
+                .font(.headline)
+
+            Text("Based on observed days from the last \(report.windowDays) days")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            ForEach(notableDeviations, id: \.metricKind) { deviation in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(deviation.metricKind.displayName)
+                        .font(.subheadline.weight(.semibold))
+                    Text(deviationText(deviation))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            ForEach(availableRelationships.indices, id: \.self) { index in
+                Text(availableRelationships[index].explanation)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !report.hasUsableInsight {
+                Text("More overlapping days are needed before S2Y can describe a personal pattern.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
+
+            Text(coverageText)
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding()
+        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityLabel("Personal health insight summary")
+    }
+
+    private var coverageText: String {
+        report.coverage.map { coverage in
+            "\(coverage.metricKind.displayName): \(coverage.observedDays)/\(coverage.expectedDays) days"
+        }.joined(separator: " · ")
+    }
+
+    private func deviationText(_ deviation: PersonalMetricDeviation) -> String {
+        switch deviation.direction {
+        case .lower:
+            "Recent values are lower than your own earlier baseline."
+        case .higher:
+            "Recent values are higher than your own earlier baseline."
+        case .typical:
+            "Recent values are within your typical personal range."
+        case .undetermined:
+            "There is not enough data to compare with your personal baseline."
+        }
+    }
+}
+
 struct HealthMetricCard: View {
     let title: String
     let value: String
