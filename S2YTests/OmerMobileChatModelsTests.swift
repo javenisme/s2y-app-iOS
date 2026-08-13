@@ -12,6 +12,19 @@ final class OmerMobileChatModelsTests: XCTestCase {
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
 
+    func testHealthSharingAuthorizationResponseDecodesGrantedScopes() throws {
+        let data = Data(
+            #"{"grantedScopes":["omerChatText","relevantHealthSummary","futureScope"]}"#.utf8
+        )
+
+        let response = try decoder.decode(OmerHealthSharingAuthorizationResponse.self, from: data)
+
+        XCTAssertEqual(
+            response.recognizedGrantedScopes,
+            [.omerChatText, .relevantHealthSummary]
+        )
+    }
+
     func testChatRequestMatchesFirebaseMobileAPIContract() throws {
         let requestID = try XCTUnwrap(UUID(uuidString: "11111111-1111-1111-1111-111111111111"))
         let conversationID = try XCTUnwrap(UUID(uuidString: "22222222-2222-2222-2222-222222222222"))
