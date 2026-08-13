@@ -196,15 +196,15 @@ struct ShowcaseView: View {
     private var supportSection: some View {
         Section("About & Support") {
             NavigationLink("Privacy Policy") {
-                WebLinkView(title: "Privacy Policy", url: URL(string: "https://www.stanford.edu/site/privacy/")!)
+                WebLinkView(title: "Privacy Policy", url: S2YPublicLinks.privacyPolicyURL)
             }
             NavigationLink("Open-Source Licenses") { ContributionsList(projectLicense: .mit) }
             NavigationLink("About") { AboutView() }
-            if let url = URL(string: "https://github.com/StanfordBDHG/S2Y/issues/new") {
+            if let url = URL(string: S2YPublicLinks.reportIssue) {
                 Link("Report a Bug", destination: url)
             }
-            if let url = URL(string: "https://github.com/StanfordBDHG/S2Y") {
-                Link("Help Center", destination: url)
+            if let url = URL(string: S2YPublicLinks.website) {
+                Link("S2Y Website", destination: url)
             }
         }
     }
