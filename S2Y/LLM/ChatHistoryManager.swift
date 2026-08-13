@@ -195,24 +195,9 @@ public final class ChatHistoryManager: ObservableObject {
     /// Import conversation data
     public func importConversationData(_ data: Data) async throws {
         let importData = try JSONDecoder().decode(ChatExportData.self, from: data)
-        
-        // Merge imported conversations (avoid duplicates)
-        for importedConv in importData.conversations {
-            if !conversations.contains(where: { $0.id == importedConv.id }) {
-                conversations.append(importedConv)
-            }
-        }
-        
-        // Merge imported favorites
-        for importedFav in importData.favoriteInsights {
-            if !favoriteInsights.contains(where: { $0.id == importedFav.id }) {
-                favoriteInsights.append(importedFav)
-            }
-        }
-        
-        // Sort by date
-        conversations.sort { $0.lastActivity > $1.lastActivity }
-        favoriteInsights.sort { $0.savedAt > $1.savedAt }
+
+        conversations = ChatHistoryNormalization.conversations(conversations + importData.conversations)
+        favoriteInsights = ChatHistoryNormalization.favorites(favoriteInsights + importData.favoriteInsights)
         
         // Apply limits
         cleanupOldConversations()
@@ -244,8 +229,8 @@ public final class ChatHistoryManager: ObservableObject {
     
     private func cleanupOldConversations() {
         let cutoffDate = Date().addingTimeInterval(-maxConversationAge)
-        
-        // Remove old conversations
+
+        conversations = ChatHistoryNormalization.conversations(conversations)
         conversations.removeAll { $0.lastActivity < cutoffDate }
         
         // Limit number of conversations
@@ -270,7 +255,7 @@ public final class ChatHistoryManager: ObservableObject {
                 let loadedConversations = try JSONDecoder().decode([StoredConversation].self, from: data)
                 
                 await MainActor.run {
-                    self.conversations = loadedConversations
+                    self.conversations = ChatHistoryNormalization.conversations(loadedConversations)
                     self.cleanupOldConversations()
                 }
                 
@@ -288,7 +273,7 @@ public final class ChatHistoryManager: ObservableObject {
                 let loadedFavorites = try JSONDecoder().decode([FavoriteInsight].self, from: data)
                 
                 await MainActor.run {
-                    self.favoriteInsights = loadedFavorites
+                    self.favoriteInsights = ChatHistoryNormalization.favorites(loadedFavorites)
                 }
                 
                 logger.info("Loaded \(loadedFavorites.count) favorite insights from storage")
@@ -316,6 +301,24 @@ public final class ChatHistoryManager: ObservableObject {
         } catch {
             logger.error("Failed to save favorite insights: \(error)")
         }
+    }
+}
+
+enum ChatHistoryNormalization {
+    static func conversations(_ values: [StoredConversation]) -> [StoredConversation] {
+        Dictionary(grouping: values, by: \.id)
+            .compactMap { _, duplicates in
+                duplicates.max { $0.lastActivity < $1.lastActivity }
+            }
+            .sorted { $0.lastActivity > $1.lastActivity }
+    }
+
+    static func favorites(_ values: [FavoriteInsight]) -> [FavoriteInsight] {
+        Dictionary(grouping: values, by: \.id)
+            .compactMap { _, duplicates in
+                duplicates.max { $0.savedAt < $1.savedAt }
+            }
+            .sorted { $0.savedAt > $1.savedAt }
     }
 }
 
