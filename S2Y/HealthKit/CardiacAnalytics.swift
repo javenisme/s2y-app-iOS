@@ -127,9 +127,6 @@ public final class CardiacAnalytics {
     public func generateCardiacProfile(windowDays: Int = 30) async throws -> CardiacHealthProfile {
         logger.info("Generating cardiac health profile for \(windowDays) days")
         
-        let endDate = Date()
-        let startDate = Calendar.current.date(byAdding: .day, value: -windowDays, to: endDate) ?? endDate
-        
         // Gather cardiac metrics concurrently
         async let restingHR = fetchLatestMetric(.restingHeartRate, days: windowDays)
         async let hrv = fetchLatestMetric(.heartRateVariability, days: windowDays)
@@ -156,7 +153,7 @@ public final class CardiacAnalytics {
         
         let overallScore = calculateOverallCardiacScore(metrics: metrics)
         let riskLevel = determineRiskLevel(score: overallScore, metrics: metrics)
-        let insights = generateInsights(metrics: metrics, windowDays: windowDays)
+        let insights = generateInsights(metrics: metrics)
         let recommendations = generateRecommendations(metrics: metrics, riskLevel: riskLevel)
         
         return CardiacHealthProfile(
@@ -352,7 +349,7 @@ public final class CardiacAnalytics {
         return .veryHigh
     }
     
-    private func generateInsights(metrics: CardiacMetrics, windowDays: Int) -> [Insight] {
+    private func generateInsights(metrics: CardiacMetrics) -> [Insight] {
         var insights: [Insight] = []
         
         // HRV Insights

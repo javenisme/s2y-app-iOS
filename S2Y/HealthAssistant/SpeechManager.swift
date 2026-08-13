@@ -37,7 +37,7 @@ final class SpeechManager: ObservableObject {
         authorizationGranted = speechStatus == .authorized
 
         let micGranted = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
-            AVAudioSession.sharedInstance().requestRecordPermission { granted in
+            AVAudioApplication.requestRecordPermission { granted in
                 continuation.resume(returning: granted)
             }
         }
@@ -77,7 +77,11 @@ final class SpeechManager: ObservableObject {
             throw NSError(domain: "SpeechManager", code: -13, userInfo: [NSLocalizedDescriptionKey: "No available audio input. Please connect a microphone or enable audio input routing."])
         }
         do {
-            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.duckOthers, .defaultToSpeaker, .allowBluetooth])
+            try audioSession.setCategory(
+                .playAndRecord,
+                mode: .default,
+                options: [.duckOthers, .defaultToSpeaker, .allowBluetoothHFP]
+            )
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             cleanupOnFailure()
@@ -172,4 +176,3 @@ final class SpeechManager: ObservableObject {
         synthesizer.speak(utterance)
     }
 }
-

@@ -262,7 +262,7 @@ public final class EnhancedHealthChatController: ObservableObject {
         let fallbackContent: String
         let structuredData: EnhancedStructuredData?
         
-        if let lastAnalysis = healthIntelligence.lastAnalysis {
+        if healthIntelligence.lastAnalysis != nil {
             fallbackContent = """
             I'm having trouble connecting to my AI service, but I can still help with your health data locally.
             
