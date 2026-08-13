@@ -7,6 +7,7 @@
 //
 
 import Testing
+import Foundation
 @testable import S2Y
 
 struct HealthLanguageGuardrailTests {
@@ -44,5 +45,36 @@ struct HealthLanguageGuardrailTests {
         #expect(response.contains("include the value you want"))
         #expect(!response.contains("Suggested Goal"))
         #expect(!response.contains("10,000"))
+    }
+
+    @Test("Generated wellness copy avoids unsupported clinical classifications")
+    func generatedCopyAvoidsClinicalClassification() {
+        let start = Date(timeIntervalSince1970: 0)
+        let trend = HealthKitService.Trend.summarize(
+            windowDays: 3,
+            points: [
+                .init(date: start, value: 6, isObserved: true),
+                .init(date: start.addingTimeInterval(86_400), value: 7, isObserved: true),
+                .init(date: start.addingTimeInterval(172_800), value: 8, isObserved: true)
+            ]
+        )
+        let copy = [
+            EnhancedQueryPlanner.formatSummary(kind: .sleepDurationHours, trend: trend, days: 3),
+            EnhancedQueryPlanner.generateGeneralHealthRecommendations()
+        ].joined(separator: " ").lowercased()
+        let unsupportedPhrases = [
+            "healthy range",
+            "health standards",
+            "data is normal",
+            "abnormal changes",
+            "recommended goal",
+            "suggested goal"
+        ]
+
+        for phrase in unsupportedPhrases {
+            #expect(!copy.contains(phrase))
+        }
+        #expect(copy.contains("not a diagnosis or treatment recommendation"))
+        #expect(copy.contains("coverage"))
     }
 }
