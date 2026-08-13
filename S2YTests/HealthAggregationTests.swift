@@ -36,4 +36,32 @@ final class HealthAggregationTests: XCTestCase {
 
         XCTAssertNil(trend.distribution)
     }
+
+    func testMovingAverageDoesNotImputeMissingDaysAsZero() {
+        let start = Date(timeIntervalSince1970: 0)
+        let trend = HealthKitService.Trend.summarize(
+            windowDays: 3,
+            points: [
+                .init(date: start, value: 2, isObserved: true),
+                .init(date: start.addingTimeInterval(86_400), value: 0, isObserved: false),
+                .init(date: start.addingTimeInterval(172_800), value: 4, isObserved: true)
+            ]
+        )
+
+        let movingAverage = trend.movingAverage(windowDays: 3)
+
+        XCTAssertEqual(movingAverage.map(\.value), [2, 2, 3])
+        XCTAssertEqual(movingAverage.map(\.observedDays), [1, 1, 2])
+        XCTAssertEqual(movingAverage.map(\.windowDays), [1, 2, 3])
+        XCTAssertEqual(movingAverage.last?.coverageRate, 2.0 / 3.0)
+    }
+
+    func testMovingAverageRepresentsEmptyWindowAsMissing() {
+        let trend = HealthKitService.Trend.summarize(
+            windowDays: 1,
+            points: [.init(date: .now, value: 0, isObserved: false)]
+        )
+
+        XCTAssertNil(trend.movingAverage(windowDays: 7).first?.value)
+    }
 }

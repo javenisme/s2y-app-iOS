@@ -583,6 +583,23 @@ public final class HealthKitService {
             Distribution.summarize(points.filter(\.isObserved).map(\.value))
         }
 
+        public func movingAverage(windowDays: Int) -> [MovingAveragePoint] {
+            guard windowDays > 0 else { return [] }
+            return points.indices.map { index in
+                let lowerBound = max(points.startIndex, index - windowDays + 1)
+                let window = points[lowerBound...index]
+                let values = window.compactMap { point in
+                    point.isObserved && point.value.isFinite ? point.value : nil
+                }
+                return MovingAveragePoint(
+                    date: points[index].date,
+                    value: values.isEmpty ? nil : values.average(),
+                    observedDays: values.count,
+                    windowDays: min(windowDays, index + 1)
+                )
+            }
+        }
+
         static func summarize(windowDays: Int, points: [DailyMetric]) -> Trend {
             let observed = points.filter { $0.isObserved && $0.value.isFinite }
             let values = observed.map(\.value)
@@ -602,6 +619,18 @@ public final class HealthKitService {
                 expectedDays: windowDays,
                 dataQuality: .classify(observedDays: observed.count, expectedDays: windowDays)
             )
+        }
+    }
+
+    public struct MovingAveragePoint: Sendable, Codable, Equatable {
+        public let date: Date
+        public let value: Double?
+        public let observedDays: Int
+        public let windowDays: Int
+
+        public var coverageRate: Double {
+            guard windowDays > 0 else { return 0 }
+            return Double(observedDays) / Double(windowDays)
         }
     }
 
