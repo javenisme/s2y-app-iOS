@@ -1023,6 +1023,15 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertNil(HealthSafetyTriage.evaluate("我没有胸痛，只想查看步数趋势"))
     }
 
+    func testSafetyEscalationMetadataDoesNotClaimAIOrHealthAnalysis() {
+        let metadata = ProcessingMetadata(safetyEscalationLevel: .emergency)
+
+        XCTAssertEqual(metadata.safetyEscalationLevel, .emergency)
+        XCTAssertNil(metadata.llmSource)
+        XCTAssertFalse(metadata.healthAnalysisUsed)
+        XCTAssertFalse(metadata.contextUsed)
+    }
+
     private func validatedWellnessSession() throws -> ValidatedWellnessSession {
         let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
         let deviceID = UUID()

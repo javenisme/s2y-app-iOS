@@ -439,10 +439,20 @@ struct HealthAssistantView: View {
 
         let userMessage = ChatMessage(role: .user, content: trimmedInput)
         messages.append(userMessage)
-        
+
         let query = trimmedInput
         inputText = ""
         isInputFocused = false
+        if let escalation = HealthSafetyTriage.evaluate(query) {
+            messages.append(ChatMessage(role: .assistant, content: escalation.userMessage))
+            notice = AssistantNotice(
+                message: "This safety guidance was generated on this iPhone without contacting an AI provider.",
+                tone: .warning
+            )
+            isProcessing = false
+            return
+        }
+
         isProcessing = true
         notice = nil
 
