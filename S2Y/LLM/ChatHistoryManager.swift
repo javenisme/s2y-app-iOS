@@ -5,6 +5,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+import CryptoKit
 import Foundation
 import OSLog
 
@@ -194,24 +195,9 @@ public final class ChatHistoryManager: ObservableObject {
     /// Import conversation data
     public func importConversationData(_ data: Data) async throws {
         let importData = try JSONDecoder().decode(ChatExportData.self, from: data)
-        
-        // Merge imported conversations (avoid duplicates)
-        for importedConv in importData.conversations {
-            if !conversations.contains(where: { $0.id == importedConv.id }) {
-                conversations.append(importedConv)
-            }
-        }
-        
-        // Merge imported favorites
-        for importedFav in importData.favoriteInsights {
-            if !favoriteInsights.contains(where: { $0.id == importedFav.id }) {
-                favoriteInsights.append(importedFav)
-            }
-        }
-        
-        // Sort by date
-        conversations.sort { $0.lastActivity > $1.lastActivity }
-        favoriteInsights.sort { $0.savedAt > $1.savedAt }
+
+        conversations = ChatHistoryNormalization.conversations(conversations + importData.conversations)
+        favoriteInsights = ChatHistoryNormalization.favorites(favoriteInsights + importData.favoriteInsights)
         
         // Apply limits
         cleanupOldConversations()
@@ -243,8 +229,8 @@ public final class ChatHistoryManager: ObservableObject {
     
     private func cleanupOldConversations() {
         let cutoffDate = Date().addingTimeInterval(-maxConversationAge)
-        
-        // Remove old conversations
+
+        conversations = ChatHistoryNormalization.conversations(conversations)
         conversations.removeAll { $0.lastActivity < cutoffDate }
         
         // Limit number of conversations
@@ -269,7 +255,7 @@ public final class ChatHistoryManager: ObservableObject {
                 let loadedConversations = try JSONDecoder().decode([StoredConversation].self, from: data)
                 
                 await MainActor.run {
-                    self.conversations = loadedConversations
+                    self.conversations = ChatHistoryNormalization.conversations(loadedConversations)
                     self.cleanupOldConversations()
                 }
                 
@@ -287,7 +273,7 @@ public final class ChatHistoryManager: ObservableObject {
                 let loadedFavorites = try JSONDecoder().decode([FavoriteInsight].self, from: data)
                 
                 await MainActor.run {
-                    self.favoriteInsights = loadedFavorites
+                    self.favoriteInsights = ChatHistoryNormalization.favorites(loadedFavorites)
                 }
                 
                 logger.info("Loaded \(loadedFavorites.count) favorite insights from storage")
@@ -318,6 +304,24 @@ public final class ChatHistoryManager: ObservableObject {
     }
 }
 
+enum ChatHistoryNormalization {
+    static func conversations(_ values: [StoredConversation]) -> [StoredConversation] {
+        Dictionary(grouping: values, by: \.id)
+            .compactMap { _, duplicates in
+                duplicates.max { $0.lastActivity < $1.lastActivity }
+            }
+            .sorted { $0.lastActivity > $1.lastActivity }
+    }
+
+    static func favorites(_ values: [FavoriteInsight]) -> [FavoriteInsight] {
+        Dictionary(grouping: values, by: \.id)
+            .compactMap { _, duplicates in
+                duplicates.max { $0.savedAt < $1.savedAt }
+            }
+            .sorted { $0.savedAt > $1.savedAt }
+    }
+}
+
 // MARK: - Data Models
 
 public struct StoredConversation: Identifiable, Codable {
@@ -342,26 +346,131 @@ public struct StoredConversation: Identifiable, Codable {
 }
 
 public struct StoredMessage: Identifiable, Codable {
-    public let id = UUID()
+    public let id: UUID
     public let role: MessageRole
     public let content: String
     public let timestamp: Date
     public let metadata: MessageMetadata?
+
+    public init(
+        id: UUID = UUID(),
+        role: MessageRole,
+        content: String,
+        timestamp: Date,
+        metadata: MessageMetadata?
+    ) {
+        self.id = id
+        self.role = role
+        self.content = content
+        self.timestamp = timestamp
+        self.metadata = metadata
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, role, content, timestamp, metadata
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        role = try container.decode(MessageRole.self, forKey: .role)
+        content = try container.decode(String.self, forKey: .content)
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        metadata = try container.decodeIfPresent(MessageMetadata.self, forKey: .metadata)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id)
+            ?? LegacyChatHistoryIdentifier.make(
+                namespace: "message",
+                components: [role.rawValue, content, timestamp.timeIntervalSince1970.description]
+            )
+    }
 }
 
 public struct StoredInsight: Identifiable, Codable {
-    public let id = UUID()
+    public let id: UUID
     public let content: String
     public let type: String
     public let timestamp: Date
     public let confidence: Double
+
+    public init(
+        id: UUID = UUID(),
+        content: String,
+        type: String,
+        timestamp: Date,
+        confidence: Double
+    ) {
+        self.id = id
+        self.content = content
+        self.type = type
+        self.timestamp = timestamp
+        self.confidence = confidence
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, content, type, timestamp, confidence
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        content = try container.decode(String.self, forKey: .content)
+        type = try container.decode(String.self, forKey: .type)
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        confidence = try container.decode(Double.self, forKey: .confidence)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id)
+            ?? LegacyChatHistoryIdentifier.make(
+                namespace: "insight",
+                components: [content, type, timestamp.timeIntervalSince1970.description]
+            )
+    }
 }
 
 public struct FavoriteInsight: Identifiable, Codable {
-    public let id = UUID()
+    public let id: UUID
     public let insight: HealthInsight
     public let conversationId: UUID
     public let savedAt: Date
+
+    public init(
+        id: UUID = UUID(),
+        insight: HealthInsight,
+        conversationId: UUID,
+        savedAt: Date
+    ) {
+        self.id = id
+        self.insight = insight
+        self.conversationId = conversationId
+        self.savedAt = savedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, insight, conversationId, savedAt
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        insight = try container.decode(HealthInsight.self, forKey: .insight)
+        conversationId = try container.decode(UUID.self, forKey: .conversationId)
+        savedAt = try container.decode(Date.self, forKey: .savedAt)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id)
+            ?? LegacyChatHistoryIdentifier.make(
+                namespace: "favorite",
+                components: [conversationId.uuidString, insight.title, savedAt.timeIntervalSince1970.description]
+            )
+    }
+}
+
+private enum LegacyChatHistoryIdentifier {
+    static func make(namespace: String, components: [String]) -> UUID {
+        let digest = SHA256.hash(data: Data(([namespace] + components).joined(separator: "\u{1F}").utf8))
+        var bytes = Array(digest.prefix(16))
+        bytes[6] = (bytes[6] & 0x0F) | 0x50
+        bytes[8] = (bytes[8] & 0x3F) | 0x80
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15]
+        ))
+    }
 }
 
 public struct ChatStatistics {
