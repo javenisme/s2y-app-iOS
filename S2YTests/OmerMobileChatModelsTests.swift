@@ -1096,6 +1096,37 @@ final class OmerMobileChatModelsTests: XCTestCase {
         )
     }
 
+    func testHealthSharingConsentReceiptSupportsImmediateRevocation() {
+        var ledger = HealthSharingConsentLedger()
+        ledger.apply(.granted, scopes: [.omerChatText, .relevantHealthSummary])
+        ledger.apply(.revoked, scopes: [.relevantHealthSummary])
+
+        let authorization = ledger.authorization()
+        XCTAssertTrue(authorization.grantedScopes.contains(.omerChatText))
+        XCTAssertFalse(authorization.grantedScopes.contains(.relevantHealthSummary))
+        XCTAssertEqual(ledger.receipts.first?.change, .revoked)
+    }
+
+    func testHealthSharingConsentDoesNotCarryAcrossPolicyVersions() {
+        var ledger = HealthSharingConsentLedger()
+        ledger.apply(
+            .granted,
+            scopes: [.omerChatText],
+            policyVersion: "previous-version"
+        )
+
+        XCTAssertTrue(ledger.authorization().grantedScopes.isEmpty)
+    }
+
+    func testHealthSharingConsentLedgerBoundsReceiptHistory() {
+        var ledger = HealthSharingConsentLedger(maximumReceiptCount: 2)
+        ledger.apply(.granted, scopes: [.omerChatText])
+        ledger.apply(.granted, scopes: [.relevantHealthSummary])
+        ledger.apply(.revoked, scopes: [.omerChatText])
+
+        XCTAssertEqual(ledger.receipts.count, 2)
+    }
+
     private func validatedWellnessSession() throws -> ValidatedWellnessSession {
         let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
         let deviceID = UUID()
