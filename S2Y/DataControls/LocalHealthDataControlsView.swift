@@ -146,8 +146,11 @@ struct LocalHealthDataControlsView: View {
 
     private var cloudBoundarySection: some View {
         Section("Cloud data") {
-            Label("Firebase account copies", systemImage: "person.crop.circle.badge.checkmark")
-            Label("Omer conversations", systemImage: "bubble.left.and.bubble.right")
+            NavigationLink {
+                CloudHealthDataLifecycleView()
+            } label: {
+                Label("Review Cloud Data and Deletion", systemImage: "cloud")
+            }
 
             Text(
                 "Local deletion never sends a remote deletion request. "

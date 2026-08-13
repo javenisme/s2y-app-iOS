@@ -79,6 +79,9 @@ struct HomeView: View {
     @State private var requestedConversationID: UUID?
     @State private var newChatRequestID = UUID()
     @State private var isRefreshingChatHistory = false
+    @State private var chatPendingDeletion: OmerChatSummary?
+    @State private var chatDeletionError: String?
+    @State private var isDeletingChat = false
 
 
     var body: some View {
@@ -107,6 +110,23 @@ struct HomeView: View {
         .onChange(of: isDrawerOpen) {
             guard isDrawerOpen else { return }
             Task { await loadDrawerChatHistory() }
+        }
+        .confirmationDialog(
+            "Delete this Omer conversation?",
+            isPresented: Binding(
+                get: { chatPendingDeletion != nil },
+                set: { if !$0 { chatPendingDeletion = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete from Omer", role: .destructive) {
+                guard let chat = chatPendingDeletion else { return }
+                chatPendingDeletion = nil
+                Task { await deleteChat(chat) }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This removes the conversation from Omer and from this iPhone's chat cache. It cannot be undone.")
         }
     }
 
@@ -163,6 +183,14 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     newChatButton
+
+                    if let chatDeletionError {
+                        Text(chatDeletionError)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 24)
+                            .accessibilityIdentifier("drawer.chat-delete-error")
+                    }
 
                     if drawerChatHistory.isEmpty {
                         Text("Recent chats")
@@ -278,26 +306,41 @@ struct HomeView: View {
     }
 
     private func drawerChatRow(_ chat: OmerChatSummary) -> some View {
-        Button {
-            selectedTab = .healthAssistant
-            requestedConversationID = chat.id
-            closeDrawer()
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "bubble.left")
-                    .foregroundStyle(.secondary)
-                Text(chat.title)
-                    .font(.subheadline)
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                Spacer(minLength: 8)
+        HStack(spacing: 8) {
+            Button {
+                selectedTab = .healthAssistant
+                requestedConversationID = chat.id
+                closeDrawer()
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "bubble.left")
+                        .foregroundStyle(.secondary)
+                    Text(chat.title)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                    Spacer(minLength: 8)
+                }
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("drawer.chat.\(chat.id.uuidString)")
+
+            Button {
+                chatPendingDeletion = chat
+            } label: {
+                Image(systemName: "ellipsis")
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isDeletingChat)
+            .accessibilityLabel("Conversation actions for \(chat.title)")
+            .accessibilityIdentifier("drawer.chat-actions.\(chat.id.uuidString)")
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("drawer.chat.\(chat.id.uuidString)")
+        .padding(.leading, 20)
+        .padding(.trailing, 14)
+        .padding(.vertical, 4)
     }
 
     private func drawerRow(for tab: Tabs) -> some View {
@@ -377,6 +420,24 @@ struct HomeView: View {
         defer { isRefreshingChatHistory = false }
         if let remoteChats = try? await OmerChatService.shared.fetchChats(limit: 50).chats {
             drawerChatHistory = remoteChats
+        }
+    }
+
+    @MainActor
+    private func deleteChat(_ chat: OmerChatSummary) async {
+        isDeletingChat = true
+        chatDeletionError = nil
+        defer { isDeletingChat = false }
+
+        do {
+            try await OmerChatService.shared.deleteChat(id: chat.id)
+            drawerChatHistory.removeAll { $0.id == chat.id }
+            if requestedConversationID == chat.id {
+                requestedConversationID = nil
+                newChatRequestID = UUID()
+            }
+        } catch {
+            chatDeletionError = "\(chat.title) was not deleted from Omer. Check your connection and try again."
         }
     }
 }
