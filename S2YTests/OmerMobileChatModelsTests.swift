@@ -1500,6 +1500,75 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(snapshot.details.map(\.chat.id), [retainedID])
     }
 
+    func testStoredHistoryIdentifiersSurviveRoundTrip() throws {
+        let messageID = UUID()
+        let insightID = UUID()
+        let favoriteID = UUID()
+        let message = StoredMessage(
+            id: messageID,
+            role: .user,
+            content: "How was my sleep?",
+            timestamp: .now,
+            metadata: nil
+        )
+        let insight = StoredInsight(
+            id: insightID,
+            content: "Sleep duration was consistent.",
+            type: "insight",
+            timestamp: .now,
+            confidence: 0.8
+        )
+        let favorite = FavoriteInsight(
+            id: favoriteID,
+            insight: HealthInsight(
+                title: "Consistent sleep",
+                titleCN: "睡眠稳定",
+                description: "Descriptive observation",
+                descriptionCN: "描述性观察",
+                type: .trend,
+                importance: 0.7
+            ),
+            conversationId: UUID(),
+            savedAt: .now
+        )
+
+        XCTAssertEqual(try decoder.decode(StoredMessage.self, from: encoder.encode(message)).id, messageID)
+        XCTAssertEqual(try decoder.decode(StoredInsight.self, from: encoder.encode(insight)).id, insightID)
+        XCTAssertEqual(try decoder.decode(FavoriteInsight.self, from: encoder.encode(favorite)).id, favoriteID)
+    }
+
+    func testLegacyHistoryWithoutIDsReceivesDeterministicIdentifiers() throws {
+        let original = StoredMessage(
+            role: .assistant,
+            content: "A stable legacy message",
+            timestamp: Date(timeIntervalSince1970: 1_786_560_000),
+            metadata: nil
+        )
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoder.encode(original)) as? [String: Any]
+        )
+        object.removeValue(forKey: "id")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+        let first = try decoder.decode(StoredMessage.self, from: legacyData)
+        let second = try decoder.decode(StoredMessage.self, from: legacyData)
+
+        XCTAssertEqual(first.id, second.id)
+        XCTAssertEqual(first.content, original.content)
+    }
+
+    func testHistoryNormalizationKeepsNewestDuplicateAndSorts() {
+        let duplicateID = UUID()
+        let older = storedConversation(id: duplicateID, lastActivity: Date(timeIntervalSince1970: 10))
+        let newer = storedConversation(id: duplicateID, lastActivity: Date(timeIntervalSince1970: 30))
+        let middle = storedConversation(id: UUID(), lastActivity: Date(timeIntervalSince1970: 20))
+
+        let normalized = ChatHistoryNormalization.conversations([older, middle, newer])
+
+        XCTAssertEqual(normalized.count, 2)
+        XCTAssertEqual(normalized.map(\.lastActivity), [newer.lastActivity, middle.lastActivity])
+    }
+
     @MainActor
     func testClearingSharingReceiptsAlsoReturnsEveryScopeToDefaultDeny() {
         let suiteName = "HealthSharingConsentStoreTests.\(UUID().uuidString)"
@@ -1525,6 +1594,20 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertTrue(HealthSharingConsentPolicy.permits(.omerChatText, authorization: authorization))
         XCTAssertFalse(
             HealthSharingConsentPolicy.permits(.onDeviceConversationSync, authorization: authorization)
+        )
+    }
+
+    private func storedConversation(id: UUID, lastActivity: Date) -> StoredConversation {
+        StoredConversation(
+            id: id,
+            title: "Conversation",
+            startTime: lastActivity.addingTimeInterval(-60),
+            lastActivity: lastActivity,
+            messageCount: 0,
+            messages: [],
+            topics: [],
+            healthMetricsDiscussed: [],
+            insights: []
         )
     }
 
