@@ -1,3 +1,11 @@
+# 历史研究（非当前技术规格）
+
+本文包含未交付的 MLX、Phi、Minimax 和自动隐私路由设想，不代表当前产品能力。
+当前 Provider、用户同意和后续计划分别以
+[`Docs/ai-provider-architecture.md`](Docs/ai-provider-architecture.md)、
+[`S2Y_App_User_Stories.md`](S2Y_App_User_Stories.md) 和
+[`Docs/roadmap.md`](Docs/roadmap.md) 为准。
+
 # S2Y Health App - Technical Specification (v0.1)
 
 > 基于 Gemini Research - 2026-02-26
