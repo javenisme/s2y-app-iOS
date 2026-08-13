@@ -17,23 +17,23 @@ struct InterestingModules: View {
     
     var body: some View {
         SequentialOnboardingView(
-            title: "Interesting Modules",
+            title: "Before You Start",
             subtitle: "INTERESTING_MODULES_SUBTITLE",
             steps: [
                 SequentialOnboardingView.Step(
-                    title: "Onboarding",
+                    title: "Health data",
                     description: "INTERESTING_MODULES_AREA1_DESCRIPTION"
                 ),
                 SequentialOnboardingView.Step(
-                    title: "HL7 FHIR",
+                    title: "AI processing",
                     description: "INTERESTING_MODULES_AREA2_DESCRIPTION"
                 ),
                 SequentialOnboardingView.Step(
-                    title: "Contact",
+                    title: "Account and sync",
                     description: "INTERESTING_MODULES_AREA3_DESCRIPTION"
                 ),
                 SequentialOnboardingView.Step(
-                    title: "HealthKit Data Source",
+                    title: "Health management",
                     description: "INTERESTING_MODULES_AREA4_DESCRIPTION"
                 )
             ],

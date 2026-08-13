@@ -62,6 +62,37 @@ final class CriticalLocalizationTests: XCTestCase {
         XCTAssertEqual(chinese["ACCOUNT_SIGNED_IN_DESCRIPTION"], "你已登录下方账户。可以继续使用，或退出登录后切换账户。")
     }
 
+    func testOnboardingExplainsUserChoicesInsteadOfFrameworkModules() throws {
+        let chinese = try chineseTranslations()
+        let englishWelcome = String(
+            localized: "WELCOME_SUBTITLE",
+            bundle: .main,
+            locale: Locale(identifier: "en")
+        )
+        let englishPrivacy = String(
+            localized: "INTERESTING_MODULES_SUBTITLE",
+            bundle: .main,
+            locale: Locale(identifier: "en")
+        )
+
+        XCTAssertEqual(
+            englishWelcome,
+            "Understand your health data and choose your own health-management actions."
+        )
+        XCTAssertEqual(englishPrivacy, "Review how S2Y handles data before choosing permissions.")
+        XCTAssertFalse(englishWelcome.localizedCaseInsensitiveContains("framework"))
+        XCTAssertFalse(englishPrivacy.localizedCaseInsensitiveContains("module"))
+
+        XCTAssertEqual(chinese["Apple Health"], "Apple 健康")
+        XCTAssertEqual(chinese["Choose your AI"], "选择 AI")
+        XCTAssertEqual(chinese["You stay in control"], "由你掌控")
+        XCTAssertEqual(chinese["Before You Start"], "开始之前")
+        XCTAssertEqual(chinese["Health data"], "健康数据")
+        XCTAssertEqual(chinese["AI processing"], "AI 处理方式")
+        XCTAssertEqual(chinese["Account and sync"], "账户与同步")
+        XCTAssertEqual(chinese["Health management"], "健康管理")
+    }
+
     private func chineseTranslations() throws -> [String: String] {
         try translations(localization: "zh-Hans")
     }
