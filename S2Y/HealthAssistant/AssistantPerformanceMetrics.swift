@@ -85,3 +85,30 @@ struct AssistantRequestTimer: Sendable {
         max(0, Int(((uptime - startedAt) * 1_000).rounded()))
     }
 }
+
+@MainActor
+final class AssistantRequestMeasurement {
+    private var timer: AssistantRequestTimer
+
+    init(startedAt: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        timer = AssistantRequestTimer(startedAt: startedAt)
+    }
+
+    func markFirstResponse(at uptime: TimeInterval = ProcessInfo.processInfo.systemUptime) {
+        timer.markFirstResponse(at: uptime)
+    }
+
+    func event(
+        provider: AssistantPerformanceProvider,
+        outcome: AssistantPerformanceOutcome,
+        usedHealthContext: Bool,
+        endedAt: TimeInterval = ProcessInfo.processInfo.systemUptime
+    ) -> AssistantPerformanceEvent {
+        timer.event(
+            provider: provider,
+            outcome: outcome,
+            usedHealthContext: usedHealthContext,
+            endedAt: endedAt
+        )
+    }
+}

@@ -51,4 +51,21 @@ final class AssistantPerformanceMetricsTests: XCTestCase {
             Set(["provider", "outcome", "totalMilliseconds", "usedHealthContext"])
         )
     }
+
+    @MainActor
+    func testMeasurementCanBeUpdatedFromMainActorStreamingCallback() {
+        let measurement = AssistantRequestMeasurement(startedAt: 10)
+        measurement.markFirstResponse(at: 10.2)
+
+        let event = measurement.event(
+            provider: .appleOnDevice,
+            outcome: .cancelled,
+            usedHealthContext: false,
+            endedAt: 10.5
+        )
+
+        XCTAssertEqual(event.firstResponseMilliseconds, 200)
+        XCTAssertEqual(event.totalMilliseconds, 500)
+        XCTAssertEqual(event.outcome, .cancelled)
+    }
 }

@@ -540,11 +540,13 @@ struct HealthAssistantView: View {
         updateAssistantAttachment(id: assistantPlaceholder.id, attachment: chartAttachment)
 
         if selectedAIMode == .onDevice, appleModelService.availability.isAvailable {
+            let measurement = AssistantRequestMeasurement()
             do {
                 try await appleModelService.streamResponse(
                     to: query,
                     healthContext: healthContext
                 ) { snapshot in
+                    measurement.markFirstResponse()
                     updateAssistantMessage(id: assistantPlaceholder.id, content: snapshot)
                 }
                 if let assistantText = messages.first(where: { $0.id == assistantPlaceholder.id })?.content,
@@ -583,10 +585,20 @@ struct HealthAssistantView: View {
                         }
                     }
                 }
+                await AssistantPerformanceMonitor.shared.record(measurement.event(
+                    provider: .appleOnDevice,
+                    outcome: .completed,
+                    usedHealthContext: healthContext?.isEmpty == false
+                ))
                 onHistoryChanged()
                 isProcessing = false
                 return
             } catch is CancellationError {
+                await AssistantPerformanceMonitor.shared.record(measurement.event(
+                    provider: .appleOnDevice,
+                    outcome: .cancelled,
+                    usedHealthContext: healthContext?.isEmpty == false
+                ))
                 if messages.first(where: { $0.id == assistantPlaceholder.id })?.content.isEmpty != false {
                     updateAssistantMessage(id: assistantPlaceholder.id, content: "Response stopped.")
                 }
@@ -594,6 +606,11 @@ struct HealthAssistantView: View {
                 isProcessing = false
                 return
             } catch {
+                await AssistantPerformanceMonitor.shared.record(measurement.event(
+                    provider: .appleOnDevice,
+                    outcome: .failed,
+                    usedHealthContext: healthContext?.isEmpty == false
+                ))
                 logger.error("Apple on-device generation failed: \(error.localizedDescription)")
                 notice = AssistantNotice(
                     message: "The on-device response stopped. Your question was not sent online. You can retry or manually choose Omer Online.",
@@ -625,6 +642,11 @@ struct HealthAssistantView: View {
     }
 
     private func sendWithOmer(_ query: String, assistantMessageID: UUID) async {
+        let measurement = AssistantRequestMeasurement()
+        let usedHealthContext = HealthSharingConsentPolicy.permits(
+            .relevantHealthSummary,
+            authorization: HealthSharingConsentStore.shared.authorization
+        )
         do {
             try await omerChatService.sendMessage(
                 message: query,
@@ -635,18 +657,39 @@ struct HealthAssistantView: View {
                     self.handleOmerEvent(event, assistantMessageID: assistantMessageID)
                 }
             }
+            measurement.markFirstResponse()
+            await AssistantPerformanceMonitor.shared.record(measurement.event(
+                provider: .omerOnline,
+                outcome: .completed,
+                usedHealthContext: usedHealthContext
+            ))
         } catch is CancellationError {
+            await AssistantPerformanceMonitor.shared.record(measurement.event(
+                provider: .omerOnline,
+                outcome: .cancelled,
+                usedHealthContext: usedHealthContext
+            ))
             if messages.first(where: { $0.id == assistantMessageID })?.content.isEmpty != false {
                 updateAssistantMessage(id: assistantMessageID, content: "Response stopped.")
             }
             notice = AssistantNotice(message: "You stopped this response.", tone: .info)
         } catch let error as HealthSharingConsentFailure {
+            await AssistantPerformanceMonitor.shared.record(measurement.event(
+                provider: .omerOnline,
+                outcome: .failed,
+                usedHealthContext: usedHealthContext
+            ))
             updateAssistantMessage(
                 id: assistantMessageID,
                 content: error.localizedDescription
             )
             notice = AssistantNotice(message: error.localizedDescription, tone: .warning)
         } catch {
+            await AssistantPerformanceMonitor.shared.record(measurement.event(
+                provider: .omerOnline,
+                outcome: .failed,
+                usedHealthContext: usedHealthContext
+            ))
             let underlyingError = error as NSError
             logger.error(
                 "Omer generation failed [\(underlyingError.domain, privacy: .public):\(underlyingError.code)]: \(error.localizedDescription, privacy: .public)"
