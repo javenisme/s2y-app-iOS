@@ -66,6 +66,7 @@ struct HealthAssistantView: View {
     @State private var pendingClarification: AssistantClarification?
     @State private var availableSuggestionMetrics: Set<HealthKitService.MetricKind> = []
     @State private var didLoadSuggestionAvailability = false
+    @State private var responseTask: Task<Void, Never>?
     @FocusState private var isInputFocused: Bool
     @AppStorage(StorageKeys.healthAssistantAIMode) private var aiModeRawValue = AssistantAIMode.onDevice.rawValue
 
@@ -129,12 +130,14 @@ struct HealthAssistantView: View {
         }
         .task(id: requestedConversationID) {
             guard let requestedConversationID else { return }
+            await stopAndWaitForResponse()
             await openConversation(id: requestedConversationID)
             self.requestedConversationID = nil
         }
         .onChange(of: newChatRequestID) {
             Task { await beginNewConversation() }
         }
+        .onDisappear(perform: stopResponse)
         .alert(item: $pendingToolApproval) { approval in
             Alert(
                 title: Text("Allow Omer action?"),
@@ -181,6 +184,7 @@ struct HealthAssistantView: View {
 
     @MainActor
     private func beginNewConversation() async {
+        await stopAndWaitForResponse()
         do {
             try await omerChatService.startNewChat()
             messages = []
@@ -331,22 +335,26 @@ struct HealthAssistantView: View {
                     .submitLabel(.send)
                     .onSubmit {
                         guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isProcessing else { return }
-                        Task { await sendMessage() }
+                        startSending()
                     }
                     .accessibilityIdentifier("health-assistant-input")
                 
                 Button {
-                    Task { await sendMessage() }
+                    if isProcessing {
+                        stopResponse()
+                    } else {
+                        startSending()
+                    }
                 } label: {
-                    Image(systemName: "paperplane.fill")
+                    Image(systemName: isProcessing ? "stop.fill" : "paperplane.fill")
                         .foregroundColor(.white)
                         .frame(width: 36, height: 36)
-                        .background(inputText.isEmpty ? Color.gray : Color.blue)
+                        .background(isProcessing ? Color.red : (inputText.isEmpty ? Color.gray : Color.blue))
                         .clipShape(Circle())
-                        .accessibilityLabel("Send Message")
+                        .accessibilityLabel(isProcessing ? "Stop Response" : "Send Message")
                 }
-                .disabled(inputText.isEmpty || isProcessing)
-                .accessibilityIdentifier("health-assistant-send")
+                .disabled(!isProcessing && inputText.isEmpty)
+                .accessibilityIdentifier(isProcessing ? "health-assistant-stop" : "health-assistant-send")
             }
             .padding()
         }
@@ -407,7 +415,29 @@ struct HealthAssistantView: View {
     ) {
         pendingClarification = nil
         inputText = AssistantConversationPolicy.applying(option, to: clarification)
-        Task { await sendMessage() }
+        startSending()
+    }
+
+    @MainActor
+    private func startSending() {
+        guard responseTask == nil else { return }
+        responseTask = Task { @MainActor in
+            await sendMessage()
+            responseTask = nil
+        }
+    }
+
+    @MainActor
+    private func stopResponse() {
+        responseTask?.cancel()
+    }
+
+    @MainActor
+    private func stopAndWaitForResponse() async {
+        let activeResponse = responseTask
+        activeResponse?.cancel()
+        await activeResponse?.value
+        responseTask = nil
     }
     
     private func initializeHealthKit() async {
@@ -501,23 +531,32 @@ struct HealthAssistantView: View {
 
         isProcessing = true
         notice = nil
+        let requestedAIMode = selectedAIMode
 
         let assistantPlaceholder = ChatMessage(role: .assistant, content: "")
         messages.append(assistantPlaceholder)
 
         let healthContext = await OmerHealthContextBuilder.buildSummary(
             for: query,
-            includeHealthContext: selectedAIMode == .onDevice
+            includeHealthContext: requestedAIMode == .onDevice
         )
+        guard !Task.isCancelled else {
+            updateAssistantMessage(id: assistantPlaceholder.id, content: "Response stopped.")
+            notice = AssistantNotice(message: "You stopped this response.", tone: .info)
+            isProcessing = false
+            return
+        }
         let chartAttachment = await HealthChatVisualizationLoader.load(for: query)
         updateAssistantAttachment(id: assistantPlaceholder.id, attachment: chartAttachment)
 
-        if selectedAIMode == .onDevice, appleModelService.availability.isAvailable {
+        if requestedAIMode == .onDevice, appleModelService.availability.isAvailable {
+            let measurement = AssistantRequestMeasurement()
             do {
                 try await appleModelService.streamResponse(
                     to: query,
                     healthContext: healthContext
                 ) { snapshot in
+                    measurement.markFirstResponse()
                     updateAssistantMessage(id: assistantPlaceholder.id, content: snapshot)
                 }
                 if let assistantText = messages.first(where: { $0.id == assistantPlaceholder.id })?.content,
@@ -556,10 +595,32 @@ struct HealthAssistantView: View {
                         }
                     }
                 }
+                await AssistantPerformanceMonitor.shared.record(measurement.event(
+                    provider: .appleOnDevice,
+                    outcome: .completed,
+                    usedHealthContext: healthContext?.isEmpty == false
+                ))
                 onHistoryChanged()
                 isProcessing = false
                 return
+            } catch is CancellationError {
+                await AssistantPerformanceMonitor.shared.record(measurement.event(
+                    provider: .appleOnDevice,
+                    outcome: .cancelled,
+                    usedHealthContext: healthContext?.isEmpty == false
+                ))
+                if messages.first(where: { $0.id == assistantPlaceholder.id })?.content.isEmpty != false {
+                    updateAssistantMessage(id: assistantPlaceholder.id, content: "Response stopped.")
+                }
+                notice = AssistantNotice(message: "You stopped this response.", tone: .info)
+                isProcessing = false
+                return
             } catch {
+                await AssistantPerformanceMonitor.shared.record(measurement.event(
+                    provider: .appleOnDevice,
+                    outcome: .failed,
+                    usedHealthContext: healthContext?.isEmpty == false
+                ))
                 logger.error("Apple on-device generation failed: \(error.localizedDescription)")
                 notice = AssistantNotice(
                     message: "The on-device response stopped. Your question was not sent online. You can retry or manually choose Omer Online.",
@@ -572,7 +633,7 @@ struct HealthAssistantView: View {
                 isProcessing = false
                 return
             }
-        } else if selectedAIMode == .onDevice {
+        } else if requestedAIMode == .onDevice {
             notice = AssistantNotice(
                 message: appleModelService.availability.recoveryGuidance,
                 tone: .warning
@@ -591,6 +652,11 @@ struct HealthAssistantView: View {
     }
 
     private func sendWithOmer(_ query: String, assistantMessageID: UUID) async {
+        let measurement = AssistantRequestMeasurement()
+        let usedHealthContext = HealthSharingConsentPolicy.permits(
+            .relevantHealthSummary,
+            authorization: HealthSharingConsentStore.shared.authorization
+        )
         do {
             try await omerChatService.sendMessage(
                 message: query,
@@ -601,13 +667,39 @@ struct HealthAssistantView: View {
                     self.handleOmerEvent(event, assistantMessageID: assistantMessageID)
                 }
             }
+            measurement.markFirstResponse()
+            await AssistantPerformanceMonitor.shared.record(measurement.event(
+                provider: .omerOnline,
+                outcome: .completed,
+                usedHealthContext: usedHealthContext
+            ))
+        } catch is CancellationError {
+            await AssistantPerformanceMonitor.shared.record(measurement.event(
+                provider: .omerOnline,
+                outcome: .cancelled,
+                usedHealthContext: usedHealthContext
+            ))
+            if messages.first(where: { $0.id == assistantMessageID })?.content.isEmpty != false {
+                updateAssistantMessage(id: assistantMessageID, content: "Response stopped.")
+            }
+            notice = AssistantNotice(message: "You stopped this response.", tone: .info)
         } catch let error as HealthSharingConsentFailure {
+            await AssistantPerformanceMonitor.shared.record(measurement.event(
+                provider: .omerOnline,
+                outcome: .failed,
+                usedHealthContext: usedHealthContext
+            ))
             updateAssistantMessage(
                 id: assistantMessageID,
                 content: error.localizedDescription
             )
             notice = AssistantNotice(message: error.localizedDescription, tone: .warning)
         } catch {
+            await AssistantPerformanceMonitor.shared.record(measurement.event(
+                provider: .omerOnline,
+                outcome: .failed,
+                usedHealthContext: usedHealthContext
+            ))
             let underlyingError = error as NSError
             logger.error(
                 "Omer generation failed [\(underlyingError.domain, privacy: .public):\(underlyingError.code)]: \(error.localizedDescription, privacy: .public)"

@@ -74,6 +74,10 @@ public final class BluetoothHealthService: ObservableObject {
         // Save to HealthKit
         let healthStore = HKHealthStore()
         try await healthStore.save(healthKitSamples)
+
+        for metric in data.affectedMetricKinds {
+            HealthKitCache.shared.clearMetric(metric)
+        }
         
         logger.info("Successfully saved \(healthKitSamples.count) health samples to HealthKit")
     }
@@ -248,5 +252,15 @@ public struct BluetoothHealthData {
         self.weight = weight
         self.systolicPressure = systolicPressure
         self.diastolicPressure = diastolicPressure
+    }
+
+    var affectedMetricKinds: Set<HealthKitService.MetricKind> {
+        var metrics: Set<HealthKitService.MetricKind> = []
+        if oxygenSaturation != nil { metrics.insert(.oxygenSaturation) }
+        if heartRate != nil { metrics.insert(.heartRateAverage) }
+        if weight != nil { metrics.insert(.bodyMass) }
+        if systolicPressure != nil { metrics.insert(.bloodPressureSystolic) }
+        if diastolicPressure != nil { metrics.insert(.bloodPressureDiastolic) }
+        return metrics
     }
 }
