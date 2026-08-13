@@ -32,14 +32,19 @@ enum HealthQueryProcessor {
     }
     
     static func processQuery(_ query: String) async throws -> QueryResult {
-        // Use enhanced query planner for better processing
+        // Structured HealthKit operations always use the validated tool contract.
+        switch QueryPlanner.parseResult(query) {
+        case .valid(let intent):
+            return try await processStructuredQuery(intent)
+        case .invalid(let error):
+            return .textResponse(error.localizedDescription)
+        case .noMatch:
+            break
+        }
+
+        // Broader summaries and guidance use the enhanced planner.
         if let intent = EnhancedQueryPlanner.parse(query) {
             return try await EnhancedQueryPlanner.run(intent: intent)
-        }
-        
-        // Fall back to basic query processing
-        if let intent = QueryPlanner.parse(query) {
-            return try await processStructuredQuery(intent)
         }
         
         // Check for insight-related queries
@@ -52,14 +57,22 @@ enum HealthQueryProcessor {
     }
     
     private static func processStructuredQuery(_ intent: QueryPlanner.Intent) async throws -> QueryResult {
-        switch intent {
-        case let .trend(kind, days):
-            let trend = try await HealthKitService.shared.trend(kind: kind, days: days, useCache: true)
-            return .trend(trend, kind)
+        switch intent.operation {
+        case .trend:
+            let trend = try await HealthKitService.shared.trend(
+                kind: intent.metric,
+                days: intent.windowDays,
+                useCache: true
+            )
+            return .trend(trend, intent.metric)
             
-        case let .compare(kind, windowDays):
-            let comparison = try await HealthKitService.shared.compare(kind: kind, windowDays: windowDays, useCache: true)
-            return .comparison(comparison, kind)
+        case .comparePeriods:
+            let comparison = try await HealthKitService.shared.compare(
+                kind: intent.metric,
+                windowDays: intent.windowDays,
+                useCache: true
+            )
+            return .comparison(comparison, intent.metric)
         }
     }
     

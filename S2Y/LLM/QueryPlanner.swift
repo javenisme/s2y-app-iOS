@@ -9,41 +9,27 @@
 import Foundation
 
 enum QueryPlanner {
-    enum Intent {
-        case compare(kind: HealthKitService.MetricKind, windowDays: Int)
-        case trend(kind: HealthKitService.MetricKind, days: Int)
+    typealias Intent = ValidatedHealthQueryToolRequest
+
+    enum ParseResult: Equatable {
+        case noMatch
+        case valid(Intent)
+        case invalid(HealthQueryToolRequestError)
     }
 
     static func parse(_ text: String) -> Intent? {
+        guard case .valid(let intent) = parseResult(text) else { return nil }
+        return intent
+    }
+
+    static func parseResult(_ text: String) -> ParseResult {
         let lowered = text.lowercased()
+        guard let kind = detectMetric(in: lowered) else { return .noMatch }
 
-        // metric detection
-        let metric: HealthKitService.MetricKind? = {
-            if lowered.contains("步数") || lowered.contains("steps") {
-                return .steps
-            }
-            if lowered.contains("静息心率") || lowered.contains("resting heart") {
-                return .restingHeartRate
-            }
-            if lowered.contains("心率") || lowered.contains("heart rate") {
-                return .heartRateAverage
-            }
-            if lowered.contains("活动能量") || lowered.contains("active energy") || lowered.contains("calorie") {
-                return .activeEnergy
-            }
-            if lowered.contains("体重") || lowered.contains("body mass") || lowered.contains("weight") {
-                return .bodyMass
-            }
-            if lowered.contains("睡眠") || lowered.contains("sleep") {
-                return .sleepDurationHours
-            }
-            return nil
-        }()
-
-        guard let kind = metric else { return nil }
-
-        // window/days detection
         let days: Int = {
+            if let explicitDays = extractExplicitDays(from: lowered) {
+                return explicitDays
+            }
             if lowered.contains("30天") || lowered.contains("30-day") || lowered.contains("30 days") {
                 return 30
             }
@@ -53,43 +39,74 @@ enum QueryPlanner {
             return 7
         }()
 
-        // intent detection
+        let operation: HealthQueryToolRequest.Operation
         let isCompare = lowered.contains("对比") || lowered.contains("compare") || lowered.contains("vs")
         if isCompare {
-            return .compare(kind: kind, windowDays: days)
+            operation = .comparePeriods
+        } else if lowered.contains("趋势") || lowered.contains("trend") || lowered.contains("变化") {
+            operation = .trend
+        } else if lowered.contains("上周") || lowered.contains("last week") {
+            operation = .comparePeriods
+        } else {
+            return .noMatch
         }
 
-        let isTrend = lowered.contains("趋势") || lowered.contains("trend") || lowered.contains("变化")
-        if isTrend {
-            return .trend(kind: kind, days: days)
+        let request = HealthQueryToolRequest(
+            operation: operation,
+            metric: kind,
+            windowDays: days
+        )
+        do {
+            return .valid(try request.validated())
+        } catch let error as HealthQueryToolRequestError {
+            return .invalid(error)
+        } catch {
+            return .noMatch
         }
-
-        // default to compare for common phrasing like "过去7天 ... vs 上周"
-        if lowered.contains("上周") || lowered.contains("last week") {
-            return .compare(kind: kind, windowDays: days)
-        }
-
-        return nil
     }
 
     static func run(intent: Intent) async throws -> String {
-        switch intent {
-        case let .compare(kind, windowDays):
+        switch intent.operation {
+        case .comparePeriods:
             let comparison = try await HealthKitService.shared.compare(
-                kind: kind,
-                windowDays: windowDays,
+                kind: intent.metric,
+                windowDays: intent.windowDays,
                 useCache: true
             )
-            return formatComparison(kind: kind, comparison: comparison)
+            return formatComparison(kind: intent.metric, comparison: comparison)
 
-        case let .trend(kind, days):
+        case .trend:
             let trendResult = try await HealthKitService.shared.trend(
-                kind: kind,
-                days: days,
+                kind: intent.metric,
+                days: intent.windowDays,
                 useCache: true
             )
-            return formatTrend(kind: kind, trend: trendResult)
+            return formatTrend(kind: intent.metric, trend: trendResult)
         }
+    }
+
+    private static func detectMetric(in text: String) -> HealthKitService.MetricKind? {
+        if text.contains("步数") || text.contains("step") { return .steps }
+        if text.contains("静息心率") || text.contains("resting heart") { return .restingHeartRate }
+        if text.contains("心率") || text.contains("heart rate") { return .heartRateAverage }
+        if text.contains("活动能量") || text.contains("active energy") || text.contains("calorie") {
+            return .activeEnergy
+        }
+        if text.contains("体重") || text.contains("body mass") || text.contains("weight") { return .bodyMass }
+        if text.contains("睡眠") || text.contains("sleep") { return .sleepDurationHours }
+        return nil
+    }
+
+    private static func extractExplicitDays(from text: String) -> Int? {
+        guard let expression = try? NSRegularExpression(pattern: #"(\d{1,4})\s*(?:days?|天)"#),
+              let match = expression.firstMatch(
+                in: text,
+                range: NSRange(text.startIndex..., in: text)
+              ),
+              let range = Range(match.range(at: 1), in: text) else {
+            return nil
+        }
+        return Int(text[range])
     }
 
     private static func metricUnit(kind: HealthKitService.MetricKind) -> String {
@@ -127,4 +144,3 @@ enum QueryPlanner {
         return "\(title)\n窗口平均：\(String(format: "%.2f", avg)) \(unit)\n首末变化：\(arrow) \(String(format: "%.1f", abs(rate)))%\n建议：保持良好习惯，必要时逐步调整计划。"
     }
 }
-
