@@ -1410,6 +1410,24 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertTrue(snapshot.items.allSatisfy { !$0.storageDescription.isEmpty })
     }
 
+    func testLocalHealthDataExportIsVersionedAndExcludesRawFHIRFields() throws {
+        let generatedAt = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
+        let package = LocalHealthDataExportPackage(
+            generatedAt: generatedAt,
+            inventory: LocalHealthDataInventorySnapshot(generatedAt: generatedAt, counts: [:]),
+            localChatCache: OmerChatCacheSnapshot(chats: [], details: [])
+        )
+
+        let data = try LocalHealthDataExportService.encodedData(for: package)
+        let json = String(decoding: data, as: UTF8.self)
+
+        XCTAssertTrue(json.contains(#""formatVersion" : 1"#))
+        XCTAssertTrue(json.contains(#""generatedAt""#))
+        XCTAssertTrue(json.contains(#""localChatCache""#))
+        XCTAssertFalse(json.contains("fhirResourceIdentifier"))
+        XCTAssertFalse(json.contains("resourceType"))
+    }
+
     func testRevokingOnDeviceSyncDoesNotRevokeOmerQuestionConsent() {
         var ledger = HealthSharingConsentLedger()
         ledger.apply(.granted, scopes: [.omerChatText, .onDeviceConversationSync])
