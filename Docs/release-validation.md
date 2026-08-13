@@ -107,6 +107,18 @@ Firebase ID Token、健康数据或聊天正文。仓库检查通过不等于 Ap
   Keychain entitlement 提示来自 `CODE_SIGNING_ALLOWED=NO` 的隔离模拟器构建，不代表签名真机验收。
 - 本主题只修复声明与回归保护，不证明 APNs 生产送达、后台唤醒时限、签名或 TestFlight 行为。
 
+## 2026-08-13 发布元数据完整性验收
+
+- HLT-156 将主屏显示名从上游模板名 `Spezi` 改为产品名 `S2Y`，不改变底层 Spezi 框架依赖。
+- HLT-157 替换相机、位置、麦克风、运动和语音识别的模板占位权限说明；语音输入明确由用户选择，
+  ResearchKit 问卷能力明确只在用户选择对应任务时使用，不在弹窗中暗示默认采集。
+- 新增 2 项构建产物回归测试，校验产品显示名、六项敏感权限说明均为 S2Y 文案且不含模板提示；
+  专项测试 2 项、0 失败。
+- 完整 `S2YTests` 实际运行通过：161 项 XCTest 与 6 项 Swift Testing，共 167 项、0 失败；
+  `build-for-testing`、Info.plist 语法和完整 SwiftLint（125 个 Swift 文件、0 违规）通过。
+- 本主题不证明 ResearchKit 的所有可选任务已投入产品，也不扩大采集范围；App Store 权限申报、
+  本地化权限文案、签名 Archive 与 TestFlight 弹窗仍须在发布渠道验收。
+
 ## 2026-08-13 Omer 健康管理安全验证
 
 - Omer PR #13 以 7 个独立故事提交合并，Vercel Preview 检查通过后正常进入
