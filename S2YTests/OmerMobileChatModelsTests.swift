@@ -387,6 +387,35 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertFalse(json.contains("FHIRResourceIdentifier"))
     }
 
+    @MainActor
+    func testClinicalRecordIndexStorePersistsAndClearsLocalSummaryFile() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let fileURL = directory.appendingPathComponent("summary-index.json")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let record = ClinicalRecordSummary(
+            id: UUID(),
+            category: .conditions,
+            displayName: "Example condition",
+            recordedAt: .now,
+            sourceName: "Provider A",
+            hasLinkedFHIRResource: true
+        )
+        let index = ClinicalRecordIndex(records: [record], selectedCategories: [.conditions])
+        let store = ClinicalRecordIndexStore(fileURL: fileURL)
+
+        try store.replace(with: index)
+
+        XCTAssertEqual(store.index, index)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
+        XCTAssertEqual(ClinicalRecordIndexStore(fileURL: fileURL).index, index)
+
+        try store.clear()
+
+        XCTAssertNil(store.index)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
+    }
+
     func testWearableMeasurementsNormalizeUnitsAndPreserveOrigin() throws {
         let date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T18:00:00Z"))
         let input = WearableMeasurementInput(
