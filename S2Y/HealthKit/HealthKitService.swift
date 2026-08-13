@@ -541,6 +541,30 @@ public final class HealthKitService {
         }
     }
 
+    public struct Distribution: Sendable, Codable, Equatable {
+        public let observedCount: Int
+        public let minimum: Double
+        public let firstQuartile: Double
+        public let median: Double
+        public let thirdQuartile: Double
+        public let maximum: Double
+
+        static func summarize(_ values: [Double]) -> Distribution? {
+            let sorted = values.filter(\.isFinite).sorted()
+            guard let minimum = sorted.first, let maximum = sorted.last else {
+                return nil
+            }
+            return Distribution(
+                observedCount: sorted.count,
+                minimum: minimum,
+                firstQuartile: sorted.quantile(0.25),
+                median: sorted.quantile(0.5),
+                thirdQuartile: sorted.quantile(0.75),
+                maximum: maximum
+            )
+        }
+    }
+
     public struct Trend: Sendable, Codable {
         public let windowDays: Int
         public let points: [DailyMetric]
@@ -555,8 +579,29 @@ public final class HealthKitService {
             return Double(observedDays) / Double(expectedDays)
         }
 
+        public var distribution: Distribution? {
+            Distribution.summarize(points.filter(\.isObserved).map(\.value))
+        }
+
+        public func movingAverage(windowDays: Int) -> [MovingAveragePoint] {
+            guard windowDays > 0 else { return [] }
+            return points.indices.map { index in
+                let lowerBound = max(points.startIndex, index - windowDays + 1)
+                let window = points[lowerBound...index]
+                let values = window.compactMap { point in
+                    point.isObserved && point.value.isFinite ? point.value : nil
+                }
+                return MovingAveragePoint(
+                    date: points[index].date,
+                    value: values.isEmpty ? nil : values.average(),
+                    observedDays: values.count,
+                    windowDays: min(windowDays, index + 1)
+                )
+            }
+        }
+
         static func summarize(windowDays: Int, points: [DailyMetric]) -> Trend {
-            let observed = points.filter(\.isObserved)
+            let observed = points.filter { $0.isObserved && $0.value.isFinite }
             let values = observed.map(\.value)
             let average = values.average()
             let changeRate: Double
@@ -574,6 +619,18 @@ public final class HealthKitService {
                 expectedDays: windowDays,
                 dataQuality: .classify(observedDays: observed.count, expectedDays: windowDays)
             )
+        }
+    }
+
+    public struct MovingAveragePoint: Sendable, Codable, Equatable {
+        public let date: Date
+        public let value: Double?
+        public let observedDays: Int
+        public let windowDays: Int
+
+        public var coverageRate: Double {
+            guard windowDays > 0 else { return 0 }
+            return Double(observedDays) / Double(windowDays)
         }
     }
 
@@ -638,7 +695,39 @@ public final class HealthKitService {
         }
     }
 
+    struct ComparisonDateWindows: Equatable {
+        let currentStart: Date
+        let currentEnd: Date
+        let previousStart: Date
+        let previousEnd: Date
+    }
+
+    nonisolated static func comparisonDateWindows(
+        windowDays: Int,
+        endingAt end: Date,
+        calendar: Calendar = .current
+    ) -> ComparisonDateWindows {
+        let days = max(windowDays, 1)
+        let currentEnd = calendar.startOfDay(for: end)
+        let currentStart = calendar.date(byAdding: .day, value: -days + 1, to: currentEnd) ?? currentEnd
+        let previousEnd = calendar.date(byAdding: .day, value: -1, to: currentStart) ?? currentStart
+        let previousStart = calendar.date(byAdding: .day, value: -days + 1, to: previousEnd) ?? previousEnd
+        return ComparisonDateWindows(
+            currentStart: currentStart,
+            currentEnd: currentEnd,
+            previousStart: previousStart,
+            previousEnd: previousEnd
+        )
+    }
+
     public func compare(kind: MetricKind, windowDays: Int, endingAt end: Date = Date(), useCache: Bool = true) async throws -> Comparison {
+        guard windowDays > 0 else {
+            throw NSError(
+                domain: "HealthKit",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Comparison window must include at least one day."]
+            )
+        }
         let cache = HealthKitCache.shared
         let cacheKey = cache.comparisonCacheKey(kind: kind, windowDays: windowDays, endDate: end)
         
@@ -648,14 +737,20 @@ public final class HealthKitService {
             return cached
         }
         
-        let calendar = Calendar.current
-        let endOfDay = calendar.startOfDay(for: end)
-        let startCurrent = calendar.date(byAdding: .day, value: -windowDays + 1, to: endOfDay) ?? endOfDay
-        let endPrev = calendar.date(byAdding: .day, value: -windowDays, to: startCurrent) ?? startCurrent
-        let startPrev = calendar.date(byAdding: .day, value: -windowDays + 1, to: endPrev) ?? endPrev
+        let windows = Self.comparisonDateWindows(windowDays: windowDays, endingAt: end)
 
-        async let current = fetchDailyMetrics(kind: kind, start: startCurrent, end: endOfDay, useCache: useCache)
-        async let previous = fetchDailyMetrics(kind: kind, start: startPrev, end: endPrev, useCache: useCache)
+        async let current = fetchDailyMetrics(
+            kind: kind,
+            start: windows.currentStart,
+            end: windows.currentEnd,
+            useCache: useCache
+        )
+        async let previous = fetchDailyMetrics(
+            kind: kind,
+            start: windows.previousStart,
+            end: windows.previousEnd,
+            useCache: useCache
+        )
 
         let (curSeries, prevSeries) = try await (current, previous)
         let result = Comparison.summarize(
@@ -742,5 +837,16 @@ extension Array where Element == Double {
     func average() -> Double {
         guard !isEmpty else { return 0 }
         return reduce(0, +) / Double(count)
+    }
+
+    func quantile(_ probability: Double) -> Double {
+        guard !isEmpty else { return 0 }
+        let boundedProbability = Swift.min(Swift.max(probability, 0), 1)
+        let position = boundedProbability * Double(count - 1)
+        let lowerIndex = Int(position.rounded(FloatingPointRoundingRule.down))
+        let upperIndex = Int(position.rounded(FloatingPointRoundingRule.up))
+        guard lowerIndex != upperIndex else { return self[lowerIndex] }
+        let fraction = position - Double(lowerIndex)
+        return self[lowerIndex] + ((self[upperIndex] - self[lowerIndex]) * fraction)
     }
 }

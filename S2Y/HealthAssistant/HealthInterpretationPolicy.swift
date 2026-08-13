@@ -41,16 +41,34 @@ enum HealthInterpretationPolicy {
         kind: HealthKitService.MetricKind
     ) -> String {
         let change = trend.changeRate * 100
-        return [
+        var parts = [
             "\(kind.displayName), \(trend.windowDays)-day average: \(kind.formatValue(trend.average)).",
             "First-to-last observed change: \(change.formatted(.number.precision(.fractionLength(1))))%.",
+        ]
+        if let distribution = trend.distribution {
+            parts.append(
+                "Observed median: \(kind.formatValue(distribution.median)); middle 50%: "
+                    + "\(kind.formatValue(distribution.firstQuartile)) to "
+                    + "\(kind.formatValue(distribution.thirdQuartile))."
+            )
+        }
+        let movingWindowDays = min(7, trend.windowDays)
+        if let latestMovingAverage = trend.movingAverage(windowDays: movingWindowDays).last,
+           let value = latestMovingAverage.value {
+            parts.append(
+                "Latest \(movingWindowDays)-day moving average: \(kind.formatValue(value)) "
+                    + "from \(latestMovingAverage.observedDays)/\(latestMovingAverage.windowDays) observed days."
+            )
+        }
+        parts.append(
             coverageDescription(
                 quality: trend.dataQuality,
                 observedDays: trend.observedDays,
                 expectedDays: trend.expectedDays
-            ),
-            wellnessBoundary
-        ].joined(separator: " ")
+            )
+        )
+        parts.append(wellnessBoundary)
+        return parts.joined(separator: " ")
     }
 
     static func comparisonContext(
