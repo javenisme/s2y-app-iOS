@@ -71,13 +71,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "You may login to your existing account. Or create a new one if you don't have one already."
+            "value" : "Sign in to your existing account, or create one if you are new to S2Y."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Du kan logga in på ditt befintliga konto. Eller skapa ett nytt om du inte redan har ett."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录现有账户；如果你是第一次使用 S2Y，也可以创建账户。"
           }
         }
       }
@@ -101,6 +107,12 @@
             "state" : "translated",
             "value" : "Du är redan inloggad med kontot som visas nedan. Fortsätt eller byt konto genom att logga ut."
           }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你已登录下方账户。可以继续使用，或退出登录后切换账户。"
+          }
         }
       }
     },
@@ -109,19 +121,25 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Die Template Application demonstriert die Verwendung des Firebase-Konto-Moduls."
+            "value" : "Mit Ihrem S2Y-Konto nutzen Sie den Health Assistant und Omer Online."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "The Template Application demonstrates the usage of the Firebase Account Module."
+            "value" : "Use your S2Y account for Health Assistant and Omer Online."
           }
         },
         "sv" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Exempelapplikationen visar användningen av Firebasekontomodulen."
+            "value" : "Använd ditt S2Y-konto för hälsoassistenten och Omer Online."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用你的 S2Y 账户连接健康助手与 Omer 在线服务。"
           }
         }
       }
@@ -1751,6 +1769,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ditt konto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的账户"
           }
         }
       }

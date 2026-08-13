@@ -21,7 +21,7 @@
 作为用户，我希望完成引导、账户登录和权限说明，以便明确知道应用将访问什么。
 
 - 验收：引导流程、账户入口、HealthKit 与通知权限说明可用。
-- 证据：现有 Onboarding/Account 模块；生产 Firebase 登录仍属于 US-201 外部验证。
+- 证据：现有 Onboarding/Account 模块；H48 / HLT-161 已移除账户页 Firebase 模板说明，改为明确的 S2Y Health Assistant/Omer 用途并补齐简体中文。生产 Firebase 登录仍属于 US-201 外部验证。
 
 ### US-002：读取并理解自己的 HealthKit 数据
 
@@ -167,7 +167,7 @@
 
 - Archive/签名、TestFlight、隐私清单、崩溃监控、App Store 元数据与回滚流程通过。
 - 仓库证据：H34（HLT-138～141）已提供增量静态质量、应用隐私清单、发布预检和脱敏验收记录。
-- 模拟器证据：H42 / HLT-153 已在独立 iPhone 16e 模拟器实际运行完整 `S2YTests`（当时 163 项、0 失败）并完成应用启动 smoke check；H43 / HLT-154～155 补齐远程通知后台模式与 Spezi 调度任务声明；H44 / HLT-156～158 移除模板显示名和敏感权限占位文案，并将完整测试更新为 167 项、0 失败。该结果不替代 APNs、签名、TestFlight 或真机验收。
+- 模拟器证据：H42 / HLT-153 已在独立 iPhone 16e 模拟器实际运行完整 `S2YTests`（当时 163 项、0 失败）并完成应用启动 smoke check；H43 / HLT-154～155 补齐远程通知后台模式与 Spezi 调度任务声明；H44 / HLT-156～158 移除模板显示名和敏感权限占位文案；H48 / HLT-161 进一步移除实际登录入口的模板说明，并将完整测试更新为 168 项、0 失败。该结果不替代 APNs、签名、TestFlight 或真机验收。
 - 外部缺口：签名 Archive 当前受 Xcode 账户凭据及 Verifiable Health Records profile 能力阻塞；TestFlight 安装、崩溃监控、元数据、回滚和审核尚未验收，不能标记完成。
 - 真机补充证据：H36 / HLT-144 的 Debug 真机构建在越过已锁定依赖的宏信任门后，仍在相同两项签名条件失败；未生成或安装 `.app`。
 

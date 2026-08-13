@@ -35,11 +35,42 @@ final class CriticalLocalizationTests: XCTestCase {
         XCTAssertEqual(translations["Data Controls"], "数据控制")
     }
 
+    func testAccountCopyUsesS2YBrandAndExplainsItsPurpose() throws {
+        let chinese = try chineseTranslations()
+        let englishSubtitle = String(
+            localized: "ACCOUNT_SUBTITLE",
+            bundle: .main,
+            locale: Locale(identifier: "en")
+        )
+        let englishSetupDescription = String(
+            localized: "ACCOUNT_SETUP_DESCRIPTION",
+            bundle: .main,
+            locale: Locale(identifier: "en")
+        )
+
+        XCTAssertEqual(englishSubtitle, "Use your S2Y account for Health Assistant and Omer Online.")
+        XCTAssertEqual(
+            englishSetupDescription,
+            "Sign in to your existing account, or create one if you are new to S2Y."
+        )
+        XCTAssertFalse(englishSubtitle.localizedCaseInsensitiveContains("template"))
+        XCTAssertFalse(englishSubtitle.localizedCaseInsensitiveContains("module"))
+
+        XCTAssertEqual(chinese["Your Account"], "你的账户")
+        XCTAssertEqual(chinese["ACCOUNT_SUBTITLE"], "使用你的 S2Y 账户连接健康助手与 Omer 在线服务。")
+        XCTAssertEqual(chinese["ACCOUNT_SETUP_DESCRIPTION"], "登录现有账户；如果你是第一次使用 S2Y，也可以创建账户。")
+        XCTAssertEqual(chinese["ACCOUNT_SIGNED_IN_DESCRIPTION"], "你已登录下方账户。可以继续使用，或退出登录后切换账户。")
+    }
+
     private func chineseTranslations() throws -> [String: String] {
+        try translations(localization: "zh-Hans")
+    }
+
+    private func translations(localization: String) throws -> [String: String] {
         let bundles = Bundle.allBundles + Bundle.allFrameworks
         let url = try XCTUnwrap(
             bundles.lazy.compactMap {
-                $0.url(forResource: "Localizable", withExtension: "strings", subdirectory: nil, localization: "zh-Hans")
+                $0.url(forResource: "Localizable", withExtension: "strings", subdirectory: nil, localization: localization)
             }.first
         )
         let data = try Data(contentsOf: url)
