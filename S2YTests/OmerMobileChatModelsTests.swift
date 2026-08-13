@@ -1428,6 +1428,22 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertFalse(json.contains("resourceType"))
     }
 
+    @MainActor
+    func testClearingSharingReceiptsAlsoReturnsEveryScopeToDefaultDeny() {
+        let suiteName = "HealthSharingConsentStoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = HealthSharingConsentStore(defaults: defaults)
+        store.set(.omerChatText, granted: true)
+        store.set(.wellbeingCheckInCloudBackup, granted: true)
+
+        store.clear()
+
+        XCTAssertTrue(store.ledger.receipts.isEmpty)
+        XCTAssertTrue(store.authorization.grantedScopes.isEmpty)
+        XCTAssertNil(defaults.data(forKey: "healthSharingConsent.v1"))
+    }
+
     func testRevokingOnDeviceSyncDoesNotRevokeOmerQuestionConsent() {
         var ledger = HealthSharingConsentLedger()
         ledger.apply(.granted, scopes: [.omerChatText, .onDeviceConversationSync])
