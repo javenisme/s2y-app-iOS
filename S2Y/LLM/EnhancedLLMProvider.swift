@@ -368,7 +368,7 @@ public enum LLMError: Error, LocalizedError {
     case authenticationFailed
     case invalidResponse
     case serverError(Int)
-    case unknown(Error)
+    case unknown(any Error)
     
     public var errorDescription: String? {
         switch self {

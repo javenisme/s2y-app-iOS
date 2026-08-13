@@ -337,7 +337,7 @@ struct LocalModelStatus_Simplified {
     let isLoaded: Bool
     let status: LocalHealthModelManager_Simplified.ModelStatus
     let loadingProgress: Double
-    let lastError: LocalizedError?
+    let lastError: (any LocalizedError)?
     
     public var statusDescription: String {
         switch status {

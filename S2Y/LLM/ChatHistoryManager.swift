@@ -390,7 +390,7 @@ extension HealthInsight: Codable {
         case title, titleCN, description, descriptionCN, type, importance, metric
     }
     
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         title = try container.decode(String.self, forKey: .title)
         titleCN = try container.decode(String.self, forKey: .titleCN)
@@ -401,7 +401,7 @@ extension HealthInsight: Codable {
         metric = try container.decodeIfPresent(HealthKitService.MetricKind.self, forKey: .metric)
     }
     
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(title, forKey: .title)
         try container.encode(titleCN, forKey: .titleCN)
