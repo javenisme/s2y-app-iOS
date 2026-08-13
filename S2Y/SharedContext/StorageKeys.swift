@@ -32,8 +32,6 @@ enum StorageKeys {
     static let cloudflareGatewayURL = "cf.gateway-url"
     /// Device-level override for the Cloudflare AI model path. Empty = bundled default.
     static let cloudflareModelPath = "cf.model-path"
-    /// Whether Health Assistant should attach summarized health context to Omer requests.
-    static let omerIncludeHealthContext = "omer.include-health-context"
     /// User-selected Health Assistant inference route: on-device Apple AI or Omer online.
     static let healthAssistantAIMode = "health-assistant.ai-mode"
     /// Enable or disable voice features globally

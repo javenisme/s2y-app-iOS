@@ -13,7 +13,8 @@ struct HealthAssistantSettingsView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var showingCacheClearedAlert = false
-    @AppStorage(StorageKeys.omerIncludeHealthContext) private var omerIncludeHealthContext = true
+    @State private var showingChatCacheClearedAlert = false
+    @StateObject private var sharingConsentStore = HealthSharingConsentStore.shared
 
     init(showsDismissButton: Bool = false) {
         self.showsDismissButton = showsDismissButton
@@ -35,7 +36,20 @@ struct HealthAssistantSettingsView: View {
             }
 
             Section {
-                Toggle("Share Health summary with Omer", isOn: $omerIncludeHealthContext)
+                Toggle(
+                    "Send questions to Omer Online",
+                    isOn: consentBinding(for: .omerChatText)
+                )
+
+                Toggle(
+                    "Share relevant Health summary",
+                    isOn: consentBinding(for: .relevantHealthSummary)
+                )
+
+                Toggle(
+                    "Sync on-device conversations",
+                    isOn: consentBinding(for: .onDeviceConversationSync)
+                )
 
                 NavigationLink {
                     HealthSafetyActivityView()
@@ -45,7 +59,10 @@ struct HealthAssistantSettingsView: View {
             } header: {
                 Text("Privacy")
             } footer: {
-                Text("When Omer Online is selected, this allows a short summary of relevant Health data to be included with your question. On-device analysis stays on your iPhone, while chat history may still sync to your S2Y account.")
+                Text(
+                    "Each sharing choice is independent and can be withdrawn immediately. "
+                        + "On-device analysis stays on this iPhone unless conversation sync is enabled."
+                )
             }
 
             Section("Plan") {
@@ -57,6 +74,13 @@ struct HealthAssistantSettingsView: View {
             }
 
             Section {
+                Button("Clear locally saved chat history", role: .destructive) {
+                    Task {
+                        await OmerChatService.shared.clearLocalChatCache()
+                        showingChatCacheClearedAlert = true
+                    }
+                }
+
                 Button("Clear Health data cache", role: .destructive) {
                     HealthKitCache.shared.clearAll()
                     showingCacheClearedAlert = true
@@ -83,5 +107,24 @@ struct HealthAssistantSettingsView: View {
         } message: {
             Text("Cached Health summaries were removed from this iPhone.")
         }
+        .alert("Local chat history cleared", isPresented: $showingChatCacheClearedAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Locally saved chat copies were removed. This does not delete conversations already synced to your S2Y account.")
+        }
+    }
+
+    private func consentBinding(for scope: HealthSharingScope) -> Binding<Bool> {
+        Binding(
+            get: {
+                HealthSharingConsentPolicy.permits(
+                    scope,
+                    authorization: sharingConsentStore.authorization
+                )
+            },
+            set: { granted in
+                sharingConsentStore.set(scope, granted: granted)
+            }
+        )
     }
 }

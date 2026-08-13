@@ -190,6 +190,20 @@ actor OmerChatService {
         await sessionStore.saveLastChatId(nil, sessionKey: sessionKey(for: serviceURL))
     }
 
+    func clearLocalChatCache() async {
+        chatCache = OmerChatCacheSnapshot(chats: [], details: [])
+        if FileManager.default.fileExists(atPath: cacheURL.path) {
+            do {
+                try FileManager.default.removeItem(at: cacheURL)
+            } catch {
+                logger.error("Failed to clear local chat cache: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        if let serviceURL = try? configuredServiceURL() {
+            await sessionStore.saveLastChatId(nil, sessionKey: sessionKey(for: serviceURL))
+        }
+    }
+
     func syncOnDeviceExchange(
         userMessageID: UUID,
         userText: String,

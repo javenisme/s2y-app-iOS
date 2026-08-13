@@ -1146,6 +1146,18 @@ final class OmerMobileChatModelsTests: XCTestCase {
         }
     }
 
+    func testRevokingOnDeviceSyncDoesNotRevokeOmerQuestionConsent() {
+        var ledger = HealthSharingConsentLedger()
+        ledger.apply(.granted, scopes: [.omerChatText, .onDeviceConversationSync])
+        ledger.apply(.revoked, scopes: [.onDeviceConversationSync])
+
+        let authorization = ledger.authorization()
+        XCTAssertTrue(HealthSharingConsentPolicy.permits(.omerChatText, authorization: authorization))
+        XCTAssertFalse(
+            HealthSharingConsentPolicy.permits(.onDeviceConversationSync, authorization: authorization)
+        )
+    }
+
     private func validatedWellnessSession() throws -> ValidatedWellnessSession {
         let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
         let deviceID = UUID()

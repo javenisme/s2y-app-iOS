@@ -87,7 +87,6 @@ struct HealthAssistantView: View {
     @State private var availableSuggestionMetrics: Set<HealthKitService.MetricKind> = []
     @State private var didLoadSuggestionAvailability = false
     @FocusState private var isInputFocused: Bool
-    @AppStorage(StorageKeys.omerIncludeHealthContext) private var omerIncludeHealthContext = true
     @AppStorage(StorageKeys.healthAssistantAIMode) private var aiModeRawValue = AssistantAIMode.onDevice.rawValue
 
     private let newChatRequestID: UUID
@@ -468,7 +467,7 @@ struct HealthAssistantView: View {
 
         let healthContext = await OmerHealthContextBuilder.buildSummary(
             for: query,
-            includeHealthContext: omerIncludeHealthContext
+            includeHealthContext: selectedAIMode == .onDevice
         )
         let chartAttachment = await HealthChatVisualizationLoader.load(for: query)
         updateAssistantAttachment(id: assistantPlaceholder.id, attachment: chartAttachment)
@@ -552,7 +551,7 @@ struct HealthAssistantView: View {
             try await omerChatService.sendMessage(
                 message: query,
                 authorization: HealthSharingConsentStore.shared.authorization,
-                includeHealthContext: omerIncludeHealthContext
+                includeHealthContext: true
             ) { event in
                 Task { @MainActor in
                     self.handleOmerEvent(event, assistantMessageID: assistantMessageID)
