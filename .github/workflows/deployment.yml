@@ -131,6 +131,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Validate identifiers and production endpoints
         run: Scripts/validate_release_configuration.sh
+      - name: Check public production endpoints
+        run: Scripts/check_public_production_endpoints.sh
   buildandtest:
     name: Build and Test
     needs: [determineenvironment, releaseconfiguration]

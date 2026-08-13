@@ -22,6 +22,11 @@ without printing credential values that:
 - retired `chat-bak.s2y.us` and embedded test-account material do not remain in
   executable/configuration paths.
 
+The workflow also runs `Scripts/check_public_production_endpoints.sh`. It verifies
+only that the public login page responds and that an unauthenticated Omer mobile
+request is rejected. It never follows an authenticated flow or prints response
+headers, cookies, tokens, or bodies.
+
 The repository previously contained an embedded development-account password.
 It has been removed from the current tree. Any account that ever used that value
 must be treated as compromised and rotated or deleted because Git history is not
