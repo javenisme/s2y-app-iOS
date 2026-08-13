@@ -208,7 +208,16 @@ struct WellnessPlanSettingsView: View {
                     Text(action.detail).font(.caption).foregroundStyle(.secondary)
                     Text("\(action.daysPerWeek) days/week · about \(action.estimatedMinutes) min")
                         .font(.caption2).foregroundStyle(.tertiary)
+                    if plan.status == .draft {
+                        Button(action.confirmedAt == nil ? "Include this action" : "Included") {
+                            toggleActionConfirmation(action, in: plan)
+                        }
+                        .font(.caption)
+                    }
                 }
+            }
+            .onDelete { offsets in
+                removeActions(at: offsets, from: plan)
             }
             if plan.status == .draft {
                 Button("Review complete — activate plan") {
@@ -218,6 +227,8 @@ struct WellnessPlanSettingsView: View {
                         errorMessage = "Review and confirm every personal goal before activation."
                     } catch WellnessPlanTransitionError.invalidGoal {
                         errorMessage = "A goal has an invalid value, unit, or review date. Edit it before activation."
+                    } catch WellnessPlanTransitionError.unconfirmedAction {
+                        errorMessage = "Choose which suggested actions to include before activation."
                     } catch {
                         errorMessage = "Add at least one personal goal and keep at least one optional action before activation."
                     }
@@ -373,6 +384,25 @@ struct WellnessPlanSettingsView: View {
         var updated = plan
         updated.goals = updated.goals.enumerated().compactMap { index, goal in
             offsets.contains(index) ? nil : goal
+        }
+        updated.updatedAt = .now
+        planStore.save(updated)
+    }
+
+    private func toggleActionConfirmation(_ action: WellnessAction, in plan: WellnessPlan) {
+        guard plan.status == .draft,
+              let index = plan.actions.firstIndex(where: { $0.id == action.id }) else { return }
+        var updated = plan
+        updated.actions[index].confirmedAt = action.confirmedAt == nil ? .now : nil
+        updated.updatedAt = .now
+        planStore.save(updated)
+    }
+
+    private func removeActions(at offsets: IndexSet, from plan: WellnessPlan) {
+        guard plan.status == .draft else { return }
+        var updated = plan
+        updated.actions = updated.actions.enumerated().compactMap { index, action in
+            offsets.contains(index) ? nil : action
         }
         updated.updatedAt = .now
         planStore.save(updated)
