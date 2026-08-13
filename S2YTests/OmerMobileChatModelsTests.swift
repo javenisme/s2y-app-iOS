@@ -923,6 +923,33 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(WellnessDailySchedule.actions(for: active, on: date), [action])
     }
 
+    func testWellnessActionsUseUserSelectedWeekdays() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let sunday = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-09T12:00:00Z"))
+        let monday = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: sunday))
+        let action = WellnessAction(
+            title: "Monday reflection",
+            detail: "A user-selected schedule",
+            category: .checkIn,
+            daysPerWeek: 1,
+            estimatedMinutes: 2,
+            confirmedAt: sunday,
+            scheduledWeekdays: [2]
+        )
+        let plan = WellnessPlan(
+            title: "Plan",
+            summary: "Summary",
+            status: .active,
+            origin: .userCreated,
+            goals: [],
+            actions: [action]
+        )
+
+        XCTAssertTrue(WellnessDailySchedule.actions(for: plan, on: sunday, calendar: calendar).isEmpty)
+        XCTAssertEqual(WellnessDailySchedule.actions(for: plan, on: monday, calendar: calendar), [action])
+    }
+
     func testWeeklyReviewKeepsMissingRecordsSeparateFromSkipped() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))

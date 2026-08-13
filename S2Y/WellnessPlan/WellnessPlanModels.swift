@@ -77,6 +77,9 @@ public struct WellnessAction: Codable, Identifiable, Sendable, Equatable {
     public var estimatedMinutes: Int
     public var isOptional: Bool
     public var confirmedAt: Date?
+    public var scheduledWeekdays: Set<Int>?
+    public var reminderHour: Int?
+    public var reminderMinute: Int?
 
     public init(
         id: UUID = UUID(),
@@ -86,22 +89,40 @@ public struct WellnessAction: Codable, Identifiable, Sendable, Equatable {
         daysPerWeek: Int,
         estimatedMinutes: Int,
         isOptional: Bool = false,
-        confirmedAt: Date? = nil
+        confirmedAt: Date? = nil,
+        scheduledWeekdays: Set<Int>? = nil,
+        reminderHour: Int? = nil,
+        reminderMinute: Int? = nil
     ) {
         self.id = id
         self.title = title
         self.detail = detail
         self.category = category
-        self.daysPerWeek = min(7, max(1, daysPerWeek))
+        let validWeekdays = scheduledWeekdays?.filter { (1...7).contains($0) }
+        self.scheduledWeekdays = validWeekdays?.isEmpty == false ? validWeekdays : nil
+        self.daysPerWeek = self.scheduledWeekdays?.count ?? min(7, max(1, daysPerWeek))
         self.estimatedMinutes = max(1, estimatedMinutes)
         self.isOptional = isOptional
         self.confirmedAt = confirmedAt
+        self.reminderHour = reminderHour
+        self.reminderMinute = reminderMinute
     }
 
     public func confirmed(at date: Date = .now) -> WellnessAction {
         var copy = self
         copy.confirmedAt = date
         return copy
+    }
+
+    public var effectiveWeekdays: Set<Int> {
+        if let scheduledWeekdays, !scheduledWeekdays.isEmpty {
+            return scheduledWeekdays
+        }
+        return Set(1...daysPerWeek)
+    }
+
+    public var hasReminder: Bool {
+        reminderHour != nil && reminderMinute != nil
     }
 }
 
@@ -161,6 +182,7 @@ public enum WellnessPlanTransitionError: Error, Equatable {
     case unconfirmedGoal
     case unconfirmedAction
     case invalidGoal
+    case invalidAction
 }
 
 public enum WellnessPlanLifecycle {
@@ -184,6 +206,15 @@ public enum WellnessPlanLifecycle {
                 || goal.confirmedAt.map { goal.reviewDate < $0 } == true
         }) {
             throw WellnessPlanTransitionError.invalidGoal
+        }
+        if status == .active, plan.actions.contains(where: { action in
+            action.effectiveWeekdays.isEmpty
+                || !action.effectiveWeekdays.allSatisfy { (1...7).contains($0) }
+                || (action.reminderHour == nil) != (action.reminderMinute == nil)
+                || action.reminderHour.map { !(0...23).contains($0) } == true
+                || action.reminderMinute.map { !(0...59).contains($0) } == true
+        }) {
+            throw WellnessPlanTransitionError.invalidAction
         }
         let allowed: Set<WellnessPlan.Status>
         switch plan.status {

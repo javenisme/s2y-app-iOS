@@ -31,9 +31,7 @@ enum WellnessDailySchedule {
     ) -> [WellnessAction] {
         guard plan.status == .active else { return [] }
         let weekday = calendar.component(.weekday, from: date)
-        return plan.actions.filter { action in
-            action.daysPerWeek >= 7 || weekday <= action.daysPerWeek
-        }
+        return plan.actions.filter { $0.effectiveWeekdays.contains(weekday) }
     }
 }
 
