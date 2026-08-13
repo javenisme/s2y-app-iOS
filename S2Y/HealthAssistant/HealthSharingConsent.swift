@@ -31,6 +31,26 @@ public enum HealthSharingDecision: Sendable, Equatable {
     case denied(missingScopes: Set<HealthSharingScope>)
 }
 
+public struct HealthSharingConsentFailure: LocalizedError, Sendable, Equatable {
+    public let missingScopes: Set<HealthSharingScope>
+
+    public var errorDescription: String? {
+        "Review Health Assistant privacy settings before sharing: "
+            + missingScopes.map(\.displayName).sorted().joined(separator: ", ")
+            + "."
+    }
+}
+
+private extension HealthSharingScope {
+    var displayName: String {
+        switch self {
+        case .omerChatText: "Omer chat text"
+        case .relevantHealthSummary: "relevant Health summary"
+        case .onDeviceConversationSync: "on-device conversation sync"
+        }
+    }
+}
+
 /// Default-deny policy for every payload that can leave the iPhone.
 public enum HealthSharingConsentPolicy {
     public static let currentVersion = "2026-08-12"
@@ -48,6 +68,18 @@ public enum HealthSharingConsentPolicy {
         authorization: HealthSharingAuthorization
     ) -> Bool {
         decision(requestedScopes: [scope], authorization: authorization) == .allowed
+    }
+
+    public static func require(
+        _ scopes: Set<HealthSharingScope>,
+        authorization: HealthSharingAuthorization
+    ) throws {
+        if case let .denied(missingScopes) = decision(
+            requestedScopes: scopes,
+            authorization: authorization
+        ) {
+            throw HealthSharingConsentFailure(missingScopes: missingScopes)
+        }
     }
 }
 

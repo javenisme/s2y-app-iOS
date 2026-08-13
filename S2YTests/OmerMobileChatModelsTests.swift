@@ -1127,6 +1127,25 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(ledger.receipts.count, 2)
     }
 
+    func testHealthSharingConsentRequirementReportsOnlyMissingScopes() throws {
+        let authorization = HealthSharingAuthorization(grantedScopes: [.omerChatText])
+
+        XCTAssertNoThrow(
+            try HealthSharingConsentPolicy.require([.omerChatText], authorization: authorization)
+        )
+        XCTAssertThrowsError(
+            try HealthSharingConsentPolicy.require(
+                [.omerChatText, .relevantHealthSummary],
+                authorization: authorization
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? HealthSharingConsentFailure,
+                HealthSharingConsentFailure(missingScopes: [.relevantHealthSummary])
+            )
+        }
+    }
+
     private func validatedWellnessSession() throws -> ValidatedWellnessSession {
         let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
         let deviceID = UUID()
