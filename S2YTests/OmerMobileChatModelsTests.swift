@@ -1073,6 +1073,91 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertTrue(log.events.isEmpty)
     }
 
+    func testHealthSharingConsentDefaultsToDenyForEveryScope() {
+        let authorization = HealthSharingAuthorization()
+
+        for scope in HealthSharingScope.allCases {
+            XCTAssertFalse(HealthSharingConsentPolicy.permits(scope, authorization: authorization))
+        }
+    }
+
+    func testHealthSharingScopesAreGrantedIndependently() {
+        let authorization = HealthSharingAuthorization(grantedScopes: [.omerChatText])
+
+        XCTAssertTrue(HealthSharingConsentPolicy.permits(.omerChatText, authorization: authorization))
+        XCTAssertFalse(HealthSharingConsentPolicy.permits(.relevantHealthSummary, authorization: authorization))
+        XCTAssertFalse(HealthSharingConsentPolicy.permits(.onDeviceConversationSync, authorization: authorization))
+        XCTAssertEqual(
+            HealthSharingConsentPolicy.decision(
+                requestedScopes: [.omerChatText, .relevantHealthSummary],
+                authorization: authorization
+            ),
+            .denied(missingScopes: [.relevantHealthSummary])
+        )
+    }
+
+    func testHealthSharingConsentReceiptSupportsImmediateRevocation() {
+        var ledger = HealthSharingConsentLedger()
+        ledger.apply(.granted, scopes: [.omerChatText, .relevantHealthSummary])
+        ledger.apply(.revoked, scopes: [.relevantHealthSummary])
+
+        let authorization = ledger.authorization()
+        XCTAssertTrue(authorization.grantedScopes.contains(.omerChatText))
+        XCTAssertFalse(authorization.grantedScopes.contains(.relevantHealthSummary))
+        XCTAssertEqual(ledger.receipts.first?.change, .revoked)
+    }
+
+    func testHealthSharingConsentDoesNotCarryAcrossPolicyVersions() {
+        var ledger = HealthSharingConsentLedger()
+        ledger.apply(
+            .granted,
+            scopes: [.omerChatText],
+            policyVersion: "previous-version"
+        )
+
+        XCTAssertTrue(ledger.authorization().grantedScopes.isEmpty)
+    }
+
+    func testHealthSharingConsentLedgerBoundsReceiptHistory() {
+        var ledger = HealthSharingConsentLedger(maximumReceiptCount: 2)
+        ledger.apply(.granted, scopes: [.omerChatText])
+        ledger.apply(.granted, scopes: [.relevantHealthSummary])
+        ledger.apply(.revoked, scopes: [.omerChatText])
+
+        XCTAssertEqual(ledger.receipts.count, 2)
+    }
+
+    func testHealthSharingConsentRequirementReportsOnlyMissingScopes() throws {
+        let authorization = HealthSharingAuthorization(grantedScopes: [.omerChatText])
+
+        XCTAssertNoThrow(
+            try HealthSharingConsentPolicy.require([.omerChatText], authorization: authorization)
+        )
+        XCTAssertThrowsError(
+            try HealthSharingConsentPolicy.require(
+                [.omerChatText, .relevantHealthSummary],
+                authorization: authorization
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? HealthSharingConsentFailure,
+                HealthSharingConsentFailure(missingScopes: [.relevantHealthSummary])
+            )
+        }
+    }
+
+    func testRevokingOnDeviceSyncDoesNotRevokeOmerQuestionConsent() {
+        var ledger = HealthSharingConsentLedger()
+        ledger.apply(.granted, scopes: [.omerChatText, .onDeviceConversationSync])
+        ledger.apply(.revoked, scopes: [.onDeviceConversationSync])
+
+        let authorization = ledger.authorization()
+        XCTAssertTrue(HealthSharingConsentPolicy.permits(.omerChatText, authorization: authorization))
+        XCTAssertFalse(
+            HealthSharingConsentPolicy.permits(.onDeviceConversationSync, authorization: authorization)
+        )
+    }
+
     private func validatedWellnessSession() throws -> ValidatedWellnessSession {
         let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-12T20:00:00Z"))
         let deviceID = UUID()

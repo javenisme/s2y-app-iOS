@@ -34,16 +34,21 @@ actor OmerChatService {
 
     func sendMessage(
         message: String,
+        authorization: HealthSharingAuthorization,
         includeHealthContext: Bool,
         onEvent: @escaping @Sendable (OmerChatStreamEvent) -> Void
     ) async throws {
+        try HealthSharingConsentPolicy.require([.omerChatText], authorization: authorization)
         let serviceURL = try configuredServiceURL()
         let sessionKey = sessionKey(for: serviceURL)
         let conversationID = await existingOrNewConversationID(sessionKey: sessionKey)
         let requestID = UUID()
         let healthContext = await OmerHealthContextBuilder.buildSummary(
             for: message,
-            includeHealthContext: includeHealthContext
+            includeHealthContext: includeHealthContext && HealthSharingConsentPolicy.permits(
+                .relevantHealthSummary,
+                authorization: authorization
+            )
         )
         let body = OmerMobileChatRequest(
             requestId: requestID,
@@ -185,12 +190,28 @@ actor OmerChatService {
         await sessionStore.saveLastChatId(nil, sessionKey: sessionKey(for: serviceURL))
     }
 
+    func clearLocalChatCache() async {
+        chatCache = OmerChatCacheSnapshot(chats: [], details: [])
+        if FileManager.default.fileExists(atPath: cacheURL.path) {
+            do {
+                try FileManager.default.removeItem(at: cacheURL)
+            } catch {
+                logger.error("Failed to clear local chat cache: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        if let serviceURL = try? configuredServiceURL() {
+            await sessionStore.saveLastChatId(nil, sessionKey: sessionKey(for: serviceURL))
+        }
+    }
+
     func syncOnDeviceExchange(
         userMessageID: UUID,
         userText: String,
         assistantMessageID: UUID,
-        assistantText: String
+        assistantText: String,
+        authorization: HealthSharingAuthorization
     ) async throws -> OmerLocalChatSyncResponse {
+        try HealthSharingConsentPolicy.require([.onDeviceConversationSync], authorization: authorization)
         let serviceURL = try configuredServiceURL()
         let key = sessionKey(for: serviceURL)
         let conversationID = await existingOrNewConversationID(sessionKey: key)
@@ -220,6 +241,26 @@ actor OmerChatService {
         )
         await sessionStore.saveLastChatId(response.conversationId.uuidString, sessionKey: key)
         return response
+    }
+
+    func saveOnDeviceExchangeLocally(
+        userMessageID: UUID,
+        userText: String,
+        assistantMessageID: UUID,
+        assistantText: String
+    ) async throws {
+        let serviceURL = try configuredServiceURL()
+        let key = sessionKey(for: serviceURL)
+        let conversationID = await existingOrNewConversationID(sessionKey: key)
+        cacheExchange(
+            conversationID: conversationID,
+            userMessageID: userMessageID,
+            userText: userText,
+            assistantMessageID: assistantMessageID,
+            assistantText: assistantText,
+            visibility: "private-local"
+        )
+        await sessionStore.saveLastChatId(conversationID.uuidString, sessionKey: key)
     }
 
     private func cacheExchange(

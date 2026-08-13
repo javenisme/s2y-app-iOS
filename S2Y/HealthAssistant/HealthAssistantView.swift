@@ -87,7 +87,6 @@ struct HealthAssistantView: View {
     @State private var availableSuggestionMetrics: Set<HealthKitService.MetricKind> = []
     @State private var didLoadSuggestionAvailability = false
     @FocusState private var isInputFocused: Bool
-    @AppStorage(StorageKeys.omerIncludeHealthContext) private var omerIncludeHealthContext = true
     @AppStorage(StorageKeys.healthAssistantAIMode) private var aiModeRawValue = AssistantAIMode.onDevice.rawValue
 
     private let newChatRequestID: UUID
@@ -468,7 +467,7 @@ struct HealthAssistantView: View {
 
         let healthContext = await OmerHealthContextBuilder.buildSummary(
             for: query,
-            includeHealthContext: omerIncludeHealthContext
+            includeHealthContext: selectedAIMode == .onDevice
         )
         let chartAttachment = await HealthChatVisualizationLoader.load(for: query)
         updateAssistantAttachment(id: assistantPlaceholder.id, attachment: chartAttachment)
@@ -483,19 +482,38 @@ struct HealthAssistantView: View {
                 }
                 if let assistantText = messages.first(where: { $0.id == assistantPlaceholder.id })?.content,
                    !assistantText.isEmpty {
+                    let authorization = HealthSharingConsentStore.shared.authorization
                     do {
-                        _ = try await omerChatService.syncOnDeviceExchange(
+                        try await omerChatService.saveOnDeviceExchangeLocally(
                             userMessageID: userMessage.id,
                             userText: query,
                             assistantMessageID: assistantPlaceholder.id,
                             assistantText: assistantText
                         )
                     } catch {
-                        logger.error("On-device chat sync failed: \(error.localizedDescription)")
+                        logger.error("Local on-device chat save failed: \(error.localizedDescription)")
                         notice = AssistantNotice(
-                            message: "The answer is available on this iPhone, but could not sync to your S2Y history yet.",
+                            message: "The answer is visible now, but could not be added to local history.",
                             tone: .warning
                         )
+                    }
+
+                    if HealthSharingConsentPolicy.permits(.onDeviceConversationSync, authorization: authorization) {
+                        do {
+                            _ = try await omerChatService.syncOnDeviceExchange(
+                                userMessageID: userMessage.id,
+                                userText: query,
+                                assistantMessageID: assistantPlaceholder.id,
+                                assistantText: assistantText,
+                                authorization: authorization
+                            )
+                        } catch {
+                            logger.error("On-device chat sync failed: \(error.localizedDescription)")
+                            notice = AssistantNotice(
+                                message: "The answer is saved on this iPhone, but could not sync to your S2Y account yet.",
+                                tone: .warning
+                            )
+                        }
                     }
                 }
                 onHistoryChanged()
@@ -532,12 +550,19 @@ struct HealthAssistantView: View {
         do {
             try await omerChatService.sendMessage(
                 message: query,
-                includeHealthContext: omerIncludeHealthContext
+                authorization: HealthSharingConsentStore.shared.authorization,
+                includeHealthContext: true
             ) { event in
                 Task { @MainActor in
                     self.handleOmerEvent(event, assistantMessageID: assistantMessageID)
                 }
             }
+        } catch let error as HealthSharingConsentFailure {
+            updateAssistantMessage(
+                id: assistantMessageID,
+                content: error.localizedDescription
+            )
+            notice = AssistantNotice(message: error.localizedDescription, tone: .warning)
         } catch {
             let underlyingError = error as NSError
             logger.error(
