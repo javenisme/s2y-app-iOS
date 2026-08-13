@@ -271,11 +271,14 @@ struct HealthAssistantView: View {
                         HStack {
                             ProgressView()
                                 .scaleEffect(0.8)
+                                .accessibilityHidden(true)
                             Text("Analyzing your health data...")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                         .padding()
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Assistant is analyzing your health data")
                     }
                 }
                 .padding()
@@ -326,6 +329,8 @@ struct HealthAssistantView: View {
                         .font(.caption.weight(.semibold))
                 }
                 .accessibilityLabel("AI provider")
+                .accessibilityValue(selectedAIMode.title)
+                .accessibilityHint("Opens a menu to choose on-device or Omer online AI")
                 .accessibilityIdentifier("health-assistant-ai-mode")
                 Spacer()
                 Text(selectedAIMode.dataBoundaryDescription)
@@ -357,12 +362,14 @@ struct HealthAssistantView: View {
                 } label: {
                     Image(systemName: isProcessing ? "stop.fill" : "paperplane.fill")
                         .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                         .background(isProcessing ? Color.red : (inputText.isEmpty ? Color.gray : Color.blue))
                         .clipShape(Circle())
-                        .accessibilityLabel(isProcessing ? "Stop Response" : "Send Message")
+                        .accessibilityHidden(true)
                 }
                 .disabled(!isProcessing && inputText.isEmpty)
+                .accessibilityLabel(isProcessing ? "Stop Response" : "Send Message")
+                .accessibilityHint(isProcessing ? "Stops the current AI response" : "Sends your health question")
                 .accessibilityIdentifier(isProcessing ? "health-assistant-stop" : "health-assistant-send")
             }
             .padding()
@@ -379,11 +386,12 @@ struct HealthAssistantView: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: notice.tone.systemImage)
                 .foregroundColor(notice.tone.tint)
-                .accessibilityLabel(notice.tone.accessibilityLabel)
+                .accessibilityHidden(true)
 
             Text(notice.message)
                 .font(.subheadline)
                 .foregroundStyle(.primary)
+                .accessibilityLabel("\(notice.tone.accessibilityLabel): \(notice.message)")
             Spacer()
 
             Button("Dismiss") {
@@ -816,7 +824,7 @@ struct HealthAssistantView: View {
                 .foregroundStyle(.red)
                 .frame(width: 44, height: 44)
                 .background(Color.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .accessibilityLabel("Health Assistant Icon")
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 5) {
                 Text("Ask about your health")
@@ -1116,6 +1124,8 @@ struct MessageBubble: View {
                     }
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel(message.role == .user ? "Your message" : "Assistant response")
             
             if message.role == .assistant {
                 Spacer(minLength: 60)
@@ -1234,5 +1244,7 @@ private struct QuickQueryRow: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(suggestion.title)
+        .accessibilityHint("Places this question in the message field")
     }
 }

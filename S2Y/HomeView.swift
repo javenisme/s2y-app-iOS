@@ -162,6 +162,7 @@ struct HomeView: View {
 
         return selectedContent
             .environment(\.homeDrawerProgress, drawerProgress)
+            .accessibilityHidden(isDrawerOpen)
             .overlay {
                 if isDrawerOpen {
                     Color.black
@@ -246,6 +247,7 @@ struct HomeView: View {
             }
         }
         .frame(width: width, alignment: .leading)
+        .accessibilityHidden(!isDrawerOpen)
         .padding(.top, 20)
         .padding(.bottom, 16)
         .background(
@@ -278,6 +280,7 @@ struct HomeView: View {
                         Image(systemName: "heart.text.square.fill")
                             .font(.title3)
                             .foregroundStyle(.red)
+                            .accessibilityHidden(true)
                     }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -322,6 +325,7 @@ struct HomeView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "bubble.left")
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                     Text(chat.title)
                         .font(.subheadline)
                         .foregroundStyle(.primary)
@@ -363,6 +367,7 @@ struct HomeView: View {
                         Image(systemName: tab.systemImage)
                             .font(.title3)
                             .foregroundStyle(tab.tint)
+                            .accessibilityHidden(true)
                     }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -380,6 +385,7 @@ struct HomeView: View {
                 if selectedTab == tab {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(tab.tint)
+                        .accessibilityHidden(true)
                 }
             }
             .padding(.horizontal, 18)
@@ -391,6 +397,8 @@ struct HomeView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(tab.title)
+        .accessibilityValue(selectedTab == tab ? "Selected" : "")
+        .accessibilityAddTraits(selectedTab == tab ? .isSelected : [])
         .accessibilityIdentifier(tab == .contact ? "drawer.account" : "drawer.\(tab.rawValue)")
         .padding(.horizontal, 14)
     }

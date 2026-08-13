@@ -65,8 +65,9 @@ struct HealthSummaryExportView: View {
 
             if let errorMessage {
                 Section {
-                    Text(errorMessage)
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
+                        .accessibilityElement(children: .combine)
                 }
             }
         }
@@ -152,6 +153,7 @@ private struct HealthSummaryPDFPreview: View {
                         ShareLink(item: pdf.url) {
                             Label("Share", systemImage: "square.and.arrow.up")
                         }
+                        .accessibilityHint("Opens the system share sheet for this health summary")
                     }
                 }
                 .safeAreaInset(edge: .bottom) {
@@ -180,6 +182,7 @@ private struct HealthSummaryPDFView: UIViewRepresentable {
         view.autoScales = true
         view.displayMode = .singlePageContinuous
         view.displayDirection = .vertical
+        view.accessibilityLabel = "Health summary PDF preview"
         return view
     }
 
