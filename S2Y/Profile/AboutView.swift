@@ -13,7 +13,7 @@ enum S2YPublicLinks {
     static let sourceCode = "https://github.com/javenisme/s2y-app-iOS"
     static let reportIssue = "https://github.com/javenisme/s2y-app-iOS/issues/new"
     static let privacyPolicy = "https://www.s2y.us/privacy-policy"
-    static let privacyPolicyURL: URL = "https://www.s2y.us/privacy-policy"
+    static let privacyPolicyURL = URL(string: privacyPolicy) ?? URL(fileURLWithPath: "/")
     static let termsOfService = "https://www.s2y.us/terms-service"
     static let consumerHealthDataPrivacy = "https://www.s2y.us/consumer-health-data-privacy"
     static let openSourceLicense = "https://opensource.org/license/mit/"
