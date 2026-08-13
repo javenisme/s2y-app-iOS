@@ -122,7 +122,7 @@ public struct LocalGenerateParameters: Sendable {
 /// Protocol for underlying model implementation
 /// Allows swapping between MLX, llama.cpp, CoreML backends
 public protocol LLMModelContainer: Sendable {
-    func generate(prompt: String, parameters: LocalGenerateParameters) -> AsyncThrowingStream<String, Error>
+    func generate(prompt: String, parameters: LocalGenerateParameters) -> AsyncThrowingStream<String, any Error>
 }
 
 // ============================================================
@@ -132,7 +132,7 @@ public protocol LLMModelContainer: Sendable {
 /// A lightweight mock container to validate the end-to-end pipeline in Simulator
 public struct MockLLMContainer: LLMModelContainer {
     public init() {}
-    public func generate(prompt: String, parameters: LocalGenerateParameters) -> AsyncThrowingStream<String, Error> {
+    public func generate(prompt: String, parameters: LocalGenerateParameters) -> AsyncThrowingStream<String, any Error> {
         AsyncThrowingStream { continuation in
             Task {
                 // Simulate token-by-token streaming
@@ -322,7 +322,7 @@ public final class LocalLLMService: ObservableObject, @unchecked Sendable {
     public func generate(
         prompt: String,
         parameters: LocalGenerateParameters = LocalGenerateParameters()
-    ) -> AsyncThrowingStream<String, Error> {
+    ) -> AsyncThrowingStream<String, any Error> {
         AsyncThrowingStream { [weak self] continuation in
             Task { [weak self] in
                 guard let self = self else {
@@ -379,7 +379,7 @@ public final class LocalLLMService: ObservableObject, @unchecked Sendable {
     
     /// Quick smoke test to validate local model pipeline on Simulator/Device
     @discardableResult
-    public func runSmokeTest(prompt: String = "Hello, how are my steps today?") async -> Result<String, Error> {
+    public func runSmokeTest(prompt: String = "Hello, how are my steps today?") async -> Result<String, any Error> {
         do {
             try await loadModel(.phi3_5Mini)
             let output = try await generateComplete(prompt: prompt, parameters: LocalGenerateParameters(maxTokens: 64))

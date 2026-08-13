@@ -25,7 +25,7 @@ class LocalHealthModelManager {
     private(set) var isModelLoaded = false
     private(set) var loadingProgress: Double = 0.0
     private(set) var modelStatus: ModelStatus = .notLoaded
-    private(set) var lastError: LocalizedError?
+    private(set) var lastError: (any LocalizedError)?
     
     // MARK: - Private Properties
     private var model: LMModel?

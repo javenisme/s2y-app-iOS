@@ -14,7 +14,7 @@ final class LLMOrchestrator: ObservableObject {
     // State (optional observables)
     @Published private(set) var isLocalLoaded: Bool = false
     @Published private(set) var currentLocalModel: LocalModelConfig?
-    @Published private(set) var lastError: Error?
+    @Published private(set) var lastError: (any Error)?
     
     private init() {}
     
@@ -22,14 +22,9 @@ final class LLMOrchestrator: ObservableObject {
     
     /// Complete a message using local model if available, otherwise fall back to cloud.
     func complete(message: String, includeContext: Bool) async throws -> LLMResponse {
-        // If we're in environments that only provide mock local backends, bypass local and use cloud
-        #if DEBUG
-        return try await cloudProvider.sendMessage(message, includeContext: includeContext)
-        #else
-        #if targetEnvironment(simulator)
-        return try await cloudProvider.sendMessage(message, includeContext: includeContext)
-        #endif
-        #endif
+        if shouldBypassLegacyLocalBackend {
+            return try await cloudProvider.sendMessage(message, includeContext: includeContext)
+        }
         
         // Ensure local model is prepared (lazy)
         if !localService.isModelLoaded {
@@ -61,21 +56,19 @@ final class LLMOrchestrator: ObservableObject {
     /// Prepare a local model (optional preloading). Automatically selects a model based on available RAM.
     func prepareLocalModelIfNeeded() async {
         guard !localService.isModelLoaded else {
-            await MainActor.run { self.isLocalLoaded = true }
+            isLocalLoaded = true
             return
         }
         
         let target = selectModelForDevice()
         do {
             try await localService.loadModel(target)
-            await MainActor.run {
-                self.isLocalLoaded = self.localService.isModelLoaded
-                self.currentLocalModel = target
-                self.lastError = nil
-            }
+            isLocalLoaded = localService.isModelLoaded
+            currentLocalModel = target
+            lastError = nil
             logger.info("Local model loaded: \(target.rawValue)")
         } catch {
-            await MainActor.run { self.lastError = error }
+            lastError = error
             logger.error("Failed to load local model: \(error.localizedDescription)")
         }
     }
@@ -83,10 +76,8 @@ final class LLMOrchestrator: ObservableObject {
     /// Unload local model to free memory
     func unloadLocalModel() async {
         await localService.unloadModel()
-        await MainActor.run {
-            self.isLocalLoaded = false
-            self.currentLocalModel = nil
-        }
+        isLocalLoaded = false
+        currentLocalModel = nil
     }
     
     // MARK: - Model selection
@@ -97,5 +88,14 @@ final class LLMOrchestrator: ObservableObject {
         if ramGB >= 8 { return .llama3_8b }
         return .phi4Mini
     }
-}
 
+    private var shouldBypassLegacyLocalBackend: Bool {
+        #if DEBUG
+        true
+        #elseif targetEnvironment(simulator)
+        true
+        #else
+        false
+        #endif
+    }
+}

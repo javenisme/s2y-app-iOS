@@ -22,7 +22,7 @@ class LocalHealthModelManager_Simplified {
     private(set) var isModelLoaded = false
     private(set) var loadingProgress: Double = 0.0
     private(set) var modelStatus: ModelStatus = .notLoaded
-    private(set) var lastError: LocalizedError?
+    private(set) var lastError: (any LocalizedError)?
     
     // MARK: - Private Properties
     private let logger = Logger(subsystem: "S2Y", category: "LocalModel")
@@ -114,7 +114,7 @@ class LocalHealthModelManager_Simplified {
             
         } catch {
             logger.error("❌ Failed to load model: \(error.localizedDescription)")
-            if let le = error as? LocalizedError {
+            if let le = error as? any LocalizedError {
                 lastError = le
             } else {
                 lastError = ModelError.loadingFailed(error.localizedDescription)
@@ -130,7 +130,7 @@ class LocalHealthModelManager_Simplified {
         }
         
         guard isModelLoaded, case .loaded = modelStatus else {
-            throw ModelError.modelNotLoaded as Error
+            throw ModelError.modelNotLoaded as any Error
         }
     }
     

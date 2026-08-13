@@ -433,7 +433,9 @@ final class MLXModelDownloadManager: ObservableObject {
     
     private func startProgressTimer() {
         progressTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateProgress()
+            Task { @MainActor [weak self] in
+                self?.updateProgress()
+            }
         }
     }
     
