@@ -28,6 +28,12 @@ struct AccountSheet: View {
                 if account.signedIn && !isInSetup {
                     AccountOverview(close: .showCloseButton) {
                         NavigationLink {
+                            CloudHealthDataLifecycleView()
+                        } label: {
+                            Text("Cloud Data and Deletion Scope")
+                        }
+
+                        NavigationLink {
                             ContributionsList(projectLicense: .mit)
                         } label: {
                             Text("License Information")
