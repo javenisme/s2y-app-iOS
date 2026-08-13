@@ -1454,6 +1454,23 @@ final class OmerMobileChatModelsTests: XCTestCase {
         )
     }
 
+    func testCloudDataLifecycleDeclaresVerifiedDeletionEntryPoints() {
+        XCTAssertEqual(CloudHealthDataLifecycle.capabilities.count, 2)
+        XCTAssertEqual(
+            CloudHealthDataLifecycle.capabilities.first { $0.service == .firebaseAccount }?.deletionScope,
+            .account
+        )
+        XCTAssertEqual(
+            CloudHealthDataLifecycle.capabilities.first { $0.service == .omer }?.deletionScope,
+            .individualConversation
+        )
+        XCTAssertTrue(
+            CloudHealthDataLifecycle.capabilities.allSatisfy {
+                !$0.storedDataDescription.isEmpty && !$0.deletionEntryPoint.isEmpty
+            }
+        )
+    }
+
     @MainActor
     func testClearingSharingReceiptsAlsoReturnsEveryScopeToDefaultDeny() {
         let suiteName = "HealthSharingConsentStoreTests.\(UUID().uuidString)"
