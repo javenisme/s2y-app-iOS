@@ -23,6 +23,7 @@ struct OmerMobileChatRequest: Encodable {
     let agentId: String
     let message: Message
     let locale: String
+    let consentPolicyVersion: String
     let healthContext: [String: String]?
     let client: Client
 }
@@ -60,7 +61,26 @@ struct OmerLocalChatSyncRequest: Encodable {
     let requestId: UUID
     let conversationId: UUID
     let source: String
+    let consentPolicyVersion: String
     let messages: [Message]
+}
+
+struct OmerHealthSharingConsentReceiptRequest: Encodable {
+    let id: UUID
+    let policyVersion: String
+    let change: String
+    let changedScopes: [String]
+    let resultingScopes: [String]
+    let recordedAt: String
+
+    init(receipt: HealthSharingConsentReceipt) {
+        self.id = receipt.id
+        self.policyVersion = receipt.policyVersion
+        self.change = receipt.change.rawValue
+        self.changedScopes = receipt.changedScopes.map(\.rawValue).sorted()
+        self.resultingScopes = receipt.resultingAuthorization.grantedScopes.map(\.rawValue).sorted()
+        self.recordedAt = ISO8601DateFormatter().string(from: receipt.recordedAt)
+    }
 }
 
 struct OmerLocalChatSyncResponse: Decodable {

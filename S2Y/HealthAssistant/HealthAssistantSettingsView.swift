@@ -13,6 +13,7 @@ struct HealthAssistantSettingsView: View {
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var sharingConsentStore = HealthSharingConsentStore.shared
+    @State private var consentSyncMessage: String?
 
     private var appleModelAvailability: AppleFoundationModelAvailability {
         AppleFoundationModelService.shared.availability
@@ -85,13 +86,19 @@ struct HealthAssistantSettingsView: View {
             } header: {
                 Text("Privacy")
             } footer: {
-                Text(
-                    "Each sharing choice is independent and can be withdrawn immediately. "
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(
+                        "Each sharing choice is independent and can be withdrawn immediately. "
                         + "Clinical record summaries are never included under the general Health summary choice. "
                         + "Imported document excerpts have their own sharing choice. "
                         + "Check-in account backup and Omer analysis are separate choices. "
                         + "On-device analysis stays on this iPhone unless conversation sync is enabled."
-                )
+                    )
+                    if let consentSyncMessage {
+                        Text(consentSyncMessage)
+                            .foregroundStyle(.orange)
+                    }
+                }
             }
 
             Section("Plan") {
@@ -161,6 +168,14 @@ struct HealthAssistantSettingsView: View {
             },
             set: { granted in
                 sharingConsentStore.set(scope, granted: granted)
+                consentSyncMessage = nil
+                Task {
+                    do {
+                        try await OmerChatService.shared.syncHealthSharingConsentReceipts()
+                    } catch {
+                        consentSyncMessage = "This choice is applied on this iPhone. Cloud confirmation is pending until Omer is reachable."
+                    }
+                }
             }
         )
     }

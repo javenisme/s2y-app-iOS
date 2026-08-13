@@ -178,9 +178,22 @@ final class HealthSharingConsentStore: ObservableObject {
         ledger.authorization()
     }
 
-    func set(_ scope: HealthSharingScope, granted: Bool, at date: Date = .now) {
-        ledger.apply(granted ? .granted : .revoked, scopes: [scope], at: date)
+    @discardableResult
+    func set(_ scope: HealthSharingScope, granted: Bool, at date: Date = .now) -> HealthSharingConsentReceipt {
+        let receipt = ledger.apply(granted ? .granted : .revoked, scopes: [scope], at: date)
         persist()
+        return receipt
+    }
+
+    @discardableResult
+    func revokeAll(at date: Date = .now) -> HealthSharingConsentReceipt? {
+        let scopes = authorization.grantedScopes
+        guard !scopes.isEmpty else {
+            return nil
+        }
+        let receipt = ledger.apply(.revoked, scopes: scopes, at: date)
+        persist()
+        return receipt
     }
 
     func clear() {

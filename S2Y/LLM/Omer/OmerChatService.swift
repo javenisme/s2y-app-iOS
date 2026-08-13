@@ -21,6 +21,7 @@ actor OmerChatService {
     private let encoder = JSONEncoder()
     private let cacheURL: URL
     private var chatCache: OmerChatCacheSnapshot
+    private var synchronizedConsentReceiptIDs: Set<UUID> = []
 
     private init() {
         let applicationSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -39,8 +40,9 @@ actor OmerChatService {
         importedDocumentContext: String?,
         onEvent: @escaping @Sendable (OmerChatStreamEvent) -> Void
     ) async throws {
-        try HealthSharingConsentPolicy.require([.omerChatText], authorization: authorization)
         let serviceURL = try configuredServiceURL()
+        try await syncHealthSharingConsentReceipts(serviceURL: serviceURL)
+        try HealthSharingConsentPolicy.require([.omerChatText], authorization: authorization)
         let sessionKey = sessionKey(for: serviceURL)
         let conversationID = await existingOrNewConversationID(sessionKey: sessionKey)
         let requestID = UUID()
@@ -85,6 +87,7 @@ actor OmerChatService {
             agentId: Self.defaultAgentID,
             message: .init(id: UUID(), text: message),
             locale: Locale.current.identifier,
+            consentPolicyVersion: HealthSharingConsentPolicy.currentVersion,
             healthContext: healthContext,
             client: .init(
                 platform: "ios",
@@ -256,8 +259,9 @@ actor OmerChatService {
         authorization: HealthSharingAuthorization,
         conversationID requestedConversationID: UUID? = nil
     ) async throws -> OmerLocalChatSyncResponse {
-        try HealthSharingConsentPolicy.require([.onDeviceConversationSync], authorization: authorization)
         let serviceURL = try configuredServiceURL()
+        try await syncHealthSharingConsentReceipts(serviceURL: serviceURL)
+        try HealthSharingConsentPolicy.require([.onDeviceConversationSync], authorization: authorization)
         let key = sessionKey(for: serviceURL)
         let conversationID: UUID
         if let requestedConversationID {
@@ -269,6 +273,7 @@ actor OmerChatService {
             requestId: UUID(),
             conversationId: conversationID,
             source: "ios-on-device",
+            consentPolicyVersion: HealthSharingConsentPolicy.currentVersion,
             messages: [
                 .init(id: userMessageID, role: "user", content: userText),
                 .init(id: assistantMessageID, role: "assistant", content: assistantText)
@@ -294,15 +299,17 @@ actor OmerChatService {
     }
 
     func syncPendingOnDeviceChats(authorization: HealthSharingAuthorization) async throws -> Int {
+        let serviceURL = try configuredServiceURL()
+        try await syncHealthSharingConsentReceipts(serviceURL: serviceURL)
         try HealthSharingConsentPolicy.require([.onDeviceConversationSync], authorization: authorization)
         let pending = chatCache.details.filter { $0.chat.visibility == "private-local" }
         var synchronized = 0
         for detail in pending {
-            let serviceURL = try configuredServiceURL()
             let request = OmerLocalChatSyncRequest(
                 requestId: UUID(),
                 conversationId: detail.chat.id,
                 source: "ios-on-device",
+                consentPolicyVersion: HealthSharingConsentPolicy.currentVersion,
                 messages: detail.messages.map {
                     .init(id: $0.id, role: $0.role, content: $0.content)
                 }
@@ -509,6 +516,48 @@ actor OmerChatService {
         let (data, response) = try await URLSession.shared.data(for: request)
         try validate(response: response, data: data)
         return try decoder.decode(OmerLocalChatSyncResponse.self, from: data)
+    }
+
+    func syncHealthSharingConsentReceipts() async throws {
+        try await syncHealthSharingConsentReceipts(serviceURL: configuredServiceURL())
+    }
+
+    private func syncHealthSharingConsentReceipts(serviceURL: URL) async throws {
+        let receipts = await MainActor.run {
+            Array(HealthSharingConsentStore.shared.ledger.receipts.reversed())
+        }
+        for receipt in receipts where !synchronizedConsentReceiptIDs.contains(receipt.id) {
+            let body = OmerHealthSharingConsentReceiptRequest(receipt: receipt)
+            do {
+                try await performConsentReceiptRequest(
+                    body,
+                    serviceURL: serviceURL,
+                    forceTokenRefresh: false
+                )
+            } catch OmerChatServiceError.unauthorized {
+                try await performConsentReceiptRequest(
+                    body,
+                    serviceURL: serviceURL,
+                    forceTokenRefresh: true
+                )
+            }
+            synchronizedConsentReceiptIDs.insert(receipt.id)
+        }
+    }
+
+    private func performConsentReceiptRequest(
+        _ body: OmerHealthSharingConsentReceiptRequest,
+        serviceURL: URL,
+        forceTokenRefresh: Bool
+    ) async throws {
+        let token = try await firebaseIDToken(forceRefresh: forceTokenRefresh)
+        var request = URLRequest(url: serviceURL.appendingPathComponent("api/mobile/v1/consents"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try encoder.encode(body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data)
     }
 
     private func performChatRequest(
