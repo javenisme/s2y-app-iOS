@@ -923,6 +923,121 @@ final class OmerMobileChatModelsTests: XCTestCase {
         XCTAssertEqual(WellnessDailySchedule.actions(for: active, on: date), [action])
     }
 
+    func testWellnessActionsUseUserSelectedWeekdays() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        let sunday = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-08-09T12:00:00Z"))
+        let monday = try XCTUnwrap(calendar.date(byAdding: .day, value: 1, to: sunday))
+        let action = WellnessAction(
+            title: "Monday reflection",
+            detail: "A user-selected schedule",
+            category: .checkIn,
+            daysPerWeek: 1,
+            estimatedMinutes: 2,
+            confirmedAt: sunday,
+            scheduledWeekdays: [2]
+        )
+        let plan = WellnessPlan(
+            title: "Plan",
+            summary: "Summary",
+            status: .active,
+            origin: .userCreated,
+            goals: [],
+            actions: [action]
+        )
+
+        XCTAssertTrue(WellnessDailySchedule.actions(for: plan, on: sunday, calendar: calendar).isEmpty)
+        XCTAssertEqual(WellnessDailySchedule.actions(for: plan, on: monday, calendar: calendar), [action])
+    }
+
+    func testWellnessNotificationPlannerUsesGenericPrivateCopy() {
+        let planID = UUID()
+        let actionID = UUID()
+        let privateDetail = "Discuss a sensitive symptom"
+        let plan = WellnessPlan(
+            id: planID,
+            title: "Private plan",
+            summary: "Private summary",
+            status: .active,
+            origin: .userCreated,
+            goals: [],
+            actions: [WellnessAction(
+                id: actionID,
+                title: "Sensitive action title",
+                detail: privateDetail,
+                category: .checkIn,
+                daysPerWeek: 2,
+                estimatedMinutes: 2,
+                confirmedAt: .now,
+                scheduledWeekdays: [2, 6],
+                reminderHour: 19,
+                reminderMinute: 30
+            )]
+        )
+
+        let requests = WellnessNotificationPlanner.requests(for: plan)
+
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertEqual(requests.map(\.dateComponents.weekday), [2, 6])
+        XCTAssertTrue(requests.allSatisfy { $0.dateComponents.hour == 19 && $0.dateComponents.minute == 30 })
+        XCTAssertTrue(requests.allSatisfy { !$0.body.contains(privateDetail) })
+        XCTAssertTrue(requests.allSatisfy {
+            $0.identifier.hasPrefix(WellnessNotificationPlanner.identifierPrefix(for: planID))
+        })
+    }
+
+    func testInactivePlanProducesNoWellnessNotifications() {
+        let plan = WellnessPlan(
+            title: "Draft",
+            summary: "Not active",
+            origin: .userCreated,
+            goals: [],
+            actions: [WellnessAction(
+                title: "Action",
+                detail: "Detail",
+                category: .checkIn,
+                daysPerWeek: 1,
+                estimatedMinutes: 1,
+                scheduledWeekdays: [1],
+                reminderHour: 9,
+                reminderMinute: 0
+            )]
+        )
+
+        XCTAssertTrue(WellnessNotificationPlanner.requests(for: plan).isEmpty)
+    }
+
+    func testWellnessPlanRejectsPartialReminderConfiguration() {
+        let date = Date.now
+        let plan = WellnessPlan(
+            title: "Invalid reminder",
+            summary: "Missing minutes",
+            origin: .userCreated,
+            goals: [.userSelected(
+                metricKind: .steps,
+                direction: .consistency,
+                targetValue: nil,
+                reviewDate: date.addingTimeInterval(86_400),
+                confirmedAt: date
+            )],
+            actions: [WellnessAction(
+                title: "Action",
+                detail: "Detail",
+                category: .checkIn,
+                daysPerWeek: 1,
+                estimatedMinutes: 1,
+                confirmedAt: date,
+                scheduledWeekdays: [2],
+                reminderHour: 9,
+                reminderMinute: nil
+            )]
+        )
+
+        XCTAssertThrowsError(try WellnessPlanLifecycle.transition(plan, to: .active)) { error in
+            XCTAssertEqual(error as? WellnessPlanTransitionError, .invalidAction)
+        }
+    }
+
     func testWeeklyReviewKeepsMissingRecordsSeparateFromSkipped() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "UTC"))
