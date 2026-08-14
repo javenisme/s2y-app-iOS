@@ -51,6 +51,29 @@ struct OmerBillingStatus: Decodable, Equatable, Sendable {
     let remainingTokens: Int
 }
 
+struct OmerMembershipStatus: Decodable, Equatable, Sendable {
+    struct AIUsage: Decodable, Equatable, Sendable {
+        let usedTokens: Int
+        let monthlyTokenLimit: Int
+        let remainingTokens: Int
+    }
+
+    struct Rewards: Decodable, Equatable, Sendable {
+        let points: Int
+        let qualifiedReferrals: Int
+        let referralCode: String
+        let shareUrl: URL
+    }
+
+    let plan: String
+    let subscriptionStatus: String
+    let billingInterval: String?
+    let currentPeriodEnd: String?
+    let ai: AIUsage
+    let rewards: Rewards
+    let manageUrl: URL
+}
+
 struct OmerLocalChatSyncRequest: Encodable {
     struct Message: Encodable {
         let id: UUID

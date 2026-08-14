@@ -17,6 +17,9 @@ struct HealthAssistantSettingsView: View {
     @State private var omerAuthorization: HealthSharingAuthorization?
     @State private var isCheckingOmerAuthorization = false
     @State private var consentSyncRequestID = UUID()
+    @State private var membership: OmerMembershipStatus?
+    @State private var membershipMessage: String?
+    @State private var isLoadingMembership = false
 
     private var appleModelAvailability: AppleFoundationModelAvailability {
         AppleFoundationModelService.shared.availability
@@ -44,6 +47,8 @@ struct HealthAssistantSettingsView: View {
                 )
             }
 
+            membershipSection
+
             privacySection
 
             planSection
@@ -63,6 +68,62 @@ struct HealthAssistantSettingsView: View {
         }
         .task {
             startConsentSynchronization()
+            await loadMembership()
+        }
+    }
+
+    @ViewBuilder private var membershipSection: some View {
+        Section {
+            if let membership {
+                LabeledContent("Membership", value: membership.plan.capitalized)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Omer AI this month")
+                        Spacer()
+                        Text("\(membership.ai.remainingTokens.formatted()) tokens left")
+                            .foregroundStyle(.secondary)
+                    }
+                    ProgressView(
+                        value: Double(membership.ai.usedTokens),
+                        total: Double(max(membership.ai.monthlyTokenLimit, 1))
+                    )
+                }
+                .accessibilityElement(children: .combine)
+
+                LabeledContent(
+                    "Reward credit",
+                    value: (Double(membership.rewards.points) / 100).formatted(.currency(code: "USD"))
+                )
+
+                ShareLink(item: membership.rewards.shareUrl) {
+                    Label("Invite someone to S2Y", systemImage: "square.and.arrow.up")
+                }
+
+                Link(destination: membership.manageUrl) {
+                    Label("Manage Membership", systemImage: "creditcard")
+                }
+            } else if isLoadingMembership {
+                HStack {
+                    ProgressView()
+                    Text("Loading membership…")
+                }
+            } else {
+                Button("Refresh Membership", systemImage: "arrow.clockwise") {
+                    Task { await loadMembership() }
+                }
+            }
+        } header: {
+            Text("S2Y Account")
+        } footer: {
+            if let membershipMessage {
+                Text(membershipMessage)
+                    .foregroundStyle(.orange)
+            } else {
+                Text(
+                    "Your Omer AI allowance, membership, and referral rewards use the same S2Y account. "
+                        + "Available reward credit is applied when you start checkout."
+                )
+            }
         }
     }
 
@@ -237,6 +298,18 @@ struct HealthAssistantSettingsView: View {
                 consentSyncMessage = "This choice is applied on this iPhone. Cloud confirmation is pending until Omer is reachable."
             }
         }
+    }
+
+    private func loadMembership() async {
+        isLoadingMembership = true
+        membershipMessage = nil
+        do {
+            membership = try await OmerChatService.shared.fetchMembership()
+        } catch {
+            membership = nil
+            membershipMessage = "Sign in and connect to Omer to load your S2Y membership."
+        }
+        isLoadingMembership = false
     }
 }
 

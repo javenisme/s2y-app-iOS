@@ -204,6 +204,14 @@ actor OmerChatService {
         return detail
     }
 
+    func fetchMembership() async throws -> OmerMembershipStatus {
+        let serviceURL = try configuredServiceURL()
+        let data = try await authenticatedGET(
+            url: serviceURL.appendingPathComponent("api/mobile/membership")
+        )
+        return try decoder.decode(OmerMembershipStatus.self, from: data)
+    }
+
     func deleteChat(id: UUID) async throws {
         let serviceURL = try configuredServiceURL()
         let url = serviceURL
