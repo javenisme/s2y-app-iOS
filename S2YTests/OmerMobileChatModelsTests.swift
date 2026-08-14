@@ -9,6 +9,38 @@
 import XCTest
 
 final class OmerMobileChatModelsTests: XCTestCase {
+    func testMembershipDecodesUnifiedCommercialState() throws {
+        let data = Data(
+            """
+            {
+              "plan": "pro",
+              "subscriptionStatus": "active",
+              "billingInterval": "monthly",
+              "currentPeriodEnd": "2026-09-14T00:00:00.000Z",
+              "ai": {
+                "usedTokens": 2500,
+                "monthlyTokenLimit": 2000000,
+                "remainingTokens": 1997500
+              },
+              "rewards": {
+                "points": 500,
+                "qualifiedReferrals": 1,
+                "referralCode": "S2YCODE",
+                "shareUrl": "https://s2yhealth.com/?ref=S2YCODE"
+              },
+              "manageUrl": "https://chat.s2y.us/pricing"
+            }
+            """.utf8
+        )
+
+        let status = try JSONDecoder().decode(OmerMembershipStatus.self, from: data)
+
+        XCTAssertEqual(status.plan, "pro")
+        XCTAssertEqual(status.ai.remainingTokens, 1_997_500)
+        XCTAssertEqual(status.rewards.points, 500)
+        XCTAssertEqual(status.rewards.referralCode, "S2YCODE")
+    }
+
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
 
